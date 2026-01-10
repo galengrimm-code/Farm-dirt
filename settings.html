@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soil Sample Analysis - Settings</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .settings-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+    .settings-card {
+      background: white;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .settings-card h3 {
+      margin: 0 0 1rem 0;
+      padding-bottom: 0.75rem;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .threshold-grid {
+      display: grid;
+      gap: 1rem;
+    }
+    .threshold-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem;
+      background: #f8fafc;
+      border-radius: 0.375rem;
+      flex-wrap: wrap;
+    }
+    .threshold-row .name {
+      flex: 1;
+      min-width: 150px;
+      font-weight: 600;
+      color: #374151;
+    }
+    .threshold-row .inputs {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .threshold-row input {
+      width: 70px;
+      padding: 0.5rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 0.25rem;
+      text-align: center;
+    }
+    .threshold-row .unit {
+      color: #64748b;
+      font-size: 0.875rem;
+      min-width: 40px;
+    }
+    .threshold-row .note {
+      font-size: 0.75rem;
+      color: #64748b;
+      font-style: italic;
+    }
+    .api-setup {
+      background: #fffbeb;
+      border: 2px solid #f59e0b;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .api-setup h4 {
+      margin: 0 0 0.75rem 0;
+      color: #92400e;
+    }
+    .api-setup ol {
+      margin: 0;
+      padding-left: 1.25rem;
+      color: #78350f;
+      font-size: 0.875rem;
+    }
+    .api-setup li {
+      margin-bottom: 0.5rem;
+    }
+    .api-setup code {
+      background: #fef3c7;
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+      font-size: 0.8125rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <div class="top-bar">
+      <div>
+        <h1>⚙️ Settings</h1>
+        <p>Configure thresholds and preferences</p>
+      </div>
+      <nav class="nav-links">
+        <a href="index.html" class="nav-link">📍 Map</a>
+        <a href="analysis.html" class="nav-link">📊 Analysis</a>
+        <a href="import.html" class="nav-link">📁 Import</a>
+        <a href="settings.html" class="nav-link active">⚙️ Settings</a>
+      </nav>
+      <div class="auth-section">
+        <span class="user-info" id="userInfo"></span>
+        <button class="sign-in-btn" id="authBtn" onclick="handleAuth()">Sign In with Google</button>
+      </div>
+    </div>
+
+    <div class="settings-container">
+      <!-- API Setup Guide -->
+      <div class="api-setup">
+        <h4>🔧 Google Sheets Setup</h4>
+        <ol>
+          <li>Go to <a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a></li>
+          <li>Create a project and enable the <strong>Google Sheets API</strong></li>
+          <li>Create credentials → OAuth 2.0 Client ID → Web application</li>
+          <li>Add your domain to authorized JavaScript origins</li>
+          <li>Copy Client ID and API Key to <code>js/config.js</code></li>
+          <li>Create a Google Sheet with 3 tabs: <code>Fields</code>, <code>Samples</code>, <code>Settings</code></li>
+          <li>Copy Sheet ID to <code>js/config.js</code></li>
+        </ol>
+      </div>
+
+      <!-- pH Section -->
+      <div class="settings-card">
+        <h3>🧪 pH</h3>
+        <div class="threshold-grid">
+          <div class="threshold-row">
+            <span class="name">Optimal Range</span>
+            <div class="inputs">
+              <input type="number" id="pH_min" step="0.1" value="6.3">
+              <span>to</span>
+              <input type="number" id="pH_max" step="0.1" value="6.9">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Macronutrients -->
+      <div class="settings-card">
+        <h3>🌿 Macronutrients</h3>
+        <div class="threshold-grid">
+          <div class="threshold-row">
+            <span class="name">Phosphorus (P)</span>
+            <div class="inputs">
+              <span>Min:</span>
+              <input type="number" id="P_min" value="20">
+              <span class="unit">ppm</span>
+            </div>
+          </div>
+          <div class="threshold-row">
+            <span class="name">Potassium (K)</span>
+            <div class="inputs">
+              <span>Min:</span>
+              <input type="number" id="K_min" value="150">
+              <span class="unit">ppm</span>
+            </div>
+          </div>
+          <div class="threshold-row">
+            <span class="name">Organic Matter (OM)</span>
+            <div class="inputs">
+              <span>Min:</span>
+              <input type="number" id="OM_min" step="0.1" value="3.0">
+              <span class="unit">%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Base Saturation -->
+      <div class="settings-card">
+        <h3>⚖️ Base Saturation</h3>
+        <div class="threshold-grid">
+          <div class="threshold-row">
+            <span class="name">Calcium (Ca)</span>
+            <div class="inputs">
+              <input type="number" id="Ca_sat_min" value="65">
+              <span>to</span>
+              <input type="number" id="Ca_sat_max" value="75">
+              <span class="unit">%</span>
+            </div>
+          </div>
+          <div class="threshold-row">
+            <span class="name">Magnesium (Mg)</span>
+            <div class="inputs">
+              <input type="number" id="Mg_sat_min" step="0.1" value="12">
+              <span>to</span>
+              <input type="number" id="Mg_sat_max" step="0.1" value="15">
+              <span class="unit">%</span>
+            </div>
+            <span class="note">* Lower is better</span>
+          </div>
+          <div class="threshold-row">
+            <span class="name">Potassium (K)</span>
+            <div class="inputs">
+              <span>Min:</span>
+              <input type="number" id="K_sat_min" step="0.1" value="3.0">
+              <span class="unit">%</span>
+            </div>
+          </div>
+          <div class="threshold-row">
+            <span class="name">Hydrogen (H)</span>
+            <div class="inputs">
+              <span>Max:</span>
+              <input type="number" id="H_sat_max" step="0.1" value="5.0">
+              <span class="unit">%</span>
+            </div>
+            <span class="note">* Lower is better</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Display Settings -->
+      <div class="settings-card">
+        <h3>🎨 Display</h3>
+        <div class="threshold-grid">
+          <div class="threshold-row">
+            <span class="name">Buffer Zone</span>
+            <div class="inputs">
+              <input type="number" id="bufferPercent" value="25">
+              <span class="unit">%</span>
+            </div>
+            <span class="note">Yellow warning zone width</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Save Button -->
+      <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        <button class="button primary" id="saveBtn" style="flex: 1;">
+          💾 Save Settings
+        </button>
+        <button class="button" id="resetBtn" style="flex: 1;">
+          🔄 Reset to Defaults
+        </button>
+      </div>
+    </div>
+
+    <div id="statusMessage"></div>
+  </div>
+
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/sheets-api.js"></script>
+  
+  <script>
+    const defaults = {
+      pH_min: 6.3, pH_max: 6.9,
+      P_min: 20, K_min: 150, OM_min: 3.0,
+      Ca_sat_min: 65, Ca_sat_max: 75,
+      Mg_sat_min: 12, Mg_sat_max: 15,
+      K_sat_min: 3.0, H_sat_max: 5.0,
+      bufferPercent: 25
+    };
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      loadSettings();
+      
+      try {
+        await SheetsAPI.init();
+        SheetsAPI.onSignInChange = handleSignInChange;
+        handleSignInChange(SheetsAPI.isSignedIn);
+      } catch (e) {
+        console.warn('Google API not configured:', e);
+      }
+      
+      document.getElementById('saveBtn').addEventListener('click', saveSettings);
+      document.getElementById('resetBtn').addEventListener('click', resetSettings);
+    });
+
+    async function handleAuth() {
+      if (SheetsAPI.isSignedIn) await SheetsAPI.signOut();
+      else await SheetsAPI.signIn();
+    }
+
+    function handleSignInChange(isSignedIn) {
+      const authBtn = document.getElementById('authBtn');
+      const userInfo = document.getElementById('userInfo');
+      if (isSignedIn) {
+        const profile = gapi.auth2.getAuthInstance().currentUser.get().getBasicProfile();
+        userInfo.textContent = profile.getName();
+        authBtn.textContent = 'Sign Out';
+      } else {
+        userInfo.textContent = '';
+        authBtn.textContent = 'Sign In with Google';
+      }
+    }
+
+    function loadSettings() {
+      try {
+        const saved = localStorage.getItem('soilSettings');
+        const settings = saved ? JSON.parse(saved) : defaults;
+        
+        Object.entries(settings).forEach(([key, value]) => {
+          const input = document.getElementById(key);
+          if (input) input.value = value;
+        });
+      } catch (e) {
+        console.error('Error loading settings:', e);
+      }
+    }
+
+    function saveSettings() {
+      const settings = {};
+      
+      Object.keys(defaults).forEach(key => {
+        const input = document.getElementById(key);
+        if (input) {
+          settings[key] = parseFloat(input.value) || defaults[key];
+        }
+      });
+      
+      localStorage.setItem('soilSettings', JSON.stringify(settings));
+      Utils.showStatus('✓ Settings saved', true);
+    }
+
+    function resetSettings() {
+      if (!confirm('Reset all settings to defaults?')) return;
+      
+      Object.entries(defaults).forEach(([key, value]) => {
+        const input = document.getElementById(key);
+        if (input) input.value = value;
+      });
+      
+      localStorage.setItem('soilSettings', JSON.stringify(defaults));
+      Utils.showStatus('✓ Settings reset to defaults', true);
+    }
+  </script>
+</body>
+</html>

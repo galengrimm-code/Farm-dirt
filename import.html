@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soil Sample Analysis - Import</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .import-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+    .import-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .import-section {
+      background: white;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .import-section h3 {
+      margin: 0 0 1rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .import-section.blue { border-left: 4px solid #3b82f6; }
+    .import-section.green { border-left: 4px solid #22c55e; }
+    .import-section.red { border-left: 4px solid #ef4444; }
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: #374151;
+      font-size: 0.875rem;
+    }
+    .form-group input[type="file"],
+    .form-group input[type="text"] {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px dashed #cbd5e1;
+      border-radius: 0.375rem;
+      background: #f8fafc;
+    }
+    .form-group input[type="file"]:hover {
+      border-color: #94a3b8;
+      background: #f1f5f9;
+    }
+    .form-group small {
+      display: block;
+      margin-top: 0.25rem;
+      color: #64748b;
+      font-size: 0.75rem;
+    }
+    .data-summary {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .data-summary h4 {
+      margin: 0 0 0.75rem 0;
+      color: #475569;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+    .summary-item {
+      text-align: center;
+      padding: 0.75rem;
+      background: white;
+      border-radius: 0.375rem;
+    }
+    .summary-item .number {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .summary-item .label {
+      font-size: 0.75rem;
+      color: #64748b;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <div class="top-bar">
+      <div>
+        <h1>📁 Import Data</h1>
+        <p>Upload boundaries and soil samples</p>
+      </div>
+      <nav class="nav-links">
+        <a href="index.html" class="nav-link">📍 Map</a>
+        <a href="analysis.html" class="nav-link">📊 Analysis</a>
+        <a href="import.html" class="nav-link active">📁 Import</a>
+        <a href="settings.html" class="nav-link">⚙️ Settings</a>
+      </nav>
+      <div class="auth-section">
+        <span class="user-info" id="userInfo"></span>
+        <button class="sign-in-btn" id="authBtn" onclick="handleAuth()">Sign In with Google</button>
+      </div>
+    </div>
+
+    <div class="import-container">
+      <!-- Data Summary -->
+      <div class="data-summary">
+        <h4>📊 Current Data</h4>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <div class="number" id="fieldCount">0</div>
+            <div class="label">Fields</div>
+          </div>
+          <div class="summary-item">
+            <div class="number" id="sampleCount">0</div>
+            <div class="label">Samples</div>
+          </div>
+          <div class="summary-item">
+            <div class="number" id="yearCount">0</div>
+            <div class="label">Years</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Import Boundaries -->
+      <div class="import-section blue">
+        <h3>📦 Import Boundaries</h3>
+        <div class="form-group">
+          <label>Field Name (optional)</label>
+          <input type="text" id="boundaryFieldName" placeholder="Auto-detects from file">
+        </div>
+        <div class="form-group">
+          <label>Boundary File(s)</label>
+          <input type="file" id="boundaryFiles" multiple accept=".shp,.dbf,.prj,.shx,.zip,.geojson,.json">
+          <small>GeoJSON, Shapefile, or ZIP • Select multiple for batch import</small>
+        </div>
+        <button class="button primary" id="uploadBoundaryBtn" style="width: 100%;">
+          Upload Boundaries
+        </button>
+      </div>
+
+      <!-- Import Samples -->
+      <div class="import-section green">
+        <h3>🔬 Import Samples</h3>
+        <div class="form-group">
+          <label>Sample Year (optional)</label>
+          <input type="text" id="sampleYear" placeholder="e.g., 2024" style="width: 120px;">
+        </div>
+        <div class="form-group">
+          <label>Sample File(s)</label>
+          <input type="file" id="sampleFiles" multiple accept=".shp,.dbf,.prj,.shx,.zip,.geojson,.json,.csv">
+          <small>CSV, Shapefile, or GeoJSON • Auto-assigns to fields by GPS</small>
+        </div>
+        <button class="button success" id="uploadSampleBtn" style="width: 100%;">
+          Upload Samples
+        </button>
+      </div>
+
+      <!-- Sync & Clear -->
+      <div class="import-section red">
+        <h3>🔄 Data Management</h3>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <button class="button primary" id="syncBtn" style="flex: 1;">
+            ☁️ Sync to Google Sheets
+          </button>
+          <button class="button danger" id="clearBtn" style="flex: 1;">
+            🗑️ Clear All Data
+          </button>
+        </div>
+        <small style="display: block; margin-top: 0.75rem; color: #64748b;">
+          Data is saved locally and synced to Google Sheets when signed in.
+        </small>
+      </div>
+    </div>
+
+    <div id="statusMessage"></div>
+  </div>
+
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/sheets-api.js"></script>
+  
+  <script>
+    let sampleData = [];
+    let fieldBoundaries = {};
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      loadLocalData();
+      updateSummary();
+      
+      try {
+        await SheetsAPI.init();
+        SheetsAPI.onSignInChange = handleSignInChange;
+        handleSignInChange(SheetsAPI.isSignedIn);
+      } catch (e) {
+        console.warn('Google API not configured:', e);
+      }
+      
+      setupEventListeners();
+    });
+
+    function setupEventListeners() {
+      document.getElementById('uploadBoundaryBtn').addEventListener('click', uploadBoundaries);
+      document.getElementById('uploadSampleBtn').addEventListener('click', uploadSamples);
+      document.getElementById('syncBtn').addEventListener('click', syncToSheets);
+      document.getElementById('clearBtn').addEventListener('click', clearAllData);
+    }
+
+    async function handleAuth() {
+      if (SheetsAPI.isSignedIn) await SheetsAPI.signOut();
+      else await SheetsAPI.signIn();
+    }
+
+    function handleSignInChange(isSignedIn) {
+      const authBtn = document.getElementById('authBtn');
+      const userInfo = document.getElementById('userInfo');
+      if (isSignedIn) {
+        const profile = gapi.auth2.getAuthInstance().currentUser.get().getBasicProfile();
+        userInfo.textContent = profile.getName();
+        authBtn.textContent = 'Sign Out';
+      } else {
+        userInfo.textContent = '';
+        authBtn.textContent = 'Sign In with Google';
+      }
+    }
+
+    function loadLocalData() {
+      try {
+        const s = localStorage.getItem('soilSamples');
+        const b = localStorage.getItem('fieldBoundaries');
+        if (s) sampleData = JSON.parse(s);
+        if (b) fieldBoundaries = JSON.parse(b);
+      } catch (e) { console.error(e); }
+    }
+
+    function saveLocalData() {
+      localStorage.setItem('soilSamples', JSON.stringify(sampleData));
+      localStorage.setItem('fieldBoundaries', JSON.stringify(fieldBoundaries));
+    }
+
+    function updateSummary() {
+      document.getElementById('fieldCount').textContent = Object.keys(fieldBoundaries).length;
+      document.getElementById('sampleCount').textContent = sampleData.length;
+      document.getElementById('yearCount').textContent = Utils.getUniqueYears(sampleData).length;
+    }
+
+    async function uploadBoundaries() {
+      const files = Array.from(document.getElementById('boundaryFiles').files);
+      const fieldName = document.getElementById('boundaryFieldName').value.trim();
+      
+      if (files.length === 0) {
+        Utils.showStatus('Please select boundary file(s)', false);
+        return;
+      }
+      
+      Utils.showStatus('Processing boundaries...', true);
+      
+      try {
+        let totalFields = 0;
+        const hasShp = files.some(f => f.name.endsWith('.shp'));
+        const isZip = files.length === 1 && files[0].name.endsWith('.zip');
+        const jsonFiles = files.filter(f => f.name.match(/\.(geo)?json$/i));
+        
+        if (hasShp || isZip) {
+          const geojson = await shp(files[0]);
+          const parsed = geojsonToBoundaries(geojson, fieldName);
+          Object.assign(fieldBoundaries, parsed);
+          totalFields = Object.keys(parsed).length;
+        } else if (jsonFiles.length > 0) {
+          for (const file of jsonFiles) {
+            const text = await file.text();
+            const geojson = JSON.parse(text);
+            const defaultName = fieldName || file.name.replace(/\.(geo)?json$/i, '');
+            const parsed = geojsonToBoundaries(geojson, defaultName);
+            Object.assign(fieldBoundaries, parsed);
+            totalFields += Object.keys(parsed).length;
+          }
+        }
+        
+        saveLocalData();
+        updateSummary();
+        Utils.showStatus(`✓ Imported ${totalFields} field(s)`, true);
+        document.getElementById('boundaryFiles').value = '';
+        document.getElementById('boundaryFieldName').value = '';
+      } catch (e) {
+        Utils.showStatus('Error: ' + e.message, false);
+        console.error(e);
+      }
+    }
+
+    function geojsonToBoundaries(geojson, defaultName) {
+      const boundaries = {};
+      const features = geojson.features || [geojson];
+      
+      features.forEach(feature => {
+        if (!feature.geometry) return;
+        const type = feature.geometry.type;
+        if (type !== 'Polygon' && type !== 'MultiPolygon') return;
+        
+        const props = feature.properties || {};
+        const name = defaultName || props.FIELD_NAME || props.field_name || props.name || props.Name || 'Unknown';
+        
+        if (!boundaries[name]) boundaries[name] = [];
+        
+        if (type === 'Polygon') {
+          const coords = feature.geometry.coordinates[0].map(c => [c[1], c[0]]);
+          boundaries[name].push(coords);
+        } else {
+          feature.geometry.coordinates.forEach(poly => {
+            const coords = poly[0].map(c => [c[1], c[0]]);
+            boundaries[name].push(coords);
+          });
+        }
+      });
+      
+      return boundaries;
+    }
+
+    async function uploadSamples() {
+      const files = Array.from(document.getElementById('sampleFiles').files);
+      const year = document.getElementById('sampleYear').value.trim() || null;
+      
+      if (files.length === 0) {
+        Utils.showStatus('Please select sample file(s)', false);
+        return;
+      }
+      
+      Utils.showStatus('Processing samples...', true);
+      
+      try {
+        let samples = [];
+        const hasShp = files.some(f => f.name.endsWith('.shp'));
+        const isZip = files.length === 1 && files[0].name.endsWith('.zip');
+        const csvFile = files.find(f => f.name.endsWith('.csv'));
+        const jsonFile = files.find(f => f.name.match(/\.(geo)?json$/i));
+        
+        if (hasShp || isZip) {
+          const geojson = await shp(files[0]);
+          samples = geojsonToSamples(geojson, year);
+        } else if (csvFile) {
+          const text = await csvFile.text();
+          samples = parseCSV(text, year);
+        } else if (jsonFile) {
+          const text = await jsonFile.text();
+          const geojson = JSON.parse(text);
+          samples = geojsonToSamples(geojson, year);
+        }
+        
+        if (samples.length === 0) throw new Error('No samples found in file');
+        
+        sampleData = [...sampleData, ...samples];
+        
+        if (Object.keys(fieldBoundaries).length > 0) {
+          const assigned = Utils.assignSamplesToFields(sampleData, fieldBoundaries);
+          if (assigned > 0) console.log(`Assigned ${assigned} samples to fields`);
+        }
+        
+        saveLocalData();
+        updateSummary();
+        Utils.showStatus(`✓ Imported ${samples.length} samples`, true);
+        document.getElementById('sampleFiles').value = '';
+        document.getElementById('sampleYear').value = '';
+      } catch (e) {
+        Utils.showStatus('Error: ' + e.message, false);
+        console.error(e);
+      }
+    }
+
+    function geojsonToSamples(geojson, assignedYear) {
+      const samples = [];
+      const features = geojson.features || [geojson];
+      
+      features.forEach((feature, idx) => {
+        if (!feature.geometry || feature.geometry.type !== 'Point') return;
+        
+        const [lon, lat] = feature.geometry.coordinates;
+        const props = feature.properties || {};
+        
+        const sample = {
+          sampleId: props.SampleID || props.sampleId || props.ID || (idx + 1),
+          field: props.Field || props.field || props.FIELD || 'Unknown',
+          lat, lon,
+          year: assignedYear || Utils.parseYear(props.CropYear || props.Year || props.date)
+        };
+        
+        // Copy all numeric properties
+        Object.entries(props).forEach(([key, val]) => {
+          if (sample[key] === undefined && val !== null) {
+            const num = parseFloat(val);
+            sample[key] = isNaN(num) ? val : num;
+          }
+        });
+        
+        samples.push(sample);
+      });
+      
+      return samples;
+    }
+
+    function parseCSV(text, assignedYear) {
+      const lines = text.trim().split('\n');
+      if (lines.length < 2) return [];
+      
+      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+      const samples = [];
+      
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+        const sample = {};
+        
+        headers.forEach((header, idx) => {
+          const val = values[idx];
+          if (val) {
+            const num = parseFloat(val);
+            sample[header] = isNaN(num) ? val : num;
+          }
+        });
+        
+        // Normalize field names
+        sample.lat = sample.lat || sample.Lat || sample.LAT || sample.latitude;
+        sample.lon = sample.lon || sample.Lon || sample.LON || sample.longitude || sample.lng;
+        sample.field = sample.field || sample.Field || sample.FIELD || 'Unknown';
+        sample.year = assignedYear || Utils.parseYear(sample.year || sample.Year || sample.date);
+        sample.sampleId = sample.sampleId || sample.SampleID || sample.ID || (i);
+        
+        if (sample.lat && sample.lon) samples.push(sample);
+      }
+      
+      return samples;
+    }
+
+    async function syncToSheets() {
+      if (!SheetsAPI.isSignedIn) {
+        Utils.showStatus('Please sign in to sync', false);
+        return;
+      }
+      
+      Utils.showStatus('Syncing to Google Sheets...', true);
+      
+      try {
+        await SheetsAPI.initializeSheets();
+        
+        // Sync fields
+        for (const [name, boundary] of Object.entries(fieldBoundaries)) {
+          await SheetsAPI.addField({ name, boundary });
+        }
+        
+        // Sync samples
+        if (sampleData.length > 0) {
+          await SheetsAPI.addSamples(sampleData);
+        }
+        
+        Utils.showStatus('✓ Synced to Google Sheets', true);
+      } catch (e) {
+        Utils.showStatus('Sync error: ' + e.message, false);
+        console.error(e);
+      }
+    }
+
+    function clearAllData() {
+      if (!confirm('Clear all local data? This cannot be undone.')) return;
+      
+      sampleData = [];
+      fieldBoundaries = {};
+      saveLocalData();
+      updateSummary();
+      Utils.showStatus('✓ Cleared all data', true);
+    }
+  </script>
+</body>
+</html>
