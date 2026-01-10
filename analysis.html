@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soil Sample Analysis - Trends</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; min-height: 100vh; }
+    .app-container { display: flex; flex-direction: column; min-height: 100vh; }
+    .top-bar { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: white; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+    .top-bar h1 { font-size: 1.5rem; font-weight: 700; }
+    .top-bar p { font-size: 0.875rem; opacity: 0.8; margin-top: 0.25rem; }
+    .nav-links { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .nav-link { padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); color: white; text-decoration: none; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; }
+    .nav-link:hover { background: rgba(255,255,255,0.2); }
+    .nav-link.active { background: #3b82f6; }
+    .auth-section { display: flex; align-items: center; gap: 1rem; }
+    .user-info { font-size: 0.875rem; color: rgba(255,255,255,0.9); }
+    .sign-in-btn { padding: 0.5rem 1rem; background: #4285f4; color: white; border: none; border-radius: 0.375rem; font-size: 0.875rem; cursor: pointer; }
+    .sign-in-btn.signed-in { background: #22c55e; }
+    .sign-in-btn.signed-in:hover { background: #16a34a; }
+    .analysis-container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+    .field-selector { background: white; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .field-selector label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569; }
+    .field-selector select { width: 100%; max-width: 400px; padding: 0.75rem; font-size: 1rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; }
+    .summary-card { background: #f8fafc; border: 2px solid #cbd5e1; border-radius: 0.5rem; padding: 1.25rem; margin-bottom: 1.5rem; }
+    .summary-card h3 { margin: 0 0 0.5rem 0; color: #1e293b; font-size: 1.25rem; }
+    .summary-card p { margin: 0; color: #64748b; font-size: 1rem; }
+    .trend-card { background: white; border: 2px solid; border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+    .trend-card.positive { background: #f0fdf4; border-color: #22c55e; }
+    .trend-card.negative { background: #fef2f2; border-color: #ef4444; }
+    .trend-card.neutral { background: #f8fafc; border-color: #94a3b8; }
+    .trend-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; }
+    .trend-title { font-size: 1.25rem; font-weight: 600; color: #1e293b; margin: 0; }
+    .trend-percent { font-size: 1.75rem; font-weight: 700; text-align: right; }
+    .trend-subtitle { font-size: 0.875rem; color: #64748b; }
+    .trend-content { display: flex; gap: 2rem; flex-wrap: wrap; align-items: center; }
+    .trend-values { flex: 0 0 180px; min-width: 150px; }
+    .trend-values-header { font-size: 0.8125rem; font-weight: 600; color: #64748b; text-transform: uppercase; margin-bottom: 0.5rem; }
+    .trend-value-row { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e2e8f0; font-size: 1rem; }
+    .trend-value-row .year { color: #64748b; }
+    .trend-value-row .value { font-weight: 600; color: #1e293b; }
+    .trend-change { margin-top: 1rem; padding-top: 1rem; border-top: 2px solid; font-size: 1rem; }
+    .trend-graph { flex: 1; min-width: 400px; min-height: 160px; }
+    .no-data { background: #fef3c7; border: 2px solid #f59e0b; border-radius: 0.5rem; padding: 2rem; text-align: center; color: #92400e; }
+    #statusMessage { display: none; position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 9999; padding: 0.75rem 1rem; border-radius: 0.375rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    @media (max-width: 639px) { .analysis-container { padding: 1rem; } .trend-content { flex-direction: column; } .trend-values { flex: none; width: 100%; } }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <div class="top-bar">
+      <div>
+        <h1>📊 Soil Fertility Trends</h1>
+        <p>Multi-Year Analysis</p>
+      </div>
+      <nav class="nav-links">
+        <a href="index.html" class="nav-link">📍 Map</a>
+        <a href="analysis.html" class="nav-link active">📊 Analysis</a>
+        <a href="import.html" class="nav-link">📁 Import</a>
+        <a href="settings.html" class="nav-link">⚙️ Settings</a>
+      </nav>
+      <div class="auth-section">
+        <span class="user-info" id="userInfo"></span>
+        <button class="sign-in-btn" id="authBtn" onclick="handleAuth()">Sign In with Google</button>
+      </div>
+    </div>
+    
+    <div class="analysis-container">
+      <div class="field-selector">
+        <label for="fieldSelect">Select Field to Analyze:</label>
+        <select id="fieldSelect"><option value="">Loading...</option></select>
+      </div>
+      <div id="analysisResults">
+        <div class="no-data"><p>Select a field to view soil fertility trends</p></div>
+      </div>
+    </div>
+    <div id="statusMessage"></div>
+  </div>
+
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://accounts.google.com/gsi/client"></script>
+  <script>
+    const CONFIG = {
+      CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
+      API_KEY: 'AIzaSyCOSDbrAlc3ct2-lRvJv1y7V0nV7haWc9E',
+      SHEET_ID: '1buu-8KXoM1kRJSOAWtHaAk40seQT5kqGFY9RICYwdRY',
+      NUTRIENT_ORDER: ['pH', 'OM', 'P', 'K', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S'],
+      LOWER_IS_BETTER: ['Mg_sat', 'H_Sat'],
+      NUTRIENT_NAMES: { pH: 'pH', OM: 'Organic Matter', P: 'Phosphorus (P)', K: 'Potassium (K)', Ca_sat: 'Calcium Base Sat', Mg_sat: 'Magnesium Base Sat', K_Sat: 'Potassium Base Sat', H_Sat: 'Hydrogen Base Sat', Zn: 'Zinc', Cu: 'Copper', Mn: 'Manganese', Fe: 'Iron', Boron: 'Boron', S: 'Sulfur' },
+      NUTRIENT_UNITS: { pH: '', OM: '%', P: 'ppm', K: 'ppm', Ca_sat: '%', Mg_sat: '%', K_Sat: '%', H_Sat: '%', Zn: 'ppm', Cu: 'ppm', Mn: 'ppm', Fe: 'ppm', Boron: 'ppm', S: 'ppm' }
+    };
+
+    let tokenClient;
+    let accessToken = null;
+    
+    const SheetsAPI = {
+      isSignedIn: false,
+      async init() {
+        return new Promise((resolve, reject) => {
+          gapi.load('client', async () => {
+            try {
+              await gapi.client.init({ apiKey: CONFIG.API_KEY, discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'] });
+              tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CONFIG.CLIENT_ID,
+                scope: 'https://www.googleapis.com/auth/spreadsheets',
+                callback: (response) => {
+                  if (response.error) return;
+                  accessToken = response.access_token;
+                  this.isSignedIn = true;
+                  this.onSignInChange(true);
+                },
+              });
+              resolve(true);
+            } catch (e) { reject(e); }
+          });
+        });
+      },
+      async signIn() { tokenClient.requestAccessToken({ prompt: 'consent' }); },
+      async signOut() { 
+        if (accessToken) google.accounts.oauth2.revoke(accessToken);
+        accessToken = null;
+        this.isSignedIn = false;
+        this.onSignInChange(false);
+      },
+      onSignInChange(s) {},
+      async getSamples() {
+        try {
+          const r = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: CONFIG.SHEET_ID, range: 'Samples!A1:ZZ10000' });
+          const rows = r.result.values || [];
+          if (rows.length < 2) return [];
+          const headers = rows[0], samples = [];
+          for (let i = 1; i < rows.length; i++) {
+            const row = rows[i], sample = {};
+            headers.forEach((h, idx) => { const v = row[idx]; if (h !== 'sampleId' && h !== 'field' && v) { const n = parseFloat(v); sample[h] = isNaN(n) ? v : n; } else { sample[h] = v || ''; } });
+            samples.push(sample);
+          }
+          return samples;
+        } catch (e) { return []; }
+      }
+    };
+
+    let sampleData = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        await SheetsAPI.init();
+        SheetsAPI.onSignInChange = handleSignInChange;
+        handleSignInChange(SheetsAPI.isSignedIn);
+      } catch (e) { loadLocalData(); }
+      document.getElementById('fieldSelect').addEventListener('change', e => { if (e.target.value) analyzeField(e.target.value); });
+    });
+
+    async function handleAuth() { if (SheetsAPI.isSignedIn) await SheetsAPI.signOut(); else await SheetsAPI.signIn(); }
+
+    function handleSignInChange(isSignedIn) {
+      const authBtn = document.getElementById('authBtn'), userInfo = document.getElementById('userInfo');
+      if (isSignedIn) {
+        userInfo.textContent = 'Connected'; authBtn.textContent = '✓ Signed In'; authBtn.classList.add('signed-in'); loadData();
+      } else { userInfo.textContent = ''; authBtn.textContent = 'Sign In with Google'; authBtn.classList.remove('signed-in'); loadLocalData(); }
+    }
+
+    async function loadData() {
+      showStatus('Loading...', true);
+      try { sampleData = await SheetsAPI.getSamples(); updateFieldSelector(); showStatus(`✓ Loaded ${sampleData.length} samples`, true); }
+      catch (e) { loadLocalData(); }
+    }
+
+    function loadLocalData() {
+      try { const s = localStorage.getItem('soilSamples'); if (s) sampleData = JSON.parse(s); updateFieldSelector(); } catch (e) {}
+    }
+
+    function updateFieldSelector() {
+      const sel = document.getElementById('fieldSelect');
+      sel.innerHTML = '<option value="">Select a field...</option>';
+      const fields = [...new Set(sampleData.map(s => s.field).filter(f => f))].sort((a,b) => a.localeCompare(b, undefined, {numeric:true}));
+      fields.forEach(f => { const o = document.createElement('option'); o.value = f; o.textContent = f; sel.appendChild(o); });
+    }
+
+    function analyzeField(fieldName) {
+      const fieldSamples = sampleData.filter(s => s.field === fieldName && s.year);
+      if (fieldSamples.length === 0) { document.getElementById('analysisResults').innerHTML = '<div class="no-data"><p>No samples with year data found</p></div>'; return; }
+      const yearGroups = {};
+      fieldSamples.forEach(s => { if (!yearGroups[s.year]) yearGroups[s.year] = []; yearGroups[s.year].push(s); });
+      const years = Object.keys(yearGroups).sort();
+      if (years.length < 2) { document.getElementById('analysisResults').innerHTML = `<div class="no-data"><p>Need at least 2 years. Found: ${years.join(', ')}</p></div>`; return; }
+      const trends = calculateTrends(yearGroups, years);
+      displayTrends(fieldName, trends, years);
+    }
+
+    function calculateTrends(yearGroups, years) {
+      const trends = {};
+      CONFIG.NUTRIENT_ORDER.forEach(nutrient => {
+        const yearlyAvg = {};
+        years.forEach(y => { const vals = yearGroups[y].map(s => s[nutrient]).filter(v => v !== undefined && !isNaN(v)); if (vals.length > 0) yearlyAvg[y] = vals.reduce((a,b) => a+b, 0) / vals.length; });
+        if (Object.keys(yearlyAvg).length >= 2) {
+          const yk = Object.keys(yearlyAvg).sort(), fy = yk[0], ly = yk[yk.length-1], fv = yearlyAvg[fy], lv = yearlyAvg[ly], ch = lv - fv, cp = (ch / fv) * 100;
+          trends[nutrient] = { years: yearlyAvg, firstYear: fy, lastYear: ly, firstValue: fv, lastValue: lv, change: ch, changePercent: cp, direction: ch > 0 ? 'increasing' : ch < 0 ? 'decreasing' : 'stable' };
+        }
+      });
+      return trends;
+    }
+
+    function displayTrends(fieldName, trends, years) {
+      let html = `<div class="summary-card"><h3>${fieldName}</h3><p>Trends from ${years[0]} to ${years[years.length-1]} (${years.length} sample years)</p></div>`;
+      Object.entries(trends).forEach(([nutrient, data]) => {
+        const isInc = data.direction === 'increasing', isDec = data.direction === 'decreasing';
+        const lowerBetter = CONFIG.LOWER_IS_BETTER.includes(nutrient);
+        let cardClass, color;
+        if (lowerBetter) { cardClass = isInc ? 'negative' : isDec ? 'positive' : 'neutral'; color = isInc ? '#ef4444' : isDec ? '#22c55e' : '#64748b'; }
+        else { cardClass = isInc ? 'positive' : isDec ? 'negative' : 'neutral'; color = isInc ? '#22c55e' : isDec ? '#ef4444' : '#64748b'; }
+        const arrow = isInc ? '📈' : isDec ? '📉' : '➡️', unit = CONFIG.NUTRIENT_UNITS[nutrient] || '', name = CONFIG.NUTRIENT_NAMES[nutrient] || nutrient;
+        const sortedYears = Object.keys(data.years).sort();
+        let valuesHtml = ''; sortedYears.forEach(y => { valuesHtml += `<div class="trend-value-row"><span class="year">${y}:</span><span class="value">${data.years[y].toFixed(1)} ${unit}</span></div>`; });
+        const graph = createLineGraph(data.years, color);
+        html += `<div class="trend-card ${cardClass}"><div class="trend-header"><h4 class="trend-title">${arrow} ${name}</h4><div class="trend-percent" style="color:${color};">${data.changePercent > 0 ? '+' : ''}${data.changePercent.toFixed(1)}%<div class="trend-subtitle">${data.firstYear} → ${data.lastYear}</div>${lowerBetter ? '<div class="trend-subtitle" style="font-style:italic;">* Lower is better</div>' : ''}</div></div><div class="trend-content"><div class="trend-values"><div class="trend-values-header">Field Average</div>${valuesHtml}<div class="trend-change" style="border-color:${color};"><span style="color:#64748b;">Change:</span> <span style="color:${color};font-weight:700;">${data.change > 0 ? '+' : ''}${data.change.toFixed(1)} ${unit}</span></div></div><div class="trend-graph">${graph}</div></div></div>`;
+      });
+      if (Object.keys(trends).length === 0) html += '<div class="no-data"><p>No nutrient data available</p></div>';
+      document.getElementById('analysisResults').innerHTML = html;
+    }
+
+    function createLineGraph(yearlyData, color) {
+      const sortedYears = Object.keys(yearlyData).sort(), values = sortedYears.map(y => yearlyData[y]);
+      if (values.length < 2) return '';
+      const minVal = Math.min(...values) * 0.9, maxVal = Math.max(...values) * 1.1, range = maxVal - minVal || 1;
+      const width = 600, height = 180, padding = 20, graphWidth = width - padding * 2, graphHeight = height - padding * 2 - 30;
+      const points = values.map((v, i) => { const x = padding + (i / (values.length - 1)) * graphWidth, y = padding + graphHeight - ((v - minVal) / range) * graphHeight; return `${x},${y}`; }).join(' ');
+      let dots = ''; values.forEach((v, i) => { const x = padding + (i / (values.length - 1)) * graphWidth, y = padding + graphHeight - ((v - minVal) / range) * graphHeight; dots += `<circle cx="${x}" cy="${y}" r="8" fill="${color}" stroke="white" stroke-width="2"/><text x="${x}" y="${height - 5}" text-anchor="middle" font-size="14" fill="#64748b" font-weight="600">${sortedYears[i]}</text><text x="${x}" y="${y - 16}" text-anchor="middle" font-size="15" fill="#1e293b" font-weight="700">${v.toFixed(1)}</text>`; });
+      return `<svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet"><line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height-padding-30}" stroke="#e2e8f0" stroke-width="2"/><line x1="${padding}" y1="${height-padding-30}" x2="${width-padding}" y2="${height-padding-30}" stroke="#e2e8f0" stroke-width="2"/><polyline points="${points}" fill="none" stroke="${color}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>${dots}</svg>`;
+    }
+
+    function showStatus(msg, isSuccess) { const el = document.getElementById('statusMessage'); el.textContent = msg; el.style.display = 'block'; el.style.background = isSuccess ? '#dcfce7' : '#fee2e2'; el.style.color = isSuccess ? '#166534' : '#991b1b'; setTimeout(() => el.style.display = 'none', 4000); }
+  </script>
+</body>
+</html>
