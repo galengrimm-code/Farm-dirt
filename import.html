@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soil Sample Analysis - Import</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; min-height: 100vh; }
+    .top-bar { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: white; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+    .top-bar h1 { font-size: 1.5rem; font-weight: 700; }
+    .top-bar p { font-size: 0.875rem; opacity: 0.8; margin-top: 0.25rem; }
+    .nav-links { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .nav-link { padding: 0.5rem 1rem; background: rgba(255,255,255,0.1); color: white; text-decoration: none; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; }
+    .nav-link:hover { background: rgba(255,255,255,0.2); }
+    .nav-link.active { background: #3b82f6; }
+    .auth-section { display: flex; align-items: center; gap: 1rem; }
+    .user-info { font-size: 0.875rem; color: rgba(255,255,255,0.9); }
+    .sign-in-btn { padding: 0.5rem 1rem; background: #4285f4; color: white; border: none; border-radius: 0.375rem; font-size: 0.875rem; cursor: pointer; }
+    .sign-in-btn.signed-in { background: #22c55e; }
+    .sign-in-btn.signed-in:hover { background: #16a34a; }
+    .import-container { max-width: 800px; margin: 0 auto; padding: 1.5rem; }
+    .data-summary { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem; }
+    .data-summary h4 { margin: 0 0 0.75rem 0; color: #475569; }
+    .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .summary-item { text-align: center; padding: 0.75rem; background: white; border-radius: 0.375rem; }
+    .summary-item .number { font-size: 1.5rem; font-weight: 700; color: #1e293b; }
+    .summary-item .label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; }
+    .import-section { background: white; border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .import-section.blue { border-left: 4px solid #3b82f6; }
+    .import-section.green { border-left: 4px solid #22c55e; }
+    .import-section.red { border-left: 4px solid #ef4444; }
+    .import-section h3 { margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151; font-size: 0.875rem; }
+    .form-group input[type="file"], .form-group input[type="text"] { width: 100%; padding: 0.75rem; border: 2px dashed #cbd5e1; border-radius: 0.375rem; background: #f8fafc; }
+    .form-group input[type="file"]:hover { border-color: #94a3b8; background: #f1f5f9; }
+    .form-group small { display: block; margin-top: 0.25rem; color: #64748b; font-size: 0.75rem; }
+    .button { padding: 0.75rem 1.5rem; border: none; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; width: 100%; }
+    .button.primary { background: #3b82f6; color: white; }
+    .button.success { background: #22c55e; color: white; }
+    .button.danger { background: #ef4444; color: white; }
+    .button:hover { opacity: 0.9; }
+    .btn-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .btn-row .button { flex: 1; }
+    #statusMessage { display: none; position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 9999; padding: 0.75rem 1rem; border-radius: 0.375rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <div>
+      <h1>📁 Import Data</h1>
+      <p>Upload boundaries and soil samples</p>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html" class="nav-link">📍 Map</a>
+      <a href="analysis.html" class="nav-link">📊 Analysis</a>
+      <a href="import.html" class="nav-link active">📁 Import</a>
+      <a href="settings.html" class="nav-link">⚙️ Settings</a>
+    </nav>
+    <div class="auth-section">
+      <span class="user-info" id="userInfo"></span>
+      <button class="sign-in-btn" id="authBtn" onclick="handleAuth()">Sign In with Google</button>
+    </div>
+  </div>
+
+  <div class="import-container">
+    <div class="data-summary">
+      <h4>📊 Current Data</h4>
+      <div class="summary-grid">
+        <div class="summary-item"><div class="number" id="fieldCount">0</div><div class="label">Fields</div></div>
+        <div class="summary-item"><div class="number" id="sampleCount">0</div><div class="label">Samples</div></div>
+        <div class="summary-item"><div class="number" id="yearCount">0</div><div class="label">Years</div></div>
+      </div>
+    </div>
+
+    <div class="import-section blue">
+      <h3>📦 Import Boundaries</h3>
+      <div class="form-group">
+        <label>Field Name (optional)</label>
+        <input type="text" id="boundaryFieldName" placeholder="Auto-detects from file">
+      </div>
+      <div class="form-group">
+        <label>Boundary File(s)</label>
+        <input type="file" id="boundaryFiles" multiple accept=".shp,.dbf,.prj,.shx,.zip,.geojson,.json">
+        <small>GeoJSON, Shapefile, or ZIP • Select multiple for batch import</small>
+      </div>
+      <button class="button primary" id="uploadBoundaryBtn">Upload Boundaries</button>
+    </div>
+
+    <div class="import-section green">
+      <h3>🔬 Import Samples</h3>
+      <div class="form-group">
+        <label>Sample Year (optional)</label>
+        <input type="text" id="sampleYear" placeholder="e.g., 2024" style="width: 120px;">
+      </div>
+      <div class="form-group">
+        <label>Sample File(s)</label>
+        <input type="file" id="sampleFiles" multiple accept=".shp,.dbf,.prj,.shx,.zip,.geojson,.json,.csv">
+        <small>CSV, Shapefile, or GeoJSON • Auto-assigns to fields by GPS</small>
+      </div>
+      <button class="button success" id="uploadSampleBtn">Upload Samples</button>
+    </div>
+
+    <div class="import-section red">
+      <h3>🔄 Data Management</h3>
+      <div class="btn-row">
+        <button class="button primary" id="syncBtn">☁️ Sync to Google Sheets</button>
+        <button class="button danger" id="clearBtn">🗑️ Clear All Data</button>
+      </div>
+      <small style="display:block; margin-top:0.75rem; color:#64748b;">Data is saved locally and synced to Google Sheets when signed in.</small>
+    </div>
+  </div>
+
+  <div id="statusMessage"></div>
+
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://accounts.google.com/gsi/client"></script>
+  <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
+  <script>
+    const CONFIG = {
+      CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
+      API_KEY: 'AIzaSyCOSDbrAlc3ct2-lRvJv1y7V0nV7haWc9E',
+      SHEET_ID: '1buu-8KXoM1kRJSOAWtHaAk40seQT5kqGFY9RICYwdRY'
+    };
+
+    let tokenClient;
+    let accessToken = null;
+    
+    const SheetsAPI = {
+      isSignedIn: false,
+      async init() {
+        return new Promise((resolve, reject) => {
+          gapi.load('client', async () => {
+            try {
+              await gapi.client.init({ apiKey: CONFIG.API_KEY, discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'] });
+              tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CONFIG.CLIENT_ID,
+                scope: 'https://www.googleapis.com/auth/spreadsheets',
+                callback: (response) => {
+                  if (response.error) return;
+                  accessToken = response.access_token;
+                  this.isSignedIn = true;
+                  this.onSignInChange(true);
+                },
+              });
+              resolve(true);
+            } catch (e) { reject(e); }
+          });
+        });
+      },
+      async signIn() { tokenClient.requestAccessToken({ prompt: 'consent' }); },
+      async signOut() { 
+        if (accessToken) google.accounts.oauth2.revoke(accessToken);
+        accessToken = null;
+        this.isSignedIn = false;
+        this.onSignInChange(false);
+      },
+      onSignInChange(s) {},
+      
+      async initializeSheets() {
+        // Create headers if needed
+        const fieldsCheck = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: CONFIG.SHEET_ID, range: 'Fields!A1:E1' });
+        if (!fieldsCheck.result.values || fieldsCheck.result.values.length === 0) {
+          await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: CONFIG.SHEET_ID, range: 'Fields!A1:E1', valueInputOption: 'RAW', resource: { values: [['id', 'name', 'boundary', 'acres', 'created']] } });
+        }
+        const samplesCheck = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: CONFIG.SHEET_ID, range: 'Samples!A1:Z1' });
+        if (!samplesCheck.result.values || samplesCheck.result.values.length === 0) {
+          await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: CONFIG.SHEET_ID, range: 'Samples!A1:U1', valueInputOption: 'RAW', resource: { values: [['sampleId', 'field', 'lat', 'lon', 'year', 'pH', 'P', 'K', 'OM', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'CEC', 'Buffer_pH']] } });
+        }
+      },
+      
+      async addField(field) {
+        await gapi.client.sheets.spreadsheets.values.append({ spreadsheetId: CONFIG.SHEET_ID, range: 'Fields!A:E', valueInputOption: 'RAW', resource: { values: [[field.id || Date.now().toString(36), field.name, JSON.stringify(field.boundary), field.acres || 0, new Date().toISOString()]] } });
+      },
+      
+      async addSamples(samples) {
+        const headerRes = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: CONFIG.SHEET_ID, range: 'Samples!A1:ZZ1' });
+        const headers = headerRes.result.values?.[0] || [];
+        const rows = samples.map(s => headers.map(h => { const v = s[h]; if (v === undefined || v === null) return ''; if (typeof v === 'object') return JSON.stringify(v); return v; }));
+        await gapi.client.sheets.spreadsheets.values.append({ spreadsheetId: CONFIG.SHEET_ID, range: 'Samples!A:ZZ', valueInputOption: 'RAW', resource: { values: rows } });
+      }
+    };
+
+    let sampleData = [], fieldBoundaries = {};
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      loadLocalData(); updateSummary();
+      try { await SheetsAPI.init(); SheetsAPI.onSignInChange = handleSignInChange; handleSignInChange(SheetsAPI.isSignedIn); } catch (e) { console.warn(e); }
+      document.getElementById('uploadBoundaryBtn').addEventListener('click', uploadBoundaries);
+      document.getElementById('uploadSampleBtn').addEventListener('click', uploadSamples);
+      document.getElementById('syncBtn').addEventListener('click', syncToSheets);
+      document.getElementById('clearBtn').addEventListener('click', clearAllData);
+    });
+
+    async function handleAuth() { if (SheetsAPI.isSignedIn) await SheetsAPI.signOut(); else await SheetsAPI.signIn(); }
+    function handleSignInChange(isSignedIn) {
+      const authBtn = document.getElementById('authBtn'), userInfo = document.getElementById('userInfo');
+      if (isSignedIn) { const p = gapi.auth2.getAuthInstance().currentUser.get().getBasicProfile(); userInfo.textContent = p.getName(); authBtn.textContent = '✓ Signed In'; authBtn.classList.add('signed-in'); }
+      else { userInfo.textContent = ''; authBtn.textContent = 'Sign In with Google'; authBtn.classList.remove('signed-in'); }
+    }
+
+    function loadLocalData() { try { const s = localStorage.getItem('soilSamples'), b = localStorage.getItem('fieldBoundaries'); if (s) sampleData = JSON.parse(s); if (b) fieldBoundaries = JSON.parse(b); } catch (e) {} }
+    function saveLocalData() { localStorage.setItem('soilSamples', JSON.stringify(sampleData)); localStorage.setItem('fieldBoundaries', JSON.stringify(fieldBoundaries)); }
+    function updateSummary() {
+      document.getElementById('fieldCount').textContent = Object.keys(fieldBoundaries).length;
+      document.getElementById('sampleCount').textContent = sampleData.length;
+      document.getElementById('yearCount').textContent = [...new Set(sampleData.map(s => s.year).filter(y => y))].length;
+    }
+
+    async function uploadBoundaries() {
+      const files = Array.from(document.getElementById('boundaryFiles').files);
+      const fieldName = document.getElementById('boundaryFieldName').value.trim();
+      if (files.length === 0) { showStatus('Please select file(s)', false); return; }
+      showStatus('Processing...', true);
+      try {
+        let total = 0;
+        const shpFile = files.find(f => f.name.toLowerCase().endsWith('.shp'));
+        const dbfFile = files.find(f => f.name.toLowerCase().endsWith('.dbf'));
+        const isZip = files.length === 1 && files[0].name.toLowerCase().endsWith('.zip');
+        const jsonFiles = files.filter(f => f.name.toLowerCase().match(/\.(geo)?json$/));
+        
+        if (isZip) {
+          const arrayBuffer = await files[0].arrayBuffer();
+          const geojson = await shp(arrayBuffer);
+          const parsed = geojsonToBoundaries(geojson, fieldName);
+          Object.assign(fieldBoundaries, parsed); total = Object.keys(parsed).length;
+        } else if (shpFile && dbfFile) {
+          const shpBuffer = await shpFile.arrayBuffer();
+          const dbfBuffer = await dbfFile.arrayBuffer();
+          const geojson = await shp({ shp: shpBuffer, dbf: dbfBuffer });
+          const parsed = geojsonToBoundaries(geojson, fieldName);
+          Object.assign(fieldBoundaries, parsed); total = Object.keys(parsed).length;
+        } else if (jsonFiles.length > 0) {
+          for (const file of jsonFiles) {
+            const text = await file.text(), geojson = JSON.parse(text);
+            const parsed = geojsonToBoundaries(geojson, fieldName || file.name.replace(/\.(geo)?json$/i, ''));
+            Object.assign(fieldBoundaries, parsed); total += Object.keys(parsed).length;
+          }
+        } else {
+          throw new Error('Please select a ZIP, Shapefile (.shp + .dbf), or GeoJSON');
+        }
+        
+        saveLocalData(); updateSummary(); showStatus(`✓ Imported ${total} field(s)`, true);
+        document.getElementById('boundaryFiles').value = ''; document.getElementById('boundaryFieldName').value = '';
+        // Auto-sync to Google Sheets if signed in
+        if (SheetsAPI.isSignedIn) {
+          showStatus('Syncing to Google Sheets...', true);
+          await syncToSheets();
+        }
+      } catch (e) { showStatus('Error: ' + e.message, false); console.error(e); }
+    }
+
+    function geojsonToBoundaries(geojson, defaultName) {
+      const boundaries = {}, features = geojson.features || [geojson];
+      features.forEach(f => {
+        if (!f.geometry) return;
+        const type = f.geometry.type;
+        if (type !== 'Polygon' && type !== 'MultiPolygon') return;
+        const props = f.properties || {};
+        
+        // Get field name - try FIELD_NAME first, then extract last part from other name fields
+        let fieldName = defaultName || props.FIELD_NAME || props.Field_Name || props.field_name;
+        if (!fieldName) {
+          const rawName = props.name || props.Name || props.Field || props.field || 'Unknown';
+          fieldName = rawName.includes('_') ? rawName.split('_').pop() : rawName;
+        }
+        
+        if (!boundaries[fieldName]) boundaries[fieldName] = [];
+        if (type === 'Polygon') { boundaries[fieldName].push(f.geometry.coordinates[0].map(c => [c[1], c[0]])); }
+        else { f.geometry.coordinates.forEach(poly => { boundaries[fieldName].push(poly[0].map(c => [c[1], c[0]])); }); }
+      });
+      return boundaries;
+    }
+
+    async function uploadSamples() {
+      const files = Array.from(document.getElementById('sampleFiles').files);
+      const year = document.getElementById('sampleYear').value.trim() || null;
+      if (files.length === 0) { showStatus('Please select file(s)', false); return; }
+      showStatus('Processing...', true);
+      try {
+        let samples = [];
+        const shpFile = files.find(f => f.name.toLowerCase().endsWith('.shp'));
+        const dbfFile = files.find(f => f.name.toLowerCase().endsWith('.dbf'));
+        const isZip = files.length === 1 && files[0].name.toLowerCase().endsWith('.zip');
+        const csvFile = files.find(f => f.name.toLowerCase().endsWith('.csv'));
+        const jsonFile = files.find(f => f.name.toLowerCase().match(/\.(geo)?json$/));
+        
+        if (isZip) {
+          // Single zip file
+          const arrayBuffer = await files[0].arrayBuffer();
+          const geojson = await shp(arrayBuffer);
+          samples = geojsonToSamples(geojson, year);
+        } else if (shpFile && dbfFile) {
+          // Multiple shapefile components - combine them
+          const shpBuffer = await shpFile.arrayBuffer();
+          const dbfBuffer = await dbfFile.arrayBuffer();
+          const geojson = await shp({ shp: shpBuffer, dbf: dbfBuffer });
+          samples = geojsonToSamples(geojson, year);
+        } else if (csvFile) {
+          const text = await csvFile.text();
+          samples = parseCSV(text, year);
+        } else if (jsonFile) {
+          const text = await jsonFile.text();
+          const geojson = JSON.parse(text);
+          samples = geojsonToSamples(geojson, year);
+        } else {
+          throw new Error('Please select a ZIP, Shapefile (.shp + .dbf), CSV, or GeoJSON');
+        }
+        
+        if (samples.length === 0) throw new Error('No samples found in file');
+        sampleData = [...sampleData, ...samples];
+        if (Object.keys(fieldBoundaries).length > 0) assignSamplesToFields();
+        saveLocalData(); updateSummary(); showStatus(`✓ Imported ${samples.length} samples`, true);
+        document.getElementById('sampleFiles').value = ''; document.getElementById('sampleYear').value = '';
+        // Auto-sync to Google Sheets if signed in
+        if (SheetsAPI.isSignedIn) {
+          showStatus('Syncing to Google Sheets...', true);
+          await syncToSheets();
+        }
+      } catch (e) { showStatus('Error: ' + e.message, false); console.error(e); }
+    }
+
+    function geojsonToSamples(geojson, assignedYear) {
+      const samples = [], features = geojson.features || [geojson];
+      features.forEach((f, idx) => {
+        if (!f.geometry || f.geometry.type !== 'Point') return;
+        const [lon, lat] = f.geometry.coordinates, props = f.properties || {};
+        
+        // Get field name - try FIELD_NAME first, then extract last part from other name fields
+        let fieldName = props.FIELD_NAME || props.Field_Name || props.field_name;
+        if (!fieldName) {
+          // Fallback: get from name/Field and extract last part after underscores
+          const rawName = props.name || props.Name || props.Field || props.field || 'Unknown';
+          // Extract last part after underscore (e.g., "Precision Farms_Precision Farms_WCG" -> "WCG")
+          fieldName = rawName.includes('_') ? rawName.split('_').pop() : rawName;
+        }
+        
+        const sample = { 
+          sampleId: props.SampleID || props.sampleId || props.ID || props.ORG_ID || (idx + 1), 
+          field: fieldName, 
+          lat, 
+          lon, 
+          year: assignedYear || parseYear(props.CropYear || props.Year || props.year || props.date) 
+        };
+        Object.entries(props).forEach(([k, v]) => { if (sample[k] === undefined && v !== null) { const n = parseFloat(v); sample[k] = isNaN(n) ? v : n; } });
+        samples.push(sample);
+      });
+      return samples;
+    }
+
+    function parseCSV(text, assignedYear) {
+      const lines = text.trim().split('\n'); if (lines.length < 2) return [];
+      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, '')), samples = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim().replace(/"/g, '')), sample = {};
+        headers.forEach((h, idx) => { const v = values[idx]; if (v) { const n = parseFloat(v); sample[h] = isNaN(n) ? v : n; } });
+        sample.lat = sample.lat || sample.Lat || sample.LAT; sample.lon = sample.lon || sample.Lon || sample.LON || sample.lng;
+        sample.field = sample.field || sample.Field || 'Unknown'; sample.year = assignedYear || parseYear(sample.year || sample.Year);
+        sample.sampleId = sample.sampleId || sample.SampleID || sample.ID || i;
+        if (sample.lat && sample.lon) samples.push(sample);
+      }
+      return samples;
+    }
+
+    function parseYear(d) { if (!d) return null; if (typeof d === 'number') return d >= 1900 && d <= 2099 ? d : null; const m = String(d).match(/\b(19|20)\d{2}\b/); return m ? parseInt(m[0]) : null; }
+
+    function assignSamplesToFields() {
+      sampleData.forEach(sample => {
+        for (const [name, polys] of Object.entries(fieldBoundaries)) {
+          const arr = Array.isArray(polys[0]?.[0]) ? polys : [polys];
+          for (const poly of arr) { if (isPointInPolygon([sample.lat, sample.lon], poly)) { sample.field = name; break; } }
+        }
+      });
+    }
+
+    function isPointInPolygon(point, polygon) {
+      const [lat, lon] = point; let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const [lat1, lon1] = polygon[i], [lat2, lon2] = polygon[j];
+        if (((lon1 > lon) !== (lon2 > lon)) && (lat < (lat2 - lat1) * (lon - lon1) / (lon2 - lon1) + lat1)) inside = !inside;
+      }
+      return inside;
+    }
+
+    async function syncToSheets() {
+      if (!SheetsAPI.isSignedIn) { showStatus('Please sign in first', false); return; }
+      showStatus('Syncing...', true);
+      try {
+        await SheetsAPI.initializeSheets();
+        for (const [name, boundary] of Object.entries(fieldBoundaries)) { await SheetsAPI.addField({ name, boundary }); }
+        if (sampleData.length > 0) await SheetsAPI.addSamples(sampleData);
+        showStatus('✓ Synced to Google Sheets', true);
+      } catch (e) { showStatus('Sync error: ' + e.message, false); console.error(e); }
+    }
+
+    function clearAllData() {
+      if (!confirm('Clear all local data?')) return;
+      sampleData = []; fieldBoundaries = {}; saveLocalData(); updateSummary(); showStatus('✓ Cleared', true);
+    }
+
+    function showStatus(msg, isSuccess) { const el = document.getElementById('statusMessage'); el.textContent = msg; el.style.display = 'block'; el.style.background = isSuccess ? '#dcfce7' : '#fee2e2'; el.style.color = isSuccess ? '#166534' : '#991b1b'; setTimeout(() => el.style.display = 'none', 4000); }
+  </script>
+</body>
+</html>
