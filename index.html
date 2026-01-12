@@ -85,10 +85,12 @@
         <div class="control-group">
           <label>ATTRIBUTE</label>
           <select id="attributeSelect">
+            <option value="sampleId">Sample ID</option>
             <option value="P">Phosphorus (P)</option>
             <option value="pH">pH</option>
             <option value="K">Potassium (K)</option>
             <option value="OM">Organic Matter</option>
+            <option value="CEC">CEC</option>
             <option value="Ca_sat">Calcium %</option>
             <option value="Mg_sat">Magnesium %</option>
             <option value="K_Sat">K Base Sat %</option>
@@ -146,12 +148,13 @@
       DEFAULT_LON: -95.5347,
       DEFAULT_ZOOM: 13,
       NUTRIENT_NAMES: {
-        pH: 'pH', OM: 'Organic Matter', P: 'Phosphorus (P)', K: 'Potassium (K)',
-        Ca_sat: 'Calcium Base Sat', Mg_sat: 'Magnesium Base Sat', K_Sat: 'Potassium Base Sat', H_Sat: 'Hydrogen Base Sat',
+        sampleId: 'Sample ID', pH: 'pH', OM: 'Organic Matter', P: 'Phosphorus (P)', K: 'Potassium (K)',
+        CEC: 'CEC', Ca_sat: 'Calcium Base Sat', Mg_sat: 'Magnesium Base Sat', K_Sat: 'Potassium Base Sat', H_Sat: 'Hydrogen Base Sat',
         Zn: 'Zinc', Cu: 'Copper', Mn: 'Manganese', Fe: 'Iron', Boron: 'Boron', S: 'Sulfur'
       },
       NUTRIENT_UNITS: {
-        pH: '', OM: '%', P: 'ppm', K: 'ppm', Ca_sat: '%', Mg_sat: '%', K_Sat: '%', H_Sat: '%',
+        sampleId: '', pH: '', OM: '%', P: 'ppm', K: 'ppm', CEC: 'meq/100g',
+        Ca_sat: '%', Mg_sat: '%', K_Sat: '%', H_Sat: '%',
         Zn: 'ppm', Cu: 'ppm', Mn: 'ppm', Fe: 'ppm', Boron: 'ppm', S: 'ppm'
       },
       LOWER_IS_BETTER: ['Mg_sat', 'H_Sat']
@@ -286,6 +289,9 @@
       },
       
       getColor(value, attribute, settings = {}, bufferPercent = 25) {
+        // Sample ID gets neutral blue color
+        if (attribute === 'sampleId') return '#3b82f6';
+        
         // Default thresholds if none provided
         const defaultThresholds = {
           pH: { min: 6.3, max: 6.9 },
