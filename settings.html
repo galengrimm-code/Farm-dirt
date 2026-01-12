@@ -97,6 +97,7 @@
 
     let tokenClient;
     let accessToken = null;
+    let tokenExpiry = null;
     
     const SheetsAPI = {
       isSignedIn: false,
@@ -111,10 +112,23 @@
                 callback: (response) => {
                   if (response.error) return;
                   accessToken = response.access_token;
+                  tokenExpiry = Date.now() + (response.expires_in * 1000) - 60000;
+                  localStorage.setItem('googleAccessToken', accessToken);
+                  localStorage.setItem('googleTokenExpiry', tokenExpiry.toString());
                   this.isSignedIn = true;
                   this.onSignInChange(true);
                 },
               });
+              // Check for saved token
+              const savedToken = localStorage.getItem('googleAccessToken');
+              const savedExpiry = localStorage.getItem('googleTokenExpiry');
+              if (savedToken && savedExpiry && Date.now() < parseInt(savedExpiry)) {
+                accessToken = savedToken;
+                tokenExpiry = parseInt(savedExpiry);
+                gapi.client.setToken({ access_token: accessToken });
+                this.isSignedIn = true;
+                this.onSignInChange(true);
+              }
               resolve(true);
             } catch (e) { reject(e); }
           });
@@ -124,6 +138,9 @@
       async signOut() { 
         if (accessToken) google.accounts.oauth2.revoke(accessToken);
         accessToken = null;
+        tokenExpiry = null;
+        localStorage.removeItem('googleAccessToken');
+        localStorage.removeItem('googleTokenExpiry');
         this.isSignedIn = false;
         this.onSignInChange(false);
       },
