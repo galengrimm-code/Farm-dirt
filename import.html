@@ -368,6 +368,7 @@
         'pH': ['pH', 'pH (1_1)', 'pH_1_1', 'ph'],
         'K': ['K', 'K (M3)', 'K_M3', 'Potassium'],
         'OM': ['OM', 'OM (LOI)', 'OM_LOI', 'Organic_Matter'],
+        'CEC': ['CEC', 'CEC (Calc)', 'CEC_Calc', 'CEC (Cal_1'],
         'Ca_sat': ['Ca_sat', 'BS-Ca', 'BS_Ca', 'Ca_Base_Sat'],
         'Mg_sat': ['Mg_sat', 'BS-Mg', 'BS_Mg', 'Mg_Base_Sat'],
         'K_Sat': ['K_Sat', 'BS-K', 'BS_K', 'K_Base_Sat'],
@@ -396,17 +397,36 @@
 
     function geojsonToSamples(geojson, assignedYear) {
       const samples = [], features = geojson.features || [geojson];
+      
+      // Debug
+      console.log('Sample GeoJSON:', geojson);
+      if (features[0]) console.log('First sample properties:', features[0].properties);
+      
       features.forEach((f, idx) => {
         if (!f.geometry || f.geometry.type !== 'Point') return;
         const [lon, lat] = f.geometry.coordinates, props = f.properties || {};
         
-        // Get field name - try FIELD_NAME first, then extract last part from other name fields
-        let fieldName = props.FIELD_NAME || props.Field_Name || props.field_name;
-        if (!fieldName) {
+        // Get field name - prioritize FIELD_NAME from properties
+        let fieldName = null;
+        
+        if (props.FIELD_NAME) {
+          fieldName = props.FIELD_NAME;
+        }
+        else if (props.Field_Name) {
+          fieldName = props.Field_Name;
+        }
+        else if (props.field_name) {
+          fieldName = props.field_name;
+        }
+        else {
           // Fallback: get from name/Field and extract last part after underscores
-          const rawName = props.name || props.Name || props.Field || props.field || 'Unknown';
+          const rawName = props.name || props.Name || props.Field || props.field || geojson.name || 'Unknown';
           // Extract last part after underscore (e.g., "Precision Farms_Precision Farms_WCG" -> "WCG")
-          fieldName = rawName.includes('_') ? rawName.split('_').pop() : rawName;
+          if (rawName.includes('_')) {
+            fieldName = rawName.split('_').pop();
+          } else {
+            fieldName = rawName;
+          }
         }
         
         const sample = { 
@@ -444,18 +464,50 @@
 
     function assignSamplesToFields() {
       sampleData.forEach(sample => {
+        // Skip if sample already has a valid field name (not Unknown)
+        if (sample.field && sample.field !== 'Unknown') return;
+        
         for (const [name, polys] of Object.entries(fieldBoundaries)) {
           const arr = Array.isArray(polys[0]?.[0]) ? polys : [polys];
-          for (const poly of arr) { if (isPointInPolygon([sample.lat, sample.lon], poly)) { sample.field = name; break; } }
+          for (const poly of arr) { 
+            if (isPointInPolygon([sample.lat, sample.lon], poly)) { 
+              sample.field = name; 
+              return; // Exit once found
+            } 
+          }
         }
       });
     }
 
     function isPointInPolygon(point, polygon) {
-      const [lat, lon] = point; let inside = false;
+      const [lat, lon] = point; 
+      let inside = false;
+      const epsilon = 0.00001; // Small buffer for edge cases
+      
       for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
         const [lat1, lon1] = polygon[i], [lat2, lon2] = polygon[j];
-        if (((lon1 > lon) !== (lon2 > lon)) && (lat < (lat2 - lat1) * (lon - lon1) / (lon2 - lon1) + lat1)) inside = !inside;
+        
+        // Check if point is on a vertex
+        if ((Math.abs(lat - lat1) < epsilon && Math.abs(lon - lon1) < epsilon) ||
+            (Math.abs(lat - lat2) < epsilon && Math.abs(lon - lon2) < epsilon)) {
+          return true;
+        }
+        
+        // Check if point is on an edge
+        if (lon1 !== lon2) {
+          const t = (lon - lon1) / (lon2 - lon1);
+          if (t >= 0 && t <= 1) {
+            const latOnEdge = lat1 + t * (lat2 - lat1);
+            if (Math.abs(lat - latOnEdge) < epsilon) {
+              return true;
+            }
+          }
+        }
+        
+        // Standard ray casting
+        if (((lon1 > lon) !== (lon2 > lon)) && (lat < (lat2 - lat1) * (lon - lon1) / (lon2 - lon1) + lat1)) {
+          inside = !inside;
+        }
       }
       return inside;
     }
