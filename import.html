@@ -257,6 +257,7 @@
       // Debug: log the geojson structure
       console.log('GeoJSON structure:', geojson);
       console.log('Features count:', features.length);
+      console.log('defaultName parameter:', defaultName);
       if (features[0]) console.log('First feature properties:', features[0].properties);
       
       features.forEach(f => {
@@ -267,27 +268,34 @@
         
         // Debug: log properties for each feature
         console.log('Feature properties:', props);
+        console.log('props.FIELD_NAME value:', props.FIELD_NAME);
+        console.log('props.FIELD_NAME truthy?:', !!props.FIELD_NAME);
         
-        // Get field name - prioritize FIELD_NAME from properties
+        // Get field name - prioritize FIELD_NAME from properties FIRST (before defaultName)
         let fieldName = null;
         
-        // First priority: user-provided default name
-        if (defaultName) {
-          fieldName = defaultName;
-        }
-        // Second priority: FIELD_NAME in properties (exact match)
-        else if (props.FIELD_NAME) {
+        // First priority: FIELD_NAME in properties (exact match)
+        if (props.FIELD_NAME) {
           fieldName = props.FIELD_NAME;
+          console.log('Using props.FIELD_NAME:', fieldName);
         }
         else if (props.Field_Name) {
           fieldName = props.Field_Name;
+          console.log('Using props.Field_Name:', fieldName);
         }
         else if (props.field_name) {
           fieldName = props.field_name;
+          console.log('Using props.field_name:', fieldName);
+        }
+        // Second priority: user-provided default name
+        else if (defaultName) {
+          fieldName = defaultName;
+          console.log('Using defaultName:', fieldName);
         }
         // Third priority: extract from compound names
         else {
           const rawName = props.name || props.Name || props.Field || props.field || geojson.name || 'Unknown';
+          console.log('Falling back to rawName:', rawName);
           // Extract last part after underscore (e.g., "Precision Farms_Precision Farms_WCG" -> "WCG")
           if (rawName.includes('_')) {
             fieldName = rawName.split('_').pop();
@@ -296,7 +304,7 @@
           }
         }
         
-        console.log('Resolved field name:', fieldName);
+        console.log('Final resolved field name:', fieldName);
         
         if (!boundaries[fieldName]) boundaries[fieldName] = [];
         if (type === 'Polygon') { boundaries[fieldName].push(f.geometry.coordinates[0].map(c => [c[1], c[0]])); }
