@@ -253,18 +253,50 @@
 
     function geojsonToBoundaries(geojson, defaultName) {
       const boundaries = {}, features = geojson.features || [geojson];
+      
+      // Debug: log the geojson structure
+      console.log('GeoJSON structure:', geojson);
+      console.log('Features count:', features.length);
+      if (features[0]) console.log('First feature properties:', features[0].properties);
+      
       features.forEach(f => {
         if (!f.geometry) return;
         const type = f.geometry.type;
         if (type !== 'Polygon' && type !== 'MultiPolygon') return;
         const props = f.properties || {};
         
-        // Get field name - try FIELD_NAME first, then extract last part from other name fields
-        let fieldName = defaultName || props.FIELD_NAME || props.Field_Name || props.field_name;
-        if (!fieldName) {
-          const rawName = props.name || props.Name || props.Field || props.field || 'Unknown';
-          fieldName = rawName.includes('_') ? rawName.split('_').pop() : rawName;
+        // Debug: log properties for each feature
+        console.log('Feature properties:', props);
+        
+        // Get field name - prioritize FIELD_NAME from properties
+        let fieldName = null;
+        
+        // First priority: user-provided default name
+        if (defaultName) {
+          fieldName = defaultName;
         }
+        // Second priority: FIELD_NAME in properties (exact match)
+        else if (props.FIELD_NAME) {
+          fieldName = props.FIELD_NAME;
+        }
+        else if (props.Field_Name) {
+          fieldName = props.Field_Name;
+        }
+        else if (props.field_name) {
+          fieldName = props.field_name;
+        }
+        // Third priority: extract from compound names
+        else {
+          const rawName = props.name || props.Name || props.Field || props.field || geojson.name || 'Unknown';
+          // Extract last part after underscore (e.g., "Precision Farms_Precision Farms_WCG" -> "WCG")
+          if (rawName.includes('_')) {
+            fieldName = rawName.split('_').pop();
+          } else {
+            fieldName = rawName;
+          }
+        }
+        
+        console.log('Resolved field name:', fieldName);
         
         if (!boundaries[fieldName]) boundaries[fieldName] = [];
         if (type === 'Polygon') { boundaries[fieldName].push(f.geometry.coordinates[0].map(c => [c[1], c[0]])); }
