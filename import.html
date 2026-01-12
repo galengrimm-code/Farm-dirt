@@ -594,19 +594,83 @@
       } catch (e) { showStatus('Sync error: ' + e.message, false); console.error(e); }
     }
 
-    function clearSamples() {
+    async function clearSamples() {
       if (!confirm('Clear all samples? Boundaries will be kept.')) return;
-      sampleData = []; saveLocalData(); updateSummary(); showStatus('✓ Samples cleared', true);
+      
+      sampleData = []; 
+      saveLocalData(); 
+      updateSummary(); 
+      
+      if (SheetsAPI.isSignedIn) {
+        showStatus('Clearing from Google Sheets...', true);
+        try {
+          await clearSheetsData('Samples');
+          showStatus('✓ Samples cleared', true);
+        } catch (e) {
+          showStatus('Local cleared, but Sheets error: ' + e.message, false);
+        }
+      } else {
+        showStatus('✓ Samples cleared', true);
+      }
     }
 
-    function clearBoundaries() {
+    async function clearBoundaries() {
       if (!confirm('Clear all field boundaries? Samples will be kept.')) return;
-      fieldBoundaries = {}; saveLocalData(); updateSummary(); showStatus('✓ Boundaries cleared', true);
+      
+      fieldBoundaries = {}; 
+      saveLocalData(); 
+      updateSummary(); 
+      
+      if (SheetsAPI.isSignedIn) {
+        showStatus('Clearing from Google Sheets...', true);
+        try {
+          await clearSheetsData('Fields');
+          showStatus('✓ Boundaries cleared', true);
+        } catch (e) {
+          showStatus('Local cleared, but Sheets error: ' + e.message, false);
+        }
+      } else {
+        showStatus('✓ Boundaries cleared', true);
+      }
     }
 
-    function clearAllData() {
-      if (!confirm('Clear ALL local data (samples and boundaries)?')) return;
-      sampleData = []; fieldBoundaries = {}; saveLocalData(); updateSummary(); showStatus('✓ All data cleared', true);
+    async function clearAllData() {
+      if (!confirm('Clear ALL data (samples and boundaries)?')) return;
+      
+      sampleData = []; 
+      fieldBoundaries = {}; 
+      saveLocalData(); 
+      updateSummary(); 
+      
+      if (SheetsAPI.isSignedIn) {
+        showStatus('Clearing from Google Sheets...', true);
+        try {
+          await clearSheetsData('Samples');
+          await clearSheetsData('Fields');
+          showStatus('✓ All data cleared', true);
+        } catch (e) {
+          showStatus('Local cleared, but Sheets error: ' + e.message, false);
+        }
+      } else {
+        showStatus('✓ All data cleared', true);
+      }
+    }
+    
+    async function clearSheetsData(sheetName) {
+      // Get the last row with data
+      const response = await gapi.client.sheets.spreadsheets.values.get({
+        spreadsheetId: CONFIG.SHEET_ID,
+        range: `${sheetName}!A:A`
+      });
+      const numRows = response.result.values ? response.result.values.length : 1;
+      
+      if (numRows > 1) {
+        // Clear all data rows (keep header row 1)
+        await gapi.client.sheets.spreadsheets.values.clear({
+          spreadsheetId: CONFIG.SHEET_ID,
+          range: `${sheetName}!A2:ZZ${numRows}`
+        });
+      }
     }
 
     function showStatus(msg, isSuccess) { const el = document.getElementById('statusMessage'); el.textContent = msg; el.style.display = 'block'; el.style.background = isSuccess ? '#dcfce7' : '#fee2e2'; el.style.color = isSuccess ? '#166534' : '#991b1b'; setTimeout(() => el.style.display = 'none', 4000); }
