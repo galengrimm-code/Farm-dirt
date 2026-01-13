@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v13 - Relative field shading when zoomed out -->
+<!-- v14 - All-attributes popup, fixed field shading -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -1077,20 +1077,46 @@
       
       // Calculate colors based on field averages using relative coloring
       // This ensures fields are colored relative to each other, not just absolute thresholds
-      Object.entries(fieldAverages).forEach(([fieldName, stats]) => {
-        // Use median-based (relative) coloring for field shading so differences are visible
-        const isLowerBetter = CONFIG.LOWER_IS_BETTER.includes(selectedAttribute);
-        let color;
-        if (allFieldAvgs.length > 1) {
-          // Use relative coloring when we have multiple fields to compare
-          color = Utils.getMedianBasedColor(stats.avg, allFieldAvgs, isLowerBetter);
-        } else {
-          // Fall back to threshold-based for single field
-          color = Utils.getColor(stats.avg, selectedAttribute, settings, bufferPct, allFieldAvgs);
-        }
-        fieldColors[fieldName] = color;
-        fieldColors[fieldName + '_stats'] = stats;
-      });
+      const isLowerBetter = CONFIG.LOWER_IS_BETTER.includes(selectedAttribute);
+
+      if (allFieldAvgs.length > 1) {
+        // Sort field averages to determine relative positions
+        const sortedAvgs = [...allFieldAvgs].sort((a, b) => a - b);
+        const minAvg = sortedAvgs[0];
+        const maxAvg = sortedAvgs[sortedAvgs.length - 1];
+        const range = maxAvg - minAvg;
+
+        Object.entries(fieldAverages).forEach(([fieldName, stats]) => {
+          let color;
+          if (range === 0) {
+            color = '#eab308'; // All same value = yellow
+          } else {
+            // Calculate position from 0 to 1
+            const position = (stats.avg - minAvg) / range;
+            // Assign color based on position (higher = greener for most, inverted for "lower is better")
+            if (isLowerBetter) {
+              // Lower is better: low position = green, high position = red
+              if (position <= 0.33) color = '#22c55e';      // Green (low/good)
+              else if (position <= 0.66) color = '#eab308'; // Yellow (medium)
+              else color = '#ef4444';                        // Red (high/bad)
+            } else {
+              // Higher is better: high position = green, low position = red
+              if (position >= 0.66) color = '#22c55e';      // Green (high/good)
+              else if (position >= 0.33) color = '#eab308'; // Yellow (medium)
+              else color = '#ef4444';                        // Red (low/bad)
+            }
+          }
+          fieldColors[fieldName] = color;
+          fieldColors[fieldName + '_stats'] = stats;
+        });
+      } else {
+        // Single field - use threshold-based coloring
+        Object.entries(fieldAverages).forEach(([fieldName, stats]) => {
+          const color = Utils.getColor(stats.avg, selectedAttribute, settings, bufferPct, allFieldAvgs);
+          fieldColors[fieldName] = color;
+          fieldColors[fieldName + '_stats'] = stats;
+        });
+      }
       
       // Update stats box with all samples
       let filtered = sampleData.filter(s => {
@@ -1138,11 +1164,40 @@
           className: '', iconSize: [size, size], iconAnchor: [size/2, size/2]
         });
         const marker = L.marker([sample.lat, sample.lon], { icon }).addTo(map);
-        marker.bindPopup(`<strong>Sample ${sample.sampleId || ''}</strong><br>Field: ${sample.field || 'Unknown'}<br>Year: ${sample.year || ''}<br>${CONFIG.NUTRIENT_NAMES[selectedAttribute] || selectedAttribute}: ${displayVal} ${CONFIG.NUTRIENT_UNITS[selectedAttribute] || ''}`);
+        marker.bindPopup(buildSamplePopup(sample));
         currentLayers.push(marker);
       });
     }
-    
+
+    function buildSamplePopup(sample) {
+      const visibleNutrients = getVisibleNutrients();
+      let html = `<div style="max-height: 300px; overflow-y: auto; min-width: 200px;">`;
+      html += `<div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; border-bottom: 2px solid #3b82f6; padding-bottom: 4px;">`;
+      html += `Sample ${sample.sampleId || 'Unknown'}</div>`;
+      html += `<div style="margin-bottom: 8px; color: #64748b; font-size: 12px;">`;
+      html += `<strong>Field:</strong> ${sample.field || 'Unknown'}<br>`;
+      html += `<strong>Year:</strong> ${sample.year || 'N/A'}`;
+      if (sample.depth) html += `<br><strong>Depth:</strong> ${sample.depth}"`;
+      html += `</div>`;
+      html += `<table style="width: 100%; font-size: 12px; border-collapse: collapse;">`;
+
+      visibleNutrients.forEach(n => {
+        if (n.key === 'sampleId') return; // Already shown in header
+        const value = sample[n.key];
+        if (value === undefined || value === null) return;
+        const displayVal = typeof value === 'number' ? value.toFixed(n.key === 'pH' || n.key === 'Buffer_pH' ? 1 : (value < 10 ? 2 : 1)) : value;
+        const unit = CONFIG.NUTRIENT_UNITS[n.key] || '';
+        const isSelected = n.key === selectedAttribute;
+        html += `<tr style="${isSelected ? 'background: #dbeafe; font-weight: 600;' : ''}">`;
+        html += `<td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0;">${n.name}</td>`;
+        html += `<td style="padding: 3px 6px; border-bottom: 1px solid #e2e8f0; text-align: right;">${displayVal} ${unit}</td>`;
+        html += `</tr>`;
+      });
+
+      html += `</table></div>`;
+      return html;
+    }
+
     function renderCompareMode() {
       // Get samples from selected year (later) and compare year (earlier)
       const laterYear = selectedYear;
