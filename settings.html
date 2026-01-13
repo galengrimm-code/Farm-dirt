@@ -127,7 +127,11 @@
     
     <div class="settings-card">
       <h3>📋 Column Mapping</h3>
-      <p style="color: #64748b; margin-bottom: 1rem; font-size: 0.875rem;">Map column names from your lab files to standard soil attributes. Add aliases so the app recognizes your lab's column headers.</p>
+      <p style="color: #64748b; margin-bottom: 0.5rem; font-size: 0.875rem;">Map column names from your lab files to standard soil attributes. Add aliases so the app recognizes your lab's column headers.</p>
+      <div style="display: flex; gap: 1rem; margin-bottom: 1rem; font-size: 0.75rem;">
+        <span><span style="background: #e2e8f0; padding: 0.15rem 0.4rem; border-radius: 0.25rem; color: #475569;">gray</span> = built-in</span>
+        <span><span style="background: #dbeafe; padding: 0.15rem 0.4rem; border-radius: 0.25rem; color: #1e40af;">blue</span> = custom (removable)</span>
+      </div>
       <div id="columnMappingGrid" style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 500px; overflow-y: auto;"></div>
       <div class="btn-row" style="margin-top: 1rem;">
         <button class="button secondary" onclick="clearAllAliases()">🗑️ Clear All Custom Aliases</button>
@@ -186,6 +190,35 @@
       NH4: { name: 'Ammonium', defaultVisible: false },
       Soluble_Salts: { name: 'Soluble Salts', defaultVisible: false },
       EC: { name: 'EC', defaultVisible: false }
+    };
+
+    // Default column aliases (must match import.html)
+    const DEFAULT_ALIASES = {
+      'P': ['P', 'P (M3)', 'P_M3', 'Phosphorus', 'Bray_P1', 'Bray P1', 'Mehlich2_P', 'Mehlich P', 'M3P', 'Olsen P', 'P1', 'P ppm'],
+      'P2': ['P2', 'Bray_P2', 'Bray P2', 'P2 ppm'],
+      'pH': ['pH', 'pH (1_1)', 'pH_1_1', 'ph', 'Soil_pH', 'pH 1:1', 'pH_s', 'soil pH'],
+      'K': ['K', 'K (M3)', 'K_M3', 'Potassium', 'ExchK', 'Exch K', 'Mehlich K', 'M3K', 'K ppm'],
+      'OM': ['OM', 'OM (LOI)', 'OM_LOI', 'Organic_Matter', 'Organic Matter', 'O.M.', 'OM %', 'SOM'],
+      'CEC': ['CEC', 'CEC (Calc)', 'CEC_Calc', 'CEC (Cal_1', 'CEC meq'],
+      'Ca_sat': ['Ca_sat', 'BS-Ca', 'BS_Ca', 'Ca_Base_Sat', 'Ca_Sat', 'Ca %', 'Ca Sat', '% Ca'],
+      'Mg_sat': ['Mg_sat', 'BS-Mg', 'BS_Mg', 'Mg_Base_Sat', 'Mg_Sat', 'Mg %', 'Mg Sat', '% Mg'],
+      'K_Sat': ['K_Sat', 'BS-K', 'BS_K', 'K_Base_Sat', 'K %', 'K Sat', '% K'],
+      'H_Sat': ['H_Sat', 'BS-H', 'BS_H', 'H_Base_Sat', 'H %', 'H Sat', '% H'],
+      'Na_Sat': ['Na_Sat', 'BS-Na', 'BS_Na', 'Na_Base_Sat', 'Na %', 'Na Sat', '% Na'],
+      'Zn': ['Zn', 'Zn (M3)', 'Zn_M3', 'Zinc', 'Mehlich Zn'],
+      'Cu': ['Cu', 'Cu (M3)', 'Cu_M3', 'Copper', 'Mehlich Cu'],
+      'Mn': ['Mn', 'Mn (M3)', 'Mn_M3', 'Manganese', 'Mehlich Mn'],
+      'Fe': ['Fe', 'Fe (M3)', 'Fe_M3', 'Iron', 'Mehlich Fe'],
+      'Boron': ['Boron', 'B (M3)', 'B_M3', 'B'],
+      'S': ['S', 'S (M3)', 'S_M3', 'Sulfur', 'SO4', 'SO4-S'],
+      'Buffer_pH': ['Buffer_pH', 'BpH', 'Buffer pH', 'SMP', 'SMP pH', 'Buffer'],
+      'Na': ['Na', 'Sodium', 'Na (M3)', 'ExchNa', 'Exch Na'],
+      'Ca': ['Ca', 'Calcium', 'Ca (M3)', 'ExchCa', 'Exch Ca'],
+      'Mg': ['Mg', 'Magnesium', 'Mg (M3)', 'ExchMg', 'Exch Mg'],
+      'NO3': ['NO3', 'NO3-N', 'Nitrate', 'Nitrate-N', 'N03'],
+      'NH4': ['NH4', 'NH4-N', 'Ammonium', 'Ammonium-N'],
+      'Soluble_Salts': ['Soluble_Salts', 'Soluble_Sal', 'Sol_Salts', 'Salts', 'SS'],
+      'EC': ['EC', 'EC (1:1)', 'Electrical Conductivity']
     };
 
     let tokenClient;
@@ -257,29 +290,39 @@
 
     // Column Mapping - editable aliases for all soil attributes
     function loadColumnMapping() {
-      const aliases = JSON.parse(localStorage.getItem('columnAliases') || '{}');
+      const customAliases = JSON.parse(localStorage.getItem('columnAliases') || '{}');
       const container = document.getElementById('columnMappingGrid');
 
       let html = '';
       for (const [key, info] of Object.entries(ALL_NUTRIENTS)) {
-        const fieldAliases = aliases[key] || [];
+        const defaultAliases = DEFAULT_ALIASES[key] || [];
+        const userAliases = customAliases[key] || [];
 
         html += `
-          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.375rem;">
-            <div style="min-width: 140px;">
-              <div style="font-weight: 600; color: #1e293b;">${info.name}</div>
-              <div style="font-size: 0.7rem; color: #64748b; font-family: monospace;">${key}</div>
+          <div style="display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.375rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <div style="min-width: 140px;">
+                <div style="font-weight: 600; color: #1e293b;">${info.name}</div>
+                <div style="font-size: 0.7rem; color: #64748b; font-family: monospace;">${key}</div>
+              </div>
+              <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center;">
+                <input type="text" id="alias_input_${key}" placeholder="+ add alias"
+                  style="width: 100px; padding: 0.2rem 0.5rem; border: 1px dashed #cbd5e1; border-radius: 0.25rem; font-size: 0.8rem; background: white;"
+                  onkeypress="if(event.key==='Enter'){addAlias('${key}');event.preventDefault();}">
+                <button onclick="addAlias('${key}')" style="background: #3b82f6; color: white; border: none; padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; cursor: pointer;">Add</button>
+              </div>
             </div>
-            <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center;">
-              ${fieldAliases.map(a => `
-                <span style="background: #dbeafe; padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.25rem; color: #1e40af;">
-                  ${a} <button onclick="removeAlias('${key}', '${a}')" style="background: none; border: none; cursor: pointer; color: #dc2626; font-weight: bold; padding: 0; line-height: 1; font-size: 1rem;">×</button>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.25rem; padding-left: 0.5rem;">
+              ${defaultAliases.map(a => `
+                <span style="background: #e2e8f0; padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; color: #475569;" title="Built-in alias">
+                  ${a}
                 </span>
               `).join('')}
-              <input type="text" id="alias_input_${key}" placeholder="+ add alias"
-                style="width: 100px; padding: 0.2rem 0.5rem; border: 1px dashed #cbd5e1; border-radius: 0.25rem; font-size: 0.8rem; background: white;"
-                onkeypress="if(event.key==='Enter'){addAlias('${key}');event.preventDefault();}">
-              <button onclick="addAlias('${key}')" style="background: #3b82f6; color: white; border: none; padding: 0.2rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; cursor: pointer;">Add</button>
+              ${userAliases.map(a => `
+                <span style="background: #dbeafe; padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.25rem; color: #1e40af;" title="Custom alias">
+                  ${a} <button onclick="removeAlias('${key}', '${a}')" style="background: none; border: none; cursor: pointer; color: #dc2626; font-weight: bold; padding: 0; line-height: 1; font-size: 0.875rem;">×</button>
+                </span>
+              `).join('')}
             </div>
           </div>
         `;
@@ -289,20 +332,28 @@
 
     function addAlias(standardField) {
       const input = document.getElementById('alias_input_' + standardField);
-      const newAlias = input.value.trim().toLowerCase();
+      const newAlias = input.value.trim();
       if (!newAlias) return;
 
-      const aliases = JSON.parse(localStorage.getItem('columnAliases') || '{}');
-      if (!aliases[standardField]) aliases[standardField] = [];
+      const customAliases = JSON.parse(localStorage.getItem('columnAliases') || '{}');
+      if (!customAliases[standardField]) customAliases[standardField] = [];
 
-      // Check if alias already exists
-      if (aliases[standardField].includes(newAlias)) {
-        showStatus('Alias already exists', false);
+      // Check if alias already exists in custom aliases
+      if (customAliases[standardField].map(a => a.toLowerCase()).includes(newAlias.toLowerCase())) {
+        showStatus('Custom alias already exists', false);
         return;
       }
 
-      aliases[standardField].push(newAlias);
-      localStorage.setItem('columnAliases', JSON.stringify(aliases));
+      // Check if alias already exists in default aliases
+      const defaultAliases = DEFAULT_ALIASES[standardField] || [];
+      if (defaultAliases.map(a => a.toLowerCase()).includes(newAlias.toLowerCase())) {
+        showStatus('This is already a built-in alias', false);
+        return;
+      }
+
+      customAliases[standardField].push(newAlias);
+      localStorage.setItem('columnAliases', JSON.stringify(customAliases));
+      input.value = '';
       loadColumnMapping();
       showStatus('Alias added: ' + newAlias + ' → ' + standardField, true);
     }
