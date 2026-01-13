@@ -78,15 +78,15 @@
     .trend-title { font-size: 1.25rem; font-weight: 700; color: #1e293b; }
     .trend-pct { font-size: 1.5rem; font-weight: 700; text-align: right; }
     .trend-sub { font-size: 0.75rem; color: #64748b; font-weight: 500; }
-    .trend-content { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: start; }
-    .trend-values { background: rgba(255,255,255,0.7); border-radius: 0.5rem; padding: 0.5rem; min-width: 200px; flex: 0 0 auto; }
+    .trend-content { display: flex; flex-wrap: wrap; gap: 1rem; align-items: start; }
+    .trend-values { background: rgba(255,255,255,0.7); border-radius: 0.5rem; padding: 0.5rem; min-width: 180px; flex: 0 0 auto; }
     .trend-row { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; font-size: 0.875rem; border-radius: 0.25rem; }
     .trend-row.alt { background: rgba(0,0,0,0.03); }
     .trend-year { font-weight: 600; color: #475569; min-width: 50px; }
     .trend-value { font-weight: 700; color: #1e293b; }
-    .trend-graph { min-width: 320px; flex: 1 1 320px; background: rgba(255,255,255,0.5); border-radius: 0.5rem; padding: 0.5rem; }
-    .trend-graph svg { display: block; width: 100%; height: auto; min-height: 140px; }
-    @media (max-width: 700px) { .trend-content { flex-direction: column; } .trend-graph { min-width: 100%; } }
+    .trend-graph { min-width: 200px; max-width: 300px; flex: 1 1 200px; background: rgba(255,255,255,0.5); border-radius: 0.5rem; padding: 0.5rem; }
+    .trend-graph svg { display: block; width: 100%; height: auto; }
+    @media (max-width: 700px) { .trend-content { flex-direction: column; } .trend-graph { min-width: 100%; max-width: 100%; } }
     
     /* Field Rankings */
     .rankings-table { width: 100%; border-collapse: collapse; background: white; border-radius: 0.5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
@@ -766,9 +766,9 @@
       const minVal = Math.min(...allValues) * 0.85, maxVal = Math.max(...allValues) * 1.15;
       const range = maxVal - minVal || 1;
 
-      // Larger dimensions with more padding
-      const width = 450, height = 180;
-      const padLeft = 35, padRight = 35, padTop = 30, padBottom = 30;
+      // Compact dimensions with adequate padding
+      const width = 280, height = 120;
+      const padLeft = 25, padRight = 25, padTop = 20, padBottom = 22;
       const gw = width - padLeft - padRight;
       const gh = height - padTop - padBottom;
 
@@ -790,41 +790,40 @@
       const medianLine = medianPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
 
       // Create dots
-      const avgDots = avgPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="6" fill="${avgColor}" stroke="white" stroke-width="2"/>`).join('');
-      const medianDots = medianPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="6" fill="${medianColor}" stroke="white" stroke-width="2"/>`).join('');
+      const avgDots = avgPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${avgColor}" stroke="white" stroke-width="1.5"/>`).join('');
+      const medianDots = medianPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${medianColor}" stroke="white" stroke-width="1.5"/>`).join('');
 
       // Year labels at bottom
-      const yearLabels = avgPts.map(p => `<text x="${p.x}" y="${height - 8}" text-anchor="middle" font-size="12" font-weight="600" fill="#475569">${p.year}</text>`).join('');
+      const yearLabels = avgPts.map(p => `<text x="${p.x}" y="${height - 5}" text-anchor="middle" font-size="9" font-weight="600" fill="#475569">${p.year}</text>`).join('');
 
       // Value labels - smarter positioning to avoid overlap
       const avgLabels = avgPts.map((p, i) => {
         const medianY = medianPts[i].y;
         const gap = Math.abs(p.y - medianY);
-        // If lines are close together, put avg above and median below (or vice versa)
         let offset;
-        if (gap < 25) {
-          offset = p.y < medianY ? -14 : 18;
+        if (gap < 16) {
+          offset = p.y < medianY ? -9 : 12;
         } else {
-          offset = -14; // Default above the dot
+          offset = -9;
         }
-        return `<text x="${p.x}" y="${p.y + offset}" text-anchor="middle" font-size="11" font-weight="700" fill="${avgColor}">${p.val.toFixed(1)}</text>`;
+        return `<text x="${p.x}" y="${p.y + offset}" text-anchor="middle" font-size="8" font-weight="700" fill="${avgColor}">${p.val.toFixed(1)}</text>`;
       }).join('');
 
       const medianLabels = medianPts.map((p, i) => {
         const avgY = avgPts[i].y;
         const gap = Math.abs(p.y - avgY);
         let offset;
-        if (gap < 25) {
-          offset = p.y <= avgY ? -14 : 18;
+        if (gap < 16) {
+          offset = p.y <= avgY ? -9 : 12;
         } else {
-          offset = 18; // Default below the dot
+          offset = 12;
         }
-        return `<text x="${p.x}" y="${p.y + offset}" text-anchor="middle" font-size="11" font-weight="700" fill="${medianColor}">${p.val.toFixed(1)}</text>`;
+        return `<text x="${p.x}" y="${p.y + offset}" text-anchor="middle" font-size="8" font-weight="700" fill="${medianColor}">${p.val.toFixed(1)}</text>`;
       }).join('');
 
-      return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;min-height:160px;">
-        <path d="${avgLine}" fill="none" stroke="${avgColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="${medianLine}" fill="none" stroke="${medianColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="8,4"/>
+      return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;">
+        <path d="${avgLine}" fill="none" stroke="${avgColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="${medianLine}" fill="none" stroke="${medianColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6,3"/>
         ${avgDots}${medianDots}
         ${yearLabels}
         ${avgLabels}${medianLabels}
@@ -1180,14 +1179,14 @@
         .trend-title { font-size: 16px; font-weight: 700; color: #1e293b; margin: 0; }
         .trend-pct { font-size: 20px; font-weight: 700; text-align: right; }
         .trend-sub { font-size: 10px; color: #64748b; font-weight: 500; }
-        .trend-content { display: flex; flex-wrap: wrap; gap: 20px; align-items: start; }
-        .trend-values { background: rgba(255,255,255,0.8); border-radius: 6px; padding: 8px; min-width: 180px; flex: 0 0 auto; }
-        .trend-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; font-size: 12px; border-radius: 4px; }
+        .trend-content { display: flex; flex-wrap: wrap; gap: 12px; align-items: start; }
+        .trend-values { background: rgba(255,255,255,0.8); border-radius: 6px; padding: 6px; min-width: 150px; flex: 0 0 auto; }
+        .trend-row { display: flex; justify-content: space-between; gap: 8px; padding: 4px 8px; font-size: 10px; border-radius: 4px; }
         .trend-row.alt { background: rgba(0,0,0,0.04); }
         .trend-year { font-weight: 600; color: #475569; }
         .trend-value { font-weight: 700; color: #1e293b; }
-        .trend-graph { min-width: 280px; flex: 1 1 280px; }
-        .trend-graph svg { width: 100%; height: auto; min-height: 140px; }
+        .trend-graph { min-width: 180px; max-width: 220px; flex: 1 1 180px; }
+        .trend-graph svg { width: 100%; height: auto; }
 
         /* Nutrient cards for Year Comparison */
         .nutrient-card { background: #fff; border: 2px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
