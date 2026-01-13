@@ -162,7 +162,7 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
           <h4 style="margin: 0; color: #475569; font-size: 0.875rem;">📋 Fields Included in Comparison</h4>
           <div>
-            <button onclick="selectAllComparisonFields()" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; background: white; cursor: pointer; margin-right: 0.25rem;">Select All</button>
+            <button onclick="selectAllComparisonFields()" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; background: white; cursor: pointer; margin-right: 0.25rem;">Select Matching</button>
             <button onclick="selectNoneComparisonFields()" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; background: white; cursor: pointer;">Select None</button>
           </div>
         </div>
@@ -470,7 +470,12 @@
       const fieldsFrom = new Set(allSamplesFrom.map(s => s.field).filter(f => f && f !== 'Unknown'));
       const fieldsTo = new Set(allSamplesTo.map(s => s.field).filter(f => f && f !== 'Unknown'));
       const allFields = [...new Set([...fieldsFrom, ...fieldsTo])];
-      allFields.forEach(f => selectedComparisonFields.add(f));
+      // Only select fields that have data in both years (matching fields)
+      allFields.forEach(f => {
+        if (fieldsFrom.has(f) && fieldsTo.has(f)) {
+          selectedComparisonFields.add(f);
+        }
+      });
       updateComparison();
     }
     
@@ -506,9 +511,14 @@
       const fieldsTo = new Set(allSamplesTo.map(s => s.field).filter(f => f && f !== 'Unknown'));
       const allFields = [...new Set([...fieldsFrom, ...fieldsTo])].sort();
       
-      // Initialize selectedComparisonFields if empty
+      // Initialize selectedComparisonFields if empty - only select fields in BOTH years by default
       if (selectedComparisonFields.size === 0) {
-        allFields.forEach(f => selectedComparisonFields.add(f));
+        allFields.forEach(f => {
+          // Only check fields that have data in both years
+          if (fieldsFrom.has(f) && fieldsTo.has(f)) {
+            selectedComparisonFields.add(f);
+          }
+        });
       }
       
       // Update field checkboxes
