@@ -117,8 +117,8 @@
       <h3>🔬 Import Samples</h3>
       <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
         <div class="form-group">
-          <label style="color: #64748b;">Sample Year <span style="font-weight: 400; font-size: 0.75rem;">(optional)</span></label>
-          <input type="text" id="sampleYear" placeholder="e.g., 2024" style="width: 120px; border: 2px dashed #cbd5e1; background: #f8fafc;">
+          <label>Sample Year <span style="font-weight: 400; font-size: 0.75rem; color: #dc2626;">(required)</span></label>
+          <input type="text" id="sampleYear" placeholder="e.g., 2024" style="width: 120px; border: 2px solid #dc2626; background: #fef2f2;" required>
         </div>
         <div class="form-group">
           <label>Sample Depth <span style="font-weight: 400; font-size: 0.75rem; color: #166534;">(default: 6")</span></label>
@@ -165,6 +165,15 @@
       </div>
       <button class="button" id="uploadYieldBtn" style="background: #f59e0b; color: white;">Upload Yield Data</button>
       <div id="yieldStatus" style="margin-top: 0.75rem;"></div>
+    </div>
+
+    <div class="import-section" style="border-color: #8b5cf6; background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);">
+      <h3>📤 Export Data</h3>
+      <p style="color: #64748b; font-size: 0.875rem; margin-bottom: 1rem;">Export all sample data with visible attributes and yield correlations.</p>
+      <div class="btn-row">
+        <button class="button" id="exportCSVBtn" style="background: #8b5cf6; color: white;">📊 Export CSV</button>
+        <button class="button" id="exportPDFBtn" style="background: #6366f1; color: white;">📄 Export PDF Report</button>
+      </div>
     </div>
 
     <div class="import-section red">
@@ -317,6 +326,8 @@
       document.getElementById('clearYieldBtn').addEventListener('click', clearYieldData);
       document.getElementById('clearAllBtn').addEventListener('click', clearAllData);
       document.getElementById('reassignBtn').addEventListener('click', reassignSamplesToBoundaries);
+      document.getElementById('exportCSVBtn').addEventListener('click', exportToCSV);
+      document.getElementById('exportPDFBtn').addEventListener('click', exportToPDF);
     });
 
     async function handleAuth() { if (SheetsAPI.isSignedIn) await SheetsAPI.signOut(); else await SheetsAPI.signIn(); }
@@ -451,8 +462,14 @@
 
     async function uploadSamples() {
       const files = Array.from(document.getElementById('sampleFiles').files);
-      const year = document.getElementById('sampleYear').value.trim() || null;
+      const yearInput = document.getElementById('sampleYear').value.trim();
       const depth = document.getElementById('sampleDepth').value.trim() || '6';
+
+      // Validate required year
+      if (!yearInput) { showStatus('Sample Year is required', false); return; }
+      const year = parseInt(yearInput);
+      if (isNaN(year) || year < 1900 || year > 2100) { showStatus('Please enter a valid year (e.g., 2024)', false); return; }
+
       if (files.length === 0) { showStatus('Please select file(s)', false); return; }
       showStatus('Processing...', true);
       try {
@@ -1363,6 +1380,150 @@
           range: `${sheetName}!A2:ZZ${numRows}`
         });
       }
+    }
+
+    // ========== EXPORT FUNCTIONS ==========
+    function getVisibleNutrients() {
+      const saved = JSON.parse(localStorage.getItem('nutrientVisibility') || '{}');
+      const defaultVisible = ['sampleId', 'pH', 'P', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH'];
+      const allNutrients = ['sampleId', 'pH', 'P', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH', 'P2', 'Na_Sat', 'Na', 'Ca', 'Mg', 'NO3', 'NH4', 'Soluble_Salts', 'EC'];
+      return allNutrients.filter(n => saved[n] !== undefined ? saved[n] : defaultVisible.includes(n));
+    }
+
+    function exportToCSV() {
+      if (sampleData.length === 0) {
+        showStatus('No sample data to export', false);
+        return;
+      }
+
+      const visibleNutrients = getVisibleNutrients();
+      const operationName = localStorage.getItem('operationName') || 'SoilData';
+
+      // Build headers: base fields + visible nutrients + yield columns
+      const headers = ['Field', 'Year', 'Lat', 'Lon', 'Depth', ...visibleNutrients, 'Yield_Year', 'Yield_Avg', 'Yield_Crop', 'Yield_Points'];
+
+      // Build rows
+      const rows = sampleData.map(sample => {
+        const row = [
+          sample.field || '',
+          sample.year || '',
+          sample.lat || '',
+          sample.lon || '',
+          sample.depth || '',
+          ...visibleNutrients.map(n => sample[n] !== undefined ? sample[n] : ''),
+        ];
+
+        // Add yield data if available
+        if (sample.yieldCorrelations && Object.keys(sample.yieldCorrelations).length > 0) {
+          const yieldYears = Object.keys(sample.yieldCorrelations);
+          const latestYear = yieldYears.sort().pop();
+          const yieldInfo = sample.yieldCorrelations[latestYear];
+          row.push(latestYear, yieldInfo.avgYield?.toFixed(1) || '', yieldInfo.crop || '', yieldInfo.pointCount || '');
+        } else {
+          row.push('', '', '', '');
+        }
+
+        return row;
+      });
+
+      // Create CSV content
+      const csvContent = [headers, ...rows]
+        .map(row => row.map(cell => {
+          const str = String(cell);
+          if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return '"' + str.replace(/"/g, '""') + '"';
+          }
+          return str;
+        }).join(','))
+        .join('\n');
+
+      // Download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${operationName}_samples_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+
+      showStatus(`✓ Exported ${sampleData.length} samples to CSV`, true);
+    }
+
+    function exportToPDF() {
+      if (sampleData.length === 0) {
+        showStatus('No sample data to export', false);
+        return;
+      }
+
+      const visibleNutrients = getVisibleNutrients();
+      const operationName = localStorage.getItem('operationName') || 'Soil Analysis';
+      const fields = [...new Set(sampleData.map(s => s.field))].filter(f => f);
+      const years = [...new Set(sampleData.map(s => s.year))].filter(y => y).sort();
+
+      // Create printable HTML
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>${operationName} - Sample Data Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; font-size: 11px; }
+            h1 { color: #1e293b; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
+            h2 { color: #334155; margin-top: 20px; }
+            .summary { display: flex; gap: 20px; margin: 20px 0; }
+            .summary-box { background: #f1f5f9; padding: 15px; border-radius: 8px; text-align: center; }
+            .summary-box .number { font-size: 24px; font-weight: bold; color: #3b82f6; }
+            .summary-box .label { color: #64748b; font-size: 12px; }
+            table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 10px; }
+            th { background: #1e293b; color: white; padding: 8px 4px; text-align: left; }
+            td { padding: 6px 4px; border-bottom: 1px solid #e2e8f0; }
+            tr:nth-child(even) { background: #f8fafc; }
+            .footer { margin-top: 30px; color: #94a3b8; font-size: 10px; text-align: center; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <h1>${operationName} - Sample Data Report</h1>
+          <p>Generated: ${new Date().toLocaleString()}</p>
+
+          <div class="summary">
+            <div class="summary-box"><div class="number">${sampleData.length}</div><div class="label">Total Samples</div></div>
+            <div class="summary-box"><div class="number">${fields.length}</div><div class="label">Fields</div></div>
+            <div class="summary-box"><div class="number">${years.join(', ') || 'N/A'}</div><div class="label">Years</div></div>
+            <div class="summary-box"><div class="number">${sampleData.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0).length}</div><div class="label">With Yield</div></div>
+          </div>
+
+          <h2>Sample Data</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Year</th>
+                ${visibleNutrients.slice(0, 12).map(n => `<th>${n}</th>`).join('')}
+                <th>Yield</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sampleData.map(s => `
+                <tr>
+                  <td>${s.field || ''}</td>
+                  <td>${s.year || ''}</td>
+                  ${visibleNutrients.slice(0, 12).map(n => `<td>${s[n] !== undefined ? (typeof s[n] === 'number' ? s[n].toFixed(1) : s[n]) : ''}</td>`).join('')}
+                  <td>${s.yieldCorrelations ? Object.values(s.yieldCorrelations)[0]?.avgYield?.toFixed(0) || '' : ''}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            Soil Sample Analysis App • ${window.location.hostname}
+          </div>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+
+      showStatus('✓ PDF report opened for printing', true);
     }
 
     function showStatus(msg, isSuccess) { const el = document.getElementById('statusMessage'); el.textContent = msg; el.style.display = 'block'; el.style.background = isSuccess ? '#dcfce7' : '#fee2e2'; el.style.color = isSuccess ? '#166534' : '#991b1b'; setTimeout(() => el.style.display = 'none', 4000); }
