@@ -162,8 +162,8 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
           <h4 style="margin: 0; color: #475569; font-size: 0.875rem;">📋 Fields Included in Comparison</h4>
           <div>
-            <button onclick="selectAllComparisonFields()" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; background: white; cursor: pointer; margin-right: 0.25rem;">Select Matching</button>
-            <button onclick="selectNoneComparisonFields()" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; background: white; cursor: pointer;">Select None</button>
+            <button onclick="selectMatchingComparisonFields()" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; background: white; cursor: pointer; margin-right: 0.25rem;">Select Matching</button>
+            <button onclick="selectAllComparisonFields()" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; background: white; cursor: pointer;">Select All</button>
           </div>
         </div>
         <div id="fieldCheckboxes" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
@@ -464,7 +464,7 @@
       updateComparison();
     };
     
-    window.selectAllComparisonFields = function() {
+    window.selectMatchingComparisonFields = function() {
       const allSamplesFrom = year1 ? sampleData.filter(s => String(s.year) === String(year1)) : [];
       const allSamplesTo = sampleData.filter(s => String(s.year) === String(year2));
       const excludeFields = ['Unknown', 'Unassigned', 'unknown', 'unassigned', null, undefined, ''];
@@ -481,8 +481,16 @@
       updateComparison();
     };
 
-    window.selectNoneComparisonFields = function() {
+    window.selectAllComparisonFields = function() {
+      const allSamplesFrom = year1 ? sampleData.filter(s => String(s.year) === String(year1)) : [];
+      const allSamplesTo = sampleData.filter(s => String(s.year) === String(year2));
+      const excludeFields = ['Unknown', 'Unassigned', 'unknown', 'unassigned', null, undefined, ''];
+      const fieldsFrom = new Set(allSamplesFrom.map(s => s.field).filter(f => f && !excludeFields.includes(f)));
+      const fieldsTo = new Set(allSamplesTo.map(s => s.field).filter(f => f && !excludeFields.includes(f)));
+      const allFields = [...new Set([...fieldsFrom, ...fieldsTo])];
+      // Select all fields from both years
       selectedComparisonFields.clear();
+      allFields.forEach(f => selectedComparisonFields.add(f));
       updateComparison();
     };
 
