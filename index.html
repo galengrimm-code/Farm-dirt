@@ -620,7 +620,12 @@
     }
 
     function setupEventListeners() {
-      document.getElementById('fieldSelect').addEventListener('change', (e) => { selectedField = e.target.value; updateMap(); zoomToField(selectedField); });
+      document.getElementById('fieldSelect').addEventListener('change', (e) => { 
+        selectedField = e.target.value; 
+        updateYearSelector(); // Update years based on selected field
+        updateMap(); 
+        zoomToField(selectedField); 
+      });
       document.getElementById('attributeSelect').addEventListener('change', (e) => { selectedAttribute = e.target.value; updateMap(); updateLegend(); });
       document.getElementById('yearSelect').addEventListener('change', (e) => { selectedYear = e.target.value; updateCompareYearOptions(); updateMap(); });
       document.getElementById('compareYearSelect').addEventListener('change', (e) => { compareYear = e.target.value; updateMap(); });
@@ -840,8 +845,22 @@
       const sel = document.getElementById('yearSelect');
       const val = sel.value;
       sel.innerHTML = '<option value="all">All Years</option>';
-      Utils.getUniqueYears(sampleData).forEach(y => { const o = document.createElement('option'); o.value = y; o.textContent = y; sel.appendChild(o); });
-      if (Utils.getUniqueYears(sampleData).includes(parseInt(val))) sel.value = val;
+      
+      // Filter samples by selected field if one is selected
+      const filteredSamples = selectedField === 'all' 
+        ? sampleData 
+        : sampleData.filter(s => s.field === selectedField);
+      
+      const years = Utils.getUniqueYears(filteredSamples);
+      years.forEach(y => { const o = document.createElement('option'); o.value = y; o.textContent = y; sel.appendChild(o); });
+      
+      // Keep previous selection if still valid, otherwise reset to 'all'
+      if (years.includes(parseInt(val))) {
+        sel.value = val;
+      } else {
+        sel.value = 'all';
+        selectedYear = 'all';
+      }
     }
 
     function updateMap() {
