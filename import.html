@@ -1133,8 +1133,18 @@
       console.log('Sample count:', sampleData.length);
       console.log('Sample bounds:', sampleBounds);
       console.log('Radius (ft):', radiusFeet, '→ Lat deg:', radiusLatDeg.toFixed(6), 'Lon deg:', radiusLonDeg.toFixed(6));
-      console.log('First yield point:', yearYield[0]);
-      console.log('First sample:', sampleData[0]);
+
+      // Find nearest yield point to first few samples
+      sampleData.slice(0, 5).forEach((sample, i) => {
+        let minDist = Infinity;
+        let nearest = null;
+        yearYield.forEach(y => {
+          const dist = Math.sqrt(Math.pow(y.lat - sample.lat, 2) + Math.pow(y.lon - sample.lon, 2));
+          if (dist < minDist) { minDist = dist; nearest = y; }
+        });
+        const minDistFeet = minDist * 364000; // rough conversion
+        console.log(`Sample ${i} (${sample.field}): lat=${sample.lat}, lon=${sample.lon} → Nearest yield: ${minDistFeet.toFixed(0)} ft away`);
+      });
 
       sampleData.forEach(sample => {
         // Match yield to ALL soil samples regardless of year (correlate by location)
