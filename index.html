@@ -40,7 +40,11 @@
     .legend-label { font-weight: 600; color: #64748b; }
     .main-content { display: flex; flex-direction: column; flex: 1; }
     #map { flex: 1; min-height: 500px; }
-    .sample-marker { border-radius: 8px; border: 2px solid rgba(255,255,255,0.9); box-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; font-weight: 600; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.4); backdrop-filter: blur(2px); }
+    .sample-marker { border-radius: 6px; border: none; box-shadow: 0 3px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-weight: 600; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5); letter-spacing: -0.5px; }
+    .gps-marker { position: relative; }
+    .gps-dot { width: 16px; height: 16px; background: #3b82f6; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+    .gps-pulse { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 16px; height: 16px; background: rgba(59,130,246,0.4); border-radius: 50%; animation: gpsPulse 2s ease-out infinite; }
+    @keyframes gpsPulse { 0% { width: 16px; height: 16px; opacity: 1; } 100% { width: 50px; height: 50px; opacity: 0; } }
     #statusMessage { display: none; position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 9999; max-width: 90%; box-shadow: 0 4px 12px rgba(0,0,0,0.15); padding: 0.75rem 1rem; border-radius: 0.375rem; }
     .field-mode .sample-marker { min-width: 44px !important; min-height: 44px !important; font-size: 14px !important; }
     .field-mode .controls-left { display: none; }
@@ -98,8 +102,8 @@
           </div>
         </div>
         <div class="control-group" id="compareYearGroup" style="display:none;">
-          <label>COMPARE TO</label>
-          <select id="compareYearSelect"><option value="">Select Year</option></select>
+          <label>VS YEAR</label>
+          <select id="compareYearSelect"><option value="">Select Earlier Year</option></select>
         </div>
       </div>
       <div class="controls-right">
@@ -564,11 +568,15 @@
             gpsMarker.setLatLng([latitude, longitude]);
             gpsCircle.setLatLng([latitude, longitude]).setRadius(accuracy);
           } else {
-            gpsMarker = L.circleMarker([latitude, longitude], {
-              radius: 8, fillColor: '#3b82f6', fillOpacity: 1, color: 'white', weight: 3
-            }).addTo(map);
+            const gpsIcon = L.divIcon({
+              html: '<div class="gps-marker"><div class="gps-pulse"></div><div class="gps-dot"></div></div>',
+              className: '',
+              iconSize: [22, 22],
+              iconAnchor: [11, 11]
+            });
+            gpsMarker = L.marker([latitude, longitude], { icon: gpsIcon }).addTo(map);
             gpsCircle = L.circle([latitude, longitude], {
-              radius: accuracy, color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.15, weight: 1
+              radius: accuracy, color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1, weight: 2, dashArray: '4'
             }).addTo(map);
           }
           Utils.showStatus('Centered on your location', true);
@@ -599,6 +607,12 @@
         document.getElementById('singleYearBtn').classList.remove('active'); 
         document.getElementById('compareYearGroup').style.display = 'block';
         updateCompareYearOptions();
+        // Auto-select the most recent year before selected year
+        const sel = document.getElementById('compareYearSelect');
+        if (sel.options.length > 1) {
+          sel.selectedIndex = 1; // First year after "Select Earlier Year"
+          compareYear = sel.value;
+        }
         updateLegend();
         updateMap(); 
       });
@@ -936,8 +950,14 @@
           const { latitude, longitude, accuracy } = pos.coords;
           if (gpsMarker) { gpsMarker.setLatLng([latitude, longitude]); gpsCircle.setLatLng([latitude, longitude]); gpsCircle.setRadius(accuracy); }
           else {
-            gpsMarker = L.marker([latitude, longitude], { icon: L.divIcon({ html: '<div style="width:20px;height:20px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 0 10px rgba(59,130,246,0.5);"></div>', className: '', iconSize: [20,20], iconAnchor: [10,10] }) }).addTo(map);
-            gpsCircle = L.circle([latitude, longitude], { radius: accuracy, color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.15, weight: 2 }).addTo(map);
+            const gpsIcon = L.divIcon({
+              html: '<div class="gps-marker"><div class="gps-pulse"></div><div class="gps-dot"></div></div>',
+              className: '',
+              iconSize: [22, 22],
+              iconAnchor: [11, 11]
+            });
+            gpsMarker = L.marker([latitude, longitude], { icon: gpsIcon }).addTo(map);
+            gpsCircle = L.circle([latitude, longitude], { radius: accuracy, color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1, weight: 2, dashArray: '4' }).addTo(map);
           }
           map.setView([latitude, longitude], map.getZoom());
         },
