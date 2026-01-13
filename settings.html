@@ -126,18 +126,12 @@
     </div>
     
     <div class="settings-card">
-      <h3>📋 Column Aliases</h3>
-      <p style="color: #64748b; margin-bottom: 1rem; font-size: 0.875rem;">Custom mappings saved during import. These help recognize column names from your lab files.</p>
-      <div id="aliasesList" style="max-height: 300px; overflow-y: auto;"></div>
+      <h3>📋 Nutrients & Column Aliases</h3>
+      <p style="color: #64748b; margin-bottom: 1rem; font-size: 0.875rem;">Toggle visibility for each nutrient and manage custom column aliases from your lab files.</p>
+      <div id="nutrientAliasGrid" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 400px; overflow-y: auto;"></div>
       <div class="btn-row" style="margin-top: 1rem;">
         <button class="button secondary" onclick="clearAllAliases()">🗑️ Clear All Custom Aliases</button>
       </div>
-    </div>
-    
-    <div class="settings-card">
-      <h3>👁️ Nutrient Visibility</h3>
-      <p style="color: #64748b; margin-bottom: 1rem; font-size: 0.875rem;">Choose which nutrients to show in dropdowns and analysis.</p>
-      <div id="nutrientVisibility" class="nutrient-grid-vis"></div>
     </div>
     
     <div class="btn-row">
@@ -253,19 +247,32 @@
       if (isSignedIn) { userInfo.textContent = 'Connected'; authBtn.textContent = '✓ Signed In'; authBtn.classList.add('signed-in'); }
       else { userInfo.textContent = ''; authBtn.textContent = 'Sign In with Google'; authBtn.classList.remove('signed-in'); }
     }
-    function loadSettings() { try { const saved = localStorage.getItem('soilSettings'), settings = saved ? JSON.parse(saved) : defaults; Object.entries(settings).forEach(([k, v]) => { const i = document.getElementById(k); if (i) i.value = v; }); loadAliases(); loadNutrientVisibility(); loadSheetConfig(); } catch (e) {} }
+    function loadSettings() { try { const saved = localStorage.getItem('soilSettings'), settings = saved ? JSON.parse(saved) : defaults; Object.entries(settings).forEach(([k, v]) => { const i = document.getElementById(k); if (i) i.value = v; }); loadNutrientVisibility(); loadSheetConfig(); } catch (e) {} }
     
     function loadNutrientVisibility() {
       const saved = JSON.parse(localStorage.getItem('nutrientVisibility') || '{}');
-      const container = document.getElementById('nutrientVisibility');
-      
+      const aliases = JSON.parse(localStorage.getItem('columnAliases') || '{}');
+      const container = document.getElementById('nutrientAliasGrid');
+
       let html = '';
       for (const [key, info] of Object.entries(ALL_NUTRIENTS)) {
         const isVisible = saved[key] !== undefined ? saved[key] : info.defaultVisible;
+        const nutrientAliases = aliases[key] || [];
+
         html += `
-          <div class="nutrient-toggle">
-            <input type="checkbox" id="vis_${key}" ${isVisible ? 'checked' : ''} onchange="saveNutrientVisibility()">
-            <label for="vis_${key}">${info.name}</label>
+          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem; background: ${isVisible ? '#f0fdf4' : '#f8fafc'}; border: 1px solid ${isVisible ? '#bbf7d0' : '#e2e8f0'}; border-radius: 0.375rem;">
+            <input type="checkbox" id="vis_${key}" ${isVisible ? 'checked' : ''} onchange="saveNutrientVisibility()" style="width: 18px; height: 18px; cursor: pointer;">
+            <div style="flex: 1; min-width: 120px;">
+              <label for="vis_${key}" style="font-weight: 600; color: #1e293b; cursor: pointer;">${info.name}</label>
+              <div style="font-size: 0.7rem; color: #94a3b8;">${key}</div>
+            </div>
+            <div style="flex: 2; display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center;">
+              ${nutrientAliases.length > 0 ? nutrientAliases.map(a => `
+                <span style="background: #e2e8f0; padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.25rem;">
+                  ${a} <button onclick="removeAlias('${key}', '${a}')" style="background: none; border: none; cursor: pointer; color: #ef4444; font-weight: bold; padding: 0; line-height: 1;">×</button>
+                </span>
+              `).join('') : '<span style="color: #cbd5e1; font-size: 0.75rem; font-style: italic;">no aliases</span>'}
+            </div>
           </div>
         `;
       }
@@ -279,29 +286,8 @@
         if (checkbox) visibility[key] = checkbox.checked;
       }
       localStorage.setItem('nutrientVisibility', JSON.stringify(visibility));
-    }
-    
-    function loadAliases() {
-      const aliases = JSON.parse(localStorage.getItem('columnAliases') || '{}');
-      const container = document.getElementById('aliasesList');
-      
-      if (Object.keys(aliases).length === 0) {
-        container.innerHTML = '<p style="color: #94a3b8; font-style: italic;">No custom aliases saved yet. Aliases are created when you map unrecognized columns during import.</p>';
-        return;
-      }
-      
-      let html = '';
-      for (const [standard, aliasList] of Object.entries(aliases)) {
-        html += `<div class="threshold-row" style="flex-direction: column; align-items: flex-start; gap: 0.5rem;">
-          <strong style="color: #3b82f6;">${standard}</strong>
-          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-            ${aliasList.map(a => `<span style="background: #e2e8f0; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.25rem;">
-              ${a} <button onclick="removeAlias('${standard}', '${a}')" style="background: none; border: none; cursor: pointer; color: #ef4444; font-weight: bold;">×</button>
-            </span>`).join('')}
-          </div>
-        </div>`;
-      }
-      container.innerHTML = html;
+      // Refresh the display to update row styling
+      loadNutrientVisibility();
     }
     
     function removeAlias(standard, alias) {
@@ -310,15 +296,15 @@
         aliases[standard] = aliases[standard].filter(a => a !== alias);
         if (aliases[standard].length === 0) delete aliases[standard];
         localStorage.setItem('columnAliases', JSON.stringify(aliases));
-        loadAliases();
+        loadNutrientVisibility();
         showStatus('Alias removed', true);
       }
     }
-    
+
     function clearAllAliases() {
       if (!confirm('Clear all custom column aliases?')) return;
       localStorage.removeItem('columnAliases');
-      loadAliases();
+      loadNutrientVisibility();
       showStatus('All custom aliases cleared', true);
     }
     

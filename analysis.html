@@ -84,6 +84,7 @@
     .rankings-table { width: 100%; border-collapse: collapse; background: white; border-radius: 0.5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
     .rankings-table th, .rankings-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
     .rankings-table th { background: #f8fafc; font-weight: 600; color: #475569; font-size: 0.75rem; text-transform: uppercase; }
+    .rankings-table th.sortable-header:hover { background: #e2e8f0; }
     .rankings-table tr:hover { background: #f8fafc; }
     .rankings-table .rank { font-weight: 700; color: #64748b; width: 60px; }
     .rankings-table .field { font-weight: 500; }
@@ -269,6 +270,11 @@
     let sampleData = [];
     let year1 = null, year2 = null;
     let selectedComparisonFields = new Set(); // Track which fields are included in comparison
+
+    // Yield correlation table state
+    let yieldCorrelationsData = [];
+    let yieldSortColumn = 'r'; // Default sort by correlation
+    let yieldSortDirection = 'desc'; // desc = highest first
     
     const SheetsAPI = {
       isSignedIn: false,
@@ -758,27 +764,39 @@
       const cropFilter = document.getElementById('yieldCropSelect').value;
       const yearFilter = document.getElementById('yieldYearSelect').value;
       const fieldFilter = document.getElementById('yieldFieldSelect').value;
-      
+
       // Get samples with yield correlations
       let samplesWithYield = sampleData.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0);
-      
+
       if (samplesWithYield.length === 0) {
         container.innerHTML = '<div class="no-data">No yield data available. Import yield maps on the Import page to see correlations.</div>';
         return;
       }
-      
+
       // Filter by field
       if (fieldFilter !== 'all') {
         samplesWithYield = samplesWithYield.filter(s => s.field === fieldFilter);
       }
-      
+
+      // Use only the most recent soil sample at each location
+      // Group by approximate location (rounded to 5 decimal places ~1m precision)
+      const locationMap = new Map();
+      samplesWithYield.forEach(sample => {
+        const locKey = `${sample.lat.toFixed(5)},${sample.lon.toFixed(5)}`;
+        const existing = locationMap.get(locKey);
+        if (!existing || (sample.year && sample.year > existing.year)) {
+          locationMap.set(locKey, sample);
+        }
+      });
+      samplesWithYield = Array.from(locationMap.values());
+
       // Build correlation data points
       const dataPoints = [];
       samplesWithYield.forEach(sample => {
         Object.entries(sample.yieldCorrelations).forEach(([year, yieldInfo]) => {
           if (yearFilter !== 'all' && String(year) !== String(yearFilter)) return;
           if (cropFilter !== 'all' && yieldInfo.crop !== cropFilter) return;
-          
+
           dataPoints.push({
             ...sample,
             yieldYear: parseInt(year),
@@ -819,14 +837,22 @@
         }
       });
       
-      // Sort by absolute correlation value
-      correlations.sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
-      
+      // Store correlations globally for re-sorting
+      yieldCorrelationsData = correlations;
+
+      // Apply current sort
+      sortYieldCorrelations();
+
       // Get summary stats
       const avgYield = dataPoints.reduce((sum, d) => sum + d.avgYield, 0) / dataPoints.length;
       const crops = [...new Set(dataPoints.map(d => d.crop))];
       const years = [...new Set(dataPoints.map(d => d.yieldYear))].sort();
-      
+
+      const getSortIcon = (col) => {
+        if (yieldSortColumn !== col) return '<span style="opacity: 0.3; font-size: 0.75rem;">&#9650;&#9660;</span>';
+        return yieldSortDirection === 'asc' ? '<span style="color: #3b82f6;">&#9650;</span>' : '<span style="color: #3b82f6;">&#9660;</span>';
+      };
+
       let html = `
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
           <div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 0.5rem; padding: 1rem; text-align: center;">
@@ -842,53 +868,38 @@
             <div style="color: #1e40af; font-size: 0.875rem;">Years: ${years.join(', ')}</div>
           </div>
         </div>
-        
+
         <h3 style="margin: 0 0 1rem 0; color: #1e293b;">Nutrient-Yield Correlations</h3>
-        <p style="color: #64748b; font-size: 0.875rem; margin-bottom: 1rem;">Shows how each nutrient relates to yield. Higher |r| = stronger relationship.</p>
-        
-        <table class="rankings-table">
+        <p style="color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem;">Shows how each soil nutrient correlates with crop yield at matched sample locations. Click column headers to sort.</p>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.375rem; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem; color: #475569;">
+          <strong>How to read this table:</strong><br>
+          <strong>r (Correlation)</strong> ranges from -1 to +1. Positive = higher nutrient, higher yield. Negative = higher nutrient, lower yield. Values closer to +/-1 indicate stronger relationships.<br>
+          <strong>R² (R-squared)</strong> shows what % of yield variation is explained by this nutrient. Example: R²=25% means 25% of yield differences can be attributed to this nutrient.<br>
+          <strong>Significance:</strong> *** = strong (|r| > 0.7), ** = moderate (|r| > 0.4), * = weak (|r| > 0.2), - = no meaningful correlation<br>
+          <strong>Note:</strong> Uses the most recent soil sample at each location. Filter by Field and Yield Year to analyze specific data.
+        </div>
+
+        <table class="rankings-table" id="yieldCorrelationTable">
           <thead>
             <tr>
-              <th>Nutrient</th>
-              <th>Correlation (r)</th>
-              <th>R²</th>
-              <th>Significance</th>
-              <th>Samples</th>
+              <th class="sortable-header" onclick="sortYieldTable('name')" style="cursor: pointer;">Nutrient ${getSortIcon('name')}</th>
+              <th class="sortable-header" onclick="sortYieldTable('r')" style="cursor: pointer;">Correlation (r) ${getSortIcon('r')}</th>
+              <th class="sortable-header" onclick="sortYieldTable('r2')" style="cursor: pointer;">R² ${getSortIcon('r2')}</th>
+              <th class="sortable-header" onclick="sortYieldTable('significance')" style="cursor: pointer;">Significance ${getSortIcon('significance')}</th>
+              <th class="sortable-header" onclick="sortYieldTable('n')" style="cursor: pointer;">Samples ${getSortIcon('n')}</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="yieldCorrelationBody">
       `;
-      
-      correlations.forEach(c => {
-        const color = c.r > 0 ? '#22c55e' : '#ef4444';
-        const barWidth = Math.abs(c.r) * 100;
-        const significance = c.significance === 'high' ? '⭐⭐⭐' : c.significance === 'medium' ? '⭐⭐' : c.significance === 'low' ? '⭐' : '—';
-        const sigColor = c.significance === 'high' ? '#22c55e' : c.significance === 'medium' ? '#f59e0b' : '#94a3b8';
-        
-        html += `
-          <tr>
-            <td class="field">${c.name}</td>
-            <td>
-              <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <div style="width: 80px; height: 12px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
-                  <div style="width: ${barWidth}%; height: 100%; background: ${color}; ${c.r < 0 ? 'margin-left: auto;' : ''}"></div>
-                </div>
-                <span style="font-weight: 600; color: ${color};">${c.r > 0 ? '+' : ''}${c.r.toFixed(3)}</span>
-              </div>
-            </td>
-            <td>${(c.r2 * 100).toFixed(1)}%</td>
-            <td style="color: ${sigColor};">${significance}</td>
-            <td>${c.n}</td>
-          </tr>
-        `;
-      });
-      
+
+      html += renderYieldCorrelationRows();
+
       html += '</tbody></table>';
-      
-      if (correlations.length === 0) {
+
+      if (yieldCorrelationsData.length === 0) {
         html = '<div class="no-data">Not enough data points to calculate correlations. Need at least 5 samples with yield data.</div>';
       }
-      
+
       container.innerHTML = html;
     }
     
@@ -920,6 +931,92 @@
       if (absR > 0.2) return 'low';
       return 'none';
     }
+
+    // Sort the yield correlations data array
+    function sortYieldCorrelations() {
+      const sigOrder = { 'high': 3, 'medium': 2, 'low': 1, 'none': 0, 'insufficient': -1 };
+
+      yieldCorrelationsData.sort((a, b) => {
+        let aVal, bVal;
+
+        switch (yieldSortColumn) {
+          case 'name':
+            aVal = a.name.toLowerCase();
+            bVal = b.name.toLowerCase();
+            return yieldSortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+          case 'r':
+            // Sort by absolute value for correlation
+            aVal = Math.abs(a.r);
+            bVal = Math.abs(b.r);
+            break;
+          case 'r2':
+            aVal = a.r2;
+            bVal = b.r2;
+            break;
+          case 'significance':
+            aVal = sigOrder[a.significance] || 0;
+            bVal = sigOrder[b.significance] || 0;
+            break;
+          case 'n':
+            aVal = a.n;
+            bVal = b.n;
+            break;
+          default:
+            aVal = Math.abs(a.r);
+            bVal = Math.abs(b.r);
+        }
+
+        if (yieldSortDirection === 'asc') {
+          return aVal - bVal;
+        } else {
+          return bVal - aVal;
+        }
+      });
+    }
+
+    // Render just the table rows (for re-sorting without rebuilding header)
+    function renderYieldCorrelationRows() {
+      let rows = '';
+      yieldCorrelationsData.forEach(c => {
+        const color = c.r > 0 ? '#22c55e' : '#ef4444';
+        const barWidth = Math.abs(c.r) * 100;
+        const significance = c.significance === 'high' ? '***' : c.significance === 'medium' ? '**' : c.significance === 'low' ? '*' : '-';
+        const sigColor = c.significance === 'high' ? '#22c55e' : c.significance === 'medium' ? '#f59e0b' : '#94a3b8';
+
+        rows += `
+          <tr>
+            <td class="field">${c.name}</td>
+            <td>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <div style="width: 80px; height: 12px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
+                  <div style="width: ${barWidth}%; height: 100%; background: ${color}; ${c.r < 0 ? 'margin-left: auto;' : ''}"></div>
+                </div>
+                <span style="font-weight: 600; color: ${color};">${c.r > 0 ? '+' : ''}${c.r.toFixed(3)}</span>
+              </div>
+            </td>
+            <td>${(c.r2 * 100).toFixed(1)}%</td>
+            <td style="color: ${sigColor};">${significance}</td>
+            <td>${c.n}</td>
+          </tr>
+        `;
+      });
+      return rows;
+    }
+
+    // Handle column header click to sort (attached to window for inline onclick)
+    window.sortYieldTable = function(column) {
+      if (yieldSortColumn === column) {
+        // Toggle direction if same column
+        yieldSortDirection = yieldSortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        // New column, default to desc (highest first)
+        yieldSortColumn = column;
+        yieldSortDirection = 'desc';
+      }
+
+      // Re-run the full update to rebuild with new sort
+      updateYieldAnalysis();
+    };
 
     function showStatus(msg, ok) {
       const el = document.getElementById('statusMessage');
