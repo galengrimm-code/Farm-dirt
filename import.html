@@ -139,8 +139,8 @@
       <p style="color: #92400e; font-size: 0.875rem; margin-bottom: 1rem;">Upload yield maps to correlate soil nutrients with crop performance.</p>
       <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
         <div class="form-group">
-          <label>Crop Year</label>
-          <input type="text" id="yieldYear" placeholder="e.g., 2024" style="width: 120px;">
+          <label>Crop Year <small style="font-weight: normal; color: #64748b;">(auto-detects)</small></label>
+          <input type="text" id="yieldYear" placeholder="auto or enter" style="width: 120px;">
         </div>
         <div class="form-group">
           <label>Crop Type</label>
@@ -949,33 +949,51 @@
     async function uploadYield() {
       const fileInput = document.getElementById('yieldFiles');
       const files = fileInput.files;
-      const yieldYear = document.getElementById('yieldYear').value.trim();
+      const yieldYearInput = document.getElementById('yieldYear');
+      let yieldYear = yieldYearInput.value.trim();
       const yieldCrop = document.getElementById('yieldCrop').value;
       const radiusFeet = parseInt(document.getElementById('yieldRadius').value);
       const statusEl = document.getElementById('yieldStatus');
-      
+
       if (!files.length) { showStatus('Please select yield file(s)', false); return; }
-      if (!yieldYear) { showStatus('Please enter the crop year', false); return; }
-      
+
       statusEl.innerHTML = '<span style="color: #3b82f6;">⏳ Processing yield data...</span>';
-      
+
       try {
         let yieldPoints = [];
-        
+        let detectedYear = null;
+
         // Check if ZIP file
         const zipFile = Array.from(files).find(f => f.name.toLowerCase().endsWith('.zip'));
-        
+
         if (zipFile) {
-          yieldPoints = await parseYieldFromZip(zipFile);
+          const result = await parseYieldFromZip(zipFile);
+          yieldPoints = result.points;
+          detectedYear = result.detectedYear;
         } else {
-          yieldPoints = await parseYieldFromShapefiles(files);
+          const result = await parseYieldFromShapefiles(files);
+          yieldPoints = result.points;
+          detectedYear = result.detectedYear;
         }
-        
+
+        // Auto-fill year if detected from file and input is empty
+        if (detectedYear && !yieldYear) {
+          yieldYear = String(detectedYear);
+          yieldYearInput.value = yieldYear;
+          statusEl.innerHTML = `<span style="color: #3b82f6;">📅 Detected year ${detectedYear} from file</span><br>`;
+        }
+
+        // Still require year even after auto-detect attempt
+        if (!yieldYear) {
+          statusEl.innerHTML = '<span style="color: #ef4444;">❌ Please enter the crop year (could not auto-detect from file)</span>';
+          return;
+        }
+
         if (yieldPoints.length === 0) {
           statusEl.innerHTML = '<span style="color: #ef4444;">❌ No yield points found in file</span>';
           return;
         }
-        
+
         // Add metadata to each point
         yieldPoints.forEach(p => {
           p.year = parseInt(yieldYear);
@@ -1001,7 +1019,8 @@
         saveLocalData();
         updateSummary();
 
-        statusEl.innerHTML = `<span style="color: #22c55e;">✓ Processed ${newPoints.length} yield points<br>✓ Matched ${correlationResults.matched} of ${correlationResults.total} soil samples<br>✓ Raw yield data cleared (correlated data saved on samples)</span>`;
+        const yearInfo = detectedYear ? `📅 Auto-detected year: ${detectedYear}<br>` : '';
+        statusEl.innerHTML = `<span style="color: #22c55e;">${yearInfo}✓ Processed ${newPoints.length} yield points<br>✓ Matched ${correlationResults.matched} of ${correlationResults.total} soil samples<br>✓ Raw yield data cleared (correlated data saved on samples)</span>`;
         
         fileInput.value = '';
         
@@ -1070,11 +1089,23 @@
         // Try partial match
         yieldField = fields.find(f => f.name.toLowerCase().includes('yield') || f.name.toLowerCase().includes('yld'));
       }
-      
+
       if (!yieldField) {
         console.warn('Available fields:', fields.map(f => f.name));
         throw new Error('Could not find yield field. Available: ' + fields.map(f => f.name).join(', '));
       }
+
+      // Find date/time field to auto-detect year - common names from JD and Climate
+      const dateFieldNames = ['TIMESTAMP', 'TimeStamp', 'IsoTime', 'ISOTIME', 'Date', 'DATE', 'HarvestDat', 'Time', 'TIME', 'DATETIME', 'DateTime', 'Harvest_Da', 'VRLOGTIME'];
+      let dateField = fields.find(f => dateFieldNames.includes(f.name));
+      if (!dateField) {
+        // Try partial match for date/time fields
+        dateField = fields.find(f => f.name.toLowerCase().includes('time') || f.name.toLowerCase().includes('date'));
+      }
+
+      // Also look for explicit year field
+      const yearFieldNames = ['Year', 'YEAR', 'CropYear', 'CROPYEAR', 'Crop_Year'];
+      let yearField = fields.find(f => yearFieldNames.includes(f.name));
       
       // Parse SHP for coordinates
       const shpView = new DataView(shpBuffer);
@@ -1097,24 +1128,56 @@
       
       // Parse DBF records and match with coordinates
       let dbfOffset = headerSize;
+      let detectedYear = null;
+
       for (let i = 0; i < Math.min(numRecords, records.length); i++) {
         dbfOffset++; // Skip deletion flag
-        
+
         let fieldOffset = 0;
         let yieldValue = null;
-        
+
         for (const field of fields) {
           const rawValue = String.fromCharCode(...new Uint8Array(dbfBuffer.slice(dbfOffset + fieldOffset, dbfOffset + fieldOffset + field.length))).trim();
-          
+
           if (field.name === yieldField.name) {
             yieldValue = parseFloat(rawValue);
           }
-          
+
+          // Try to detect year from first record with valid data
+          if (detectedYear === null && rawValue) {
+            // Check explicit year field first
+            if (yearField && field.name === yearField.name) {
+              const yr = parseInt(rawValue);
+              if (yr >= 1990 && yr <= 2100) {
+                detectedYear = yr;
+              }
+            }
+            // Check date/time field
+            else if (dateField && field.name === dateField.name) {
+              // Try various date formats
+              // ISO format: 2024-09-15T... or 2024/09/15
+              const isoMatch = rawValue.match(/^(20\d{2}|19\d{2})[-\/]/);
+              if (isoMatch) {
+                detectedYear = parseInt(isoMatch[1]);
+              }
+              // US format: 09/15/2024 or 09-15-2024
+              const usMatch = rawValue.match(/[-\/](20\d{2}|19\d{2})($|\s|T)/);
+              if (!detectedYear && usMatch) {
+                detectedYear = parseInt(usMatch[1]);
+              }
+              // Just year: 2024
+              const yearOnly = rawValue.match(/^(20\d{2}|19\d{2})$/);
+              if (!detectedYear && yearOnly) {
+                detectedYear = parseInt(yearOnly[1]);
+              }
+            }
+          }
+
           fieldOffset += field.length;
         }
-        
+
         dbfOffset += recordSize - 1;
-        
+
         if (records[i] && yieldValue && !isNaN(yieldValue) && yieldValue > 0) {
           points.push({
             lat: records[i].lat,
@@ -1123,8 +1186,8 @@
           });
         }
       }
-      
-      return points;
+
+      return { points, detectedYear };
     }
     
     function correlateYieldToSamples(yieldYear, radiusFeet) {
