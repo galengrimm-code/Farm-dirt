@@ -425,25 +425,19 @@
         container.innerHTML = '<p style="color: #94a3b8; font-style: italic;">No data</p>';
         return;
       }
-      
+
       // Get unique fields
       const fields = [...new Set(samples.map(s => s.field).filter(f => f && f !== 'Unknown'))].sort();
-      
+
       let html = `
-        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-start;">
+        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: center;">
           <div>
             <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">${year}</div>
-            <div style="font-size: 0.875rem; color: #64748b;">${samples.length} samples</div>
-          </div>
-          <div style="flex: 1; min-width: 150px;">
-            <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.25rem;">Fields Sampled (${fields.length}):</div>
-            <select style="width: 100%; padding: 0.375rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; font-size: 0.8125rem; background: white;">
-              ${fields.map(f => `<option>${f}</option>`).join('')}
-            </select>
+            <div style="font-size: 0.875rem; color: #64748b;">${samples.length} samples across ${fields.length} fields</div>
           </div>
         </div>
       `;
-      
+
       container.innerHTML = html;
     }
     
