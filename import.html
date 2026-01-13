@@ -481,7 +481,6 @@
           await syncToSheets();
         }
     }
-    }
 
     // Standard fields we care about
     const STANDARD_FIELDS = ['pH', 'P', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH', 'Na', 'Ca', 'Mg', 'NO3', 'NH4'];
@@ -713,7 +712,7 @@
         const fileDepth = props.Depth || props.depth || props.DEPTH || props.DepthUnits;
         
         const sample = { 
-          sampleId: props.SampleID || props.sampleId || props.ID || props.ORG_ID || (idx + 1), 
+          sampleId: props.ORG_ID || props.SampleID || props.sampleId || props.Sample_ID || props.SAMPLE_ID || props.ID || (idx + 1), 
           field: fieldName, 
           lat, 
           lon, 
