@@ -178,6 +178,7 @@
       <div class="btn-row" style="margin-top: 0.75rem;">
         <button class="button danger" id="clearSamplesBtn">🗑️ Clear Samples</button>
         <button class="button danger" id="clearBoundariesBtn">🗑️ Clear Boundaries</button>
+        <button class="button danger" id="clearYieldBtn">🗑️ Clear Yield Data</button>
         <button class="button danger" id="clearAllBtn">🗑️ Clear All</button>
       </div>
       <small style="display:block; margin-top:0.75rem; color:#64748b;">Data is saved locally and synced to Google Sheets when signed in.</small>
@@ -286,7 +287,7 @@
         }
         const samplesCheck = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: CONFIG.SHEET_ID, range: 'Samples!A1:Z1' });
         if (!samplesCheck.result.values || samplesCheck.result.values.length === 0) {
-          await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: CONFIG.SHEET_ID, range: 'Samples!A1:U1', valueInputOption: 'RAW', resource: { values: [['sampleId', 'field', 'lat', 'lon', 'year', 'pH', 'P', 'K', 'OM', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'CEC', 'Buffer_pH']] } });
+          await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: CONFIG.SHEET_ID, range: 'Samples!A1:V1', valueInputOption: 'RAW', resource: { values: [['sampleId', 'field', 'lat', 'lon', 'year', 'pH', 'P', 'K', 'OM', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'CEC', 'Buffer_pH', 'yieldCorrelations']] } });
         }
       },
       
@@ -313,6 +314,7 @@
       document.getElementById('syncBtn').addEventListener('click', syncToSheets);
       document.getElementById('clearSamplesBtn').addEventListener('click', clearSamples);
       document.getElementById('clearBoundariesBtn').addEventListener('click', clearBoundaries);
+      document.getElementById('clearYieldBtn').addEventListener('click', clearYieldData);
       document.getElementById('clearAllBtn').addEventListener('click', clearAllData);
       document.getElementById('reassignBtn').addEventListener('click', reassignSamplesToBoundaries);
     });
@@ -1096,34 +1098,45 @@
       // 1 degree longitude ≈ 288,000 feet (at 40°N)
       const radiusLatDeg = radiusFeet / 364000;
       const radiusLonDeg = radiusFeet / 288000;
-      
+
       let matched = 0;
+      let skippedYear = 0;
+      let skippedLocation = 0;
       const yieldYear_int = parseInt(yieldYear);
-      
+
       // Filter yield data for this year
       const yearYield = yieldData.filter(y => y.year === yieldYear_int);
-      
+
       if (yearYield.length === 0) {
-        return { matched: 0, total: sampleData.length };
+        return { matched: 0, total: sampleData.length, skippedYear: 0, skippedLocation: 0, noYieldData: true };
       }
-      
+
+      // Get yield data bounding box for debugging
+      const yieldLats = yearYield.map(y => y.lat);
+      const yieldLons = yearYield.map(y => y.lon);
+      const yieldBounds = {
+        minLat: Math.min(...yieldLats), maxLat: Math.max(...yieldLats),
+        minLon: Math.min(...yieldLons), maxLon: Math.max(...yieldLons)
+      };
+      console.log('Yield data bounds:', yieldBounds);
+      console.log('Sample years:', [...new Set(sampleData.map(s => s.year))]);
+
       sampleData.forEach(sample => {
-        // Find closest soil sample year to yield year
-        const sampleYear = parseInt(sample.year);
-        if (Math.abs(sampleYear - yieldYear_int) > 2) return; // Skip if soil sample is more than 2 years from yield
-        
+        // Match yield to ALL soil samples regardless of year (correlate by location)
+        // The yield year is stored with the correlation data
+
         // Find all yield points within radius
         const nearbyYields = yearYield.filter(y => {
           const latDiff = Math.abs(y.lat - sample.lat);
           const lonDiff = Math.abs(y.lon - sample.lon);
           return latDiff <= radiusLatDeg && lonDiff <= radiusLonDeg;
         });
-        
+
         if (nearbyYields.length > 0) {
           // Calculate average yield
           const avgYield = nearbyYields.reduce((sum, y) => sum + y.yield, 0) / nearbyYields.length;
           const crop = nearbyYields[0].crop;
-          
+
           // Store on sample
           if (!sample.yieldCorrelations) sample.yieldCorrelations = {};
           sample.yieldCorrelations[yieldYear_int] = {
@@ -1132,15 +1145,17 @@
             crop: crop,
             radiusFt: radiusFeet
           };
-          
+
           matched++;
+        } else {
+          skippedLocation++;
         }
       });
-      
+
       // Save updated samples
       saveLocalData();
-      
-      return { matched, total: sampleData.length };
+
+      return { matched, total: sampleData.length, skippedYear, skippedLocation, yieldBounds };
     }
     
     async function loadJSZip() {
@@ -1247,12 +1262,29 @@
       }
     }
 
+    async function clearYieldData() {
+      if (!confirm('Clear all yield data and correlations?')) return;
+
+      // Clear yield data array
+      yieldData = [];
+
+      // Remove yield correlations from all samples
+      sampleData.forEach(s => {
+        if (s.yieldCorrelations) delete s.yieldCorrelations;
+      });
+
+      saveLocalData();
+      updateSummary();
+      showStatus('✓ Yield data cleared', true);
+    }
+
     async function clearAllData() {
-      if (!confirm('Clear ALL data (samples and boundaries)?')) return;
-      
-      sampleData = []; 
-      fieldBoundaries = {}; 
-      saveLocalData(); 
+      if (!confirm('Clear ALL data (samples, boundaries, and yield)?')) return;
+
+      sampleData = [];
+      fieldBoundaries = {};
+      yieldData = [];
+      saveLocalData();
       updateSummary(); 
       
       if (SheetsAPI.isSignedIn) {

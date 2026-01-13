@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v15 - Status message moved below nav -->
+<!-- v16 - Yield correlation syncs to Sheets -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -412,7 +412,10 @@
             const sample = {};
             headers.forEach((header, idx) => {
               const value = row[idx];
-              if (header !== 'sampleId' && header !== 'field' && value) {
+              if (header === 'yieldCorrelations' && value) {
+                // Parse JSON object for yield correlations
+                try { sample[header] = JSON.parse(value); } catch (e) { sample[header] = null; }
+              } else if (header !== 'sampleId' && header !== 'field' && value) {
                 const num = parseFloat(value);
                 sample[header] = isNaN(num) ? value : num;
               } else {
