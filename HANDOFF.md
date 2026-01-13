@@ -53,7 +53,7 @@ API_KEY: 'AIzaSyCOSDbrAlc3ct2-lRvJv1y7V0nV7haWc9E'
 ### Required Google Sheet Tabs
 | Tab Name | Columns |
 |----------|---------|
-| **Samples** | sampleId, field, lat, lon, year, pH, P, K, OM, Ca_sat, Mg_sat, K_Sat, H_Sat, Zn, Cu, Mn, Fe, Boron, S, CEC, Buffer_pH, P2, Na_Sat, Na, Ca, Mg, NO3, NH4, Soluble_Salts, EC |
+| **Samples** | sampleId, field, lat, lon, year, depth, pH, P, K, OM, Ca_sat, Mg_sat, K_Sat, H_Sat, Zn, Cu, Mn, Fe, Boron, S, CEC, Buffer_pH, P2, Na_Sat, Na, Ca, Mg, NO3, NH4, Soluble_Salts, EC |
 | **Fields** | id, name, boundary (JSON), acres, created |
 | **Settings** | key, min, target, max |
 
@@ -179,6 +179,7 @@ Users can configure their own Google Sheet in Settings:
   lat: 39.8528,
   lon: -95.5347,
   year: 2021,
+  depth: "6",  // Sample depth in inches (default: 6)
   pH: 6.8,
   P: 28,
   K: 185,

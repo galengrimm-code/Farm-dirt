@@ -296,7 +296,7 @@
         }
         const samplesCheck = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: CONFIG.SHEET_ID, range: 'Samples!A1:Z1' });
         if (!samplesCheck.result.values || samplesCheck.result.values.length === 0) {
-          await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: CONFIG.SHEET_ID, range: 'Samples!A1:V1', valueInputOption: 'RAW', resource: { values: [['sampleId', 'field', 'lat', 'lon', 'year', 'pH', 'P', 'K', 'OM', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'CEC', 'Buffer_pH', 'yieldCorrelations']] } });
+          await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: CONFIG.SHEET_ID, range: 'Samples!A1:W1', valueInputOption: 'RAW', resource: { values: [['sampleId', 'field', 'lat', 'lon', 'year', 'depth', 'pH', 'P', 'K', 'OM', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'CEC', 'Buffer_pH', 'yieldCorrelations']] } });
         }
       },
       
