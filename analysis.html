@@ -131,7 +131,7 @@
     <div id="comparison" class="tab-content active">
       <div class="controls-bar">
         <div class="control-group">
-          <label>Compare Year</label>
+          <label>From Year</label>
           <select id="year1Select"></select>
         </div>
         <div class="control-group">
@@ -179,23 +179,37 @@
       API_KEY: 'AIzaSyCOSDbrAlc3ct2-lRvJv1y7V0nV7haWc9E',
       SHEET_ID: '1buu-8KXoM1kRJSOAWtHaAk40seQT5kqGFY9RICYwdRY',
       
-      NUTRIENTS: ['pH', 'P', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH'],
+      NUTRIENTS: ['pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH', 'Na', 'Ca', 'Mg', 'NO3', 'NH4', 'Soluble_Salts', 'EC'],
       
       NUTRIENT_NAMES: {
-        pH: 'pH', P: 'Phosphorus (P)', K: 'Potassium (K)', OM: 'Organic Matter',
+        pH: 'pH', P: 'Phosphorus (P)', P2: 'Phosphorus P2', K: 'Potassium (K)', OM: 'Organic Matter',
         CEC: 'CEC', Ca_sat: 'Calcium Sat %', Mg_sat: 'Magnesium Sat %',
-        K_Sat: 'K Base Sat %', H_Sat: 'H Base Sat %', Zn: 'Zinc', Cu: 'Copper',
-        Mn: 'Manganese', Fe: 'Iron', Boron: 'Boron', S: 'Sulfur', Buffer_pH: 'Buffer pH'
+        K_Sat: 'K Base Sat %', H_Sat: 'H Base Sat %', Na_Sat: 'Na Base Sat %', Zn: 'Zinc', Cu: 'Copper',
+        Mn: 'Manganese', Fe: 'Iron', Boron: 'Boron', S: 'Sulfur', Buffer_pH: 'Buffer pH',
+        Na: 'Sodium', Ca: 'Calcium', Mg: 'Magnesium', NO3: 'Nitrate', NH4: 'Ammonium', Soluble_Salts: 'Soluble Salts', EC: 'EC'
       },
       
       NUTRIENT_UNITS: {
-        pH: '', P: 'ppm', K: 'ppm', OM: '%', CEC: 'meq/100g',
-        Ca_sat: '%', Mg_sat: '%', K_Sat: '%', H_Sat: '%',
-        Zn: 'ppm', Cu: 'ppm', Mn: 'ppm', Fe: 'ppm', Boron: 'ppm', S: 'ppm', Buffer_pH: ''
+        pH: '', P: 'ppm', P2: 'ppm', K: 'ppm', OM: '%', CEC: 'meq/100g',
+        Ca_sat: '%', Mg_sat: '%', K_Sat: '%', H_Sat: '%', Na_Sat: '%',
+        Zn: 'ppm', Cu: 'ppm', Mn: 'ppm', Fe: 'ppm', Boron: 'ppm', S: 'ppm', Buffer_pH: '',
+        Na: 'ppm', Ca: 'ppm', Mg: 'ppm', NO3: 'ppm', NH4: 'ppm', Soluble_Salts: 'mmhos/cm', EC: 'dS/m'
       },
       
-      LOWER_IS_BETTER: ['Mg_sat', 'H_Sat']
+      LOWER_IS_BETTER: ['Mg_sat', 'H_Sat', 'Na_Sat', 'Soluble_Salts'],
+      
+      // Default visibility for nutrients (used if no settings saved)
+      DEFAULT_VISIBLE: ['pH', 'P', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH']
     };
+    
+    // Get visible nutrients based on settings
+    function getVisibleNutrients() {
+      const saved = JSON.parse(localStorage.getItem('nutrientVisibility') || '{}');
+      return CONFIG.NUTRIENTS.filter(n => {
+        if (saved[n] !== undefined) return saved[n];
+        return CONFIG.DEFAULT_VISIBLE.includes(n);
+      });
+    }
 
     let tokenClient, accessToken = null;
     let sampleData = [];
@@ -271,16 +285,16 @@
       const years = [...new Set(sampleData.map(s => s.year).filter(y => y))].sort((a, b) => b - a);
       const fields = [...new Set(sampleData.map(s => s.field).filter(f => f && f !== 'Unknown'))].sort();
       
-      // Year comparison selectors
+      // Year comparison selectors - year1 is earlier (FROM), year2 is later (TO)
       const year1Sel = document.getElementById('year1Select');
       const year2Sel = document.getElementById('year2Select');
       year1Sel.innerHTML = ''; year2Sel.innerHTML = '';
       years.forEach((y, i) => {
-        year1Sel.innerHTML += `<option value="${y}" ${i === 0 ? 'selected' : ''}>${y}</option>`;
-        year2Sel.innerHTML += `<option value="${y}" ${i === 1 ? 'selected' : ''}>${y}</option>`;
+        year1Sel.innerHTML += `<option value="${y}" ${i === 1 ? 'selected' : ''}>${y}</option>`;
+        year2Sel.innerHTML += `<option value="${y}" ${i === 0 ? 'selected' : ''}>${y}</option>`;
       });
-      year1 = years[0] || null;
-      year2 = years[1] || years[0] || null;
+      year1 = years[1] || years[0] || null;  // Earlier year (second most recent)
+      year2 = years[0] || null;               // Later year (most recent)
       
       // History field selector
       const historyFieldSel = document.getElementById('historyFieldSelect');
@@ -290,7 +304,8 @@
       // Rankings selectors
       const rankAttrSel = document.getElementById('rankingAttrSelect');
       rankAttrSel.innerHTML = '';
-      CONFIG.NUTRIENTS.forEach(n => { rankAttrSel.innerHTML += `<option value="${n}">${CONFIG.NUTRIENT_NAMES[n] || n}</option>`; });
+      const visibleNutrients = getVisibleNutrients();
+      visibleNutrients.forEach(n => { rankAttrSel.innerHTML += `<option value="${n}">${CONFIG.NUTRIENT_NAMES[n] || n}</option>`; });
       
       const rankYearSel = document.getElementById('rankingYearSelect');
       rankYearSel.innerHTML = '<option value="most_recent" selected>Most Recent</option>';
@@ -328,29 +343,32 @@
     }
 
     // ========== TAB 1: Year Comparison ==========
+    // year1 = FROM (earlier year), year2 = TO (later year)
+    // Stats shown are for year2, change = year2 - year1
     function updateComparison() {
       const grid = document.getElementById('comparisonGrid');
       
-      if (!year1 || sampleData.length === 0) {
+      if (!year2 || sampleData.length === 0) {
         grid.innerHTML = '<div class="no-data">No data available. Import soil samples to see analysis.</div>';
         return;
       }
       
-      const samples1 = sampleData.filter(s => String(s.year) === String(year1));
-      const samples2 = year2 ? sampleData.filter(s => String(s.year) === String(year2)) : [];
+      const samplesFrom = year1 ? sampleData.filter(s => String(s.year) === String(year1)) : [];
+      const samplesTo = sampleData.filter(s => String(s.year) === String(year2));
       
-      if (samples1.length === 0) {
-        grid.innerHTML = `<div class="no-data">No samples found for ${year1}</div>`;
+      if (samplesTo.length === 0) {
+        grid.innerHTML = `<div class="no-data">No samples found for ${year2}</div>`;
         return;
       }
       
       let html = '';
       
-      CONFIG.NUTRIENTS.forEach(attr => {
-        const stats1 = getStats(samples1, attr);
-        const stats2 = year2 ? getStats(samples2, attr) : null;
+      const visibleNutrients = getVisibleNutrients();
+      visibleNutrients.forEach(attr => {
+        const statsTo = getStats(samplesTo, attr);
+        const statsFrom = year1 ? getStats(samplesFrom, attr) : null;
         
-        if (!stats1) return;
+        if (!statsTo) return;
         
         const name = CONFIG.NUTRIENT_NAMES[attr] || attr;
         const unit = CONFIG.NUTRIENT_UNITS[attr] || '';
@@ -359,9 +377,9 @@
         
         let pointChange = 0, pctChange = 0, cardClass = '', pctClass = 'neutral';
         
-        if (stats2 && stats2.avg) {
-          pointChange = stats1.avg - stats2.avg;
-          pctChange = stats2.avg !== 0 ? (pointChange / stats2.avg) * 100 : 0;
+        if (statsFrom && statsFrom.avg) {
+          pointChange = statsTo.avg - statsFrom.avg;
+          pctChange = statsFrom.avg !== 0 ? (pointChange / statsFrom.avg) * 100 : 0;
           const isPositive = isLowerBetter ? pointChange < 0 : pointChange > 0;
           const isSignificant = Math.abs(pctChange) > 2;
           if (isSignificant) {
@@ -374,24 +392,24 @@
           <div class="nutrient-card ${cardClass}">
             <div class="nutrient-header">
               <span class="nutrient-name">${name}</span>
-              ${stats2 ? `<span class="nutrient-pct ${pctClass}">${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(1)}%</span>` : ''}
+              ${statsFrom ? `<span class="nutrient-pct ${pctClass}">${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(1)}%</span>` : ''}
             </div>
             <div class="nutrient-stats">
-              <div class="stat-box"><div class="label">Average</div><div class="value">${stats1.avg.toFixed(decimals)}</div></div>
-              <div class="stat-box"><div class="label">High</div><div class="value">${stats1.high.toFixed(decimals)}</div></div>
-              <div class="stat-box"><div class="label">Low</div><div class="value">${stats1.low.toFixed(decimals)}</div></div>
+              <div class="stat-box"><div class="label">Average</div><div class="value">${statsTo.avg.toFixed(decimals)}</div></div>
+              <div class="stat-box"><div class="label">High</div><div class="value">${statsTo.high.toFixed(decimals)}</div></div>
+              <div class="stat-box"><div class="label">Low</div><div class="value">${statsTo.low.toFixed(decimals)}</div></div>
             </div>
-            ${stats2 ? `
+            ${statsFrom ? `
               <div class="year-comparison">
-                <div class="year-val"><div class="yr">${year2}</div><div class="num">${stats2.avg.toFixed(decimals)}</div></div>
+                <div class="year-val"><div class="yr">${year1}</div><div class="num">${statsFrom.avg.toFixed(decimals)}</div></div>
                 <div class="year-arrow">→</div>
-                <div class="year-val"><div class="yr">${year1}</div><div class="num">${stats1.avg.toFixed(decimals)}</div></div>
+                <div class="year-val"><div class="yr">${year2}</div><div class="num">${statsTo.avg.toFixed(decimals)}</div></div>
               </div>
               <div class="change-row">
                 <span>Point: <span class="val ${pctClass}">${pointChange >= 0 ? '+' : ''}${pointChange.toFixed(decimals)}</span></span>
                 <span>%: <span class="val ${pctClass}">${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(1)}%</span></span>
               </div>
-            ` : `<div class="year-comparison" style="justify-content:center;"><div class="year-val"><div class="yr">${year1}</div><div class="num">${stats1.avg.toFixed(decimals)} ${unit}</div></div></div>`}
+            ` : `<div class="year-comparison" style="justify-content:center;"><div class="year-val"><div class="yr">${year2}</div><div class="num">${statsTo.avg.toFixed(decimals)} ${unit}</div></div></div>`}
           </div>
         `;
       });
@@ -418,7 +436,8 @@
       
       let html = `<div style="background:#f8fafc;border:2px solid #cbd5e1;border-radius:0.5rem;padding:1rem;margin-bottom:1rem;"><h3 style="margin:0 0 0.25rem 0;">${fieldName}</h3><p style="margin:0;color:#64748b;">Years: ${years.join(', ')}</p></div>`;
       
-      CONFIG.NUTRIENTS.forEach(attr => {
+      const visibleNutrients = getVisibleNutrients();
+      visibleNutrients.forEach(attr => {
         const yearData = [];
         let hasData = false;
         
