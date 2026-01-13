@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v16 - Yield correlation syncs to Sheets -->
+<!-- v18 - Smooth color gradients, year filtering by attribute -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -108,19 +108,19 @@
           <select id="attributeSelect"></select>
         </div>
         <div class="control-group">
-          <label>YEAR</label>
+          <label>SHOW YEAR</label>
           <select id="yearSelect"><option value="all">All Years</option></select>
         </div>
         <div class="control-group compare-mode">
-          <label>COMPARE MODE</label>
+          <label>MODE</label>
           <div class="toggle-group">
-            <button class="toggle-btn active" id="singleYearBtn">Single Year</button>
-            <button class="toggle-btn" id="compareYearsBtn">Compare Years</button>
+            <button class="toggle-btn active" id="singleYearBtn">View</button>
+            <button class="toggle-btn" id="compareYearsBtn">Compare</button>
           </div>
         </div>
         <div class="control-group" id="compareYearGroup" style="display:none;">
-          <label>VS YEAR</label>
-          <select id="compareYearSelect"><option value="">Select Earlier Year</option></select>
+          <label>BASELINE</label>
+          <select id="compareYearSelect"><option value="">Select baseline year...</option></select>
         </div>
       </div>
       <div class="controls-right">
@@ -131,8 +131,32 @@
     
     <div class="legend" id="legendBar">
       <span class="legend-label">Legend:</span>
-      <div style="width: 100px; height: 16px; background: linear-gradient(to right, #ef4444, #eab308, #22c55e); border-radius: 8px; border: 1px solid #cbd5e1;"></div>
+      <div style="width: 100px; height: 16px; background: linear-gradient(to right, #dc2626, #f97316, #eab308, #84cc16, #16a34a); border-radius: 8px; border: 1px solid #cbd5e1;"></div>
       <span id="legendText">Low → High</span>
+    </div>
+
+    <!-- Compare mode info bar -->
+    <div id="compareInfoBar" style="display:none; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 2px solid #3b82f6; border-radius: 0.5rem; padding: 0.75rem 1rem; margin: 0 1rem 0.5rem 1rem; font-size: 0.875rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="font-weight: 700; color: #1d4ed8;">📊 Comparing:</span>
+          <span id="compareFromYear" style="background: #fef3c7; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">-</span>
+          <span style="color: #64748b;">→</span>
+          <span id="compareToYear" style="background: #dcfce7; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">-</span>
+        </div>
+        <div id="compareSummary" style="color: #475569;"></div>
+      </div>
+      <div style="margin-top: 0.5rem; font-size: 0.75rem; color: #64748b;">
+        <div style="margin-bottom: 0.25rem;">Each marker shows the change in value from baseline to current year. Samples are matched by location within each field.</div>
+        <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+          <span style="font-weight: 500;">Color scale:</span>
+          <span><span style="color: #dc2626; font-weight: 700;">●</span> Large decrease</span>
+          <span><span style="color: #f87171; font-weight: 700;">●</span> Small decrease</span>
+          <span><span style="color: #94a3b8; font-weight: 700;">●</span> No change</span>
+          <span><span style="color: #86efac; font-weight: 700;">●</span> Small increase</span>
+          <span><span style="color: #16a34a; font-weight: 700;">●</span> Large increase</span>
+        </div>
+      </div>
     </div>
     
     <!-- Mobile bottom toolbar -->
@@ -468,6 +492,65 @@
         return settings;
       },
 
+      // Interpolate between two hex colors
+      interpolateColor(color1, color2, factor) {
+        const hex = c => parseInt(c, 16);
+        const r1 = hex(color1.slice(1,3)), g1 = hex(color1.slice(3,5)), b1 = hex(color1.slice(5,7));
+        const r2 = hex(color2.slice(1,3)), g2 = hex(color2.slice(3,5)), b2 = hex(color2.slice(5,7));
+        const r = Math.round(r1 + (r2 - r1) * factor);
+        const g = Math.round(g1 + (g2 - g1) * factor);
+        const b = Math.round(b1 + (b2 - b1) * factor);
+        return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+      },
+
+      // Get gradient color from red->yellow->green based on position (0-1)
+      getGradientColor(position, isLowerBetter = false) {
+        // Clamp position to 0-1
+        const p = Math.max(0, Math.min(1, isLowerBetter ? 1 - position : position));
+        // Color stops: red (#dc2626) -> orange (#f97316) -> yellow (#eab308) -> lime (#84cc16) -> green (#16a34a)
+        const stops = [
+          { pos: 0.0, color: '#dc2626' },  // red
+          { pos: 0.25, color: '#f97316' }, // orange
+          { pos: 0.5, color: '#eab308' },  // yellow
+          { pos: 0.75, color: '#84cc16' }, // lime
+          { pos: 1.0, color: '#16a34a' }   // green
+        ];
+        // Find the two stops to interpolate between
+        for (let i = 0; i < stops.length - 1; i++) {
+          if (p >= stops[i].pos && p <= stops[i+1].pos) {
+            const range = stops[i+1].pos - stops[i].pos;
+            const factor = (p - stops[i].pos) / range;
+            return this.interpolateColor(stops[i].color, stops[i+1].color, factor);
+          }
+        }
+        return stops[stops.length - 1].color;
+      },
+
+      // Get gradient color for change values (negative->neutral->positive)
+      getChangeGradientColor(percentChange) {
+        // Clamp to -30% to +30% range for color scaling
+        const clampedPct = Math.max(-30, Math.min(30, percentChange));
+        // Map to 0-1 where 0 = -30%, 0.5 = 0%, 1 = +30%
+        const position = (clampedPct + 30) / 60;
+        // Color stops: dark red -> light red -> gray -> light green -> dark green
+        const stops = [
+          { pos: 0.0, color: '#b91c1c' },  // dark red (-30%+)
+          { pos: 0.25, color: '#f87171' }, // light red
+          { pos: 0.45, color: '#d1d5db' }, // light gray
+          { pos: 0.55, color: '#d1d5db' }, // light gray (neutral zone)
+          { pos: 0.75, color: '#86efac' }, // light green
+          { pos: 1.0, color: '#15803d' }   // dark green (+30%+)
+        ];
+        for (let i = 0; i < stops.length - 1; i++) {
+          if (position >= stops[i].pos && position <= stops[i+1].pos) {
+            const range = stops[i+1].pos - stops[i].pos;
+            const factor = (position - stops[i].pos) / range;
+            return this.interpolateColor(stops[i].color, stops[i+1].color, factor);
+          }
+        }
+        return stops[stops.length - 1].color;
+      },
+
       // Get median-based color using IQR to handle outliers
       // isLowerBetter: if true, lower values get green, higher get red (for Mg_sat, H_Sat, etc.)
       getMedianBasedColor(value, values, isLowerBetter = false) {
@@ -477,7 +560,6 @@
 
         // Calculate quartiles
         const q1 = sorted[Math.floor(len * 0.25)];
-        const median = sorted[Math.floor(len * 0.5)];
         const q3 = sorted[Math.floor(len * 0.75)];
         const iqr = q3 - q1;
 
@@ -488,47 +570,30 @@
 
         if (range === 0) return '#eab308'; // All same value = yellow
 
-        const red = '#ef4444', yellow = '#eab308', green = '#22c55e';
-
         // Clamp value to bounds for color calculation
         const clampedValue = Math.max(lowerBound, Math.min(upperBound, value));
         const position = (clampedValue - lowerBound) / range; // 0 to 1
 
-        // For "lower is better" attributes, invert the scale
-        if (isLowerBetter) {
-          if (position > 0.66) return red;
-          if (position > 0.33) return yellow;
-          return green;
-        }
-
-        if (position < 0.33) return red;
-        if (position < 0.66) return yellow;
-        return green;
+        // Use smooth gradient
+        return this.getGradientColor(position, isLowerBetter);
       },
       
       // Get color for year-over-year change
       getChangeColor(change, percentChange) {
-        const red = '#ef4444', white = '#f8fafc', green = '#22c55e';
-        
-        if (Math.abs(percentChange) < 2) return white; // Less than 2% change = neutral
-        if (percentChange > 15) return green; // Big increase = bright green
-        if (percentChange > 5) return '#86efac'; // Medium increase = light green
-        if (percentChange > 0) return '#bbf7d0'; // Small increase = very light green
-        if (percentChange > -5) return '#fecaca'; // Small decrease = very light red
-        if (percentChange > -15) return '#f87171'; // Medium decrease = light red
-        return red; // Big decrease = bright red
+        // Use smooth gradient for change colors
+        return this.getChangeGradientColor(percentChange);
       },
       
       getColor(value, attribute, settings = {}, bufferPercent = 25, allValues = null) {
         // Sample ID gets neutral blue color
         if (attribute === 'sampleId') return '#3b82f6';
-        
+
         // CEC and micronutrients use median-based coloring if allValues provided
         const medianBasedAttrs = ['CEC', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S'];
         if (medianBasedAttrs.includes(attribute) && allValues && allValues.length > 0) {
           return this.getMedianBasedColor(value, allValues);
         }
-        
+
         // Default thresholds if none provided
         const defaultThresholds = {
           pH: { min: 6.3, max: 6.9 },
@@ -540,26 +605,59 @@
           K_Sat: { min: 3.0, max: null },
           H_Sat: { min: null, max: 5.0 }
         };
-        
+
         const threshold = settings[attribute] || defaultThresholds[attribute];
-        const red = '#ef4444', yellow = '#eab308', green = '#22c55e';
-        
+        const isLowerBetter = CONFIG.LOWER_IS_BETTER.includes(attribute);
+
         if (!threshold) {
           return '#94a3b8';
         }
+
+        // Calculate position for smooth gradient (0 = worst, 1 = best)
         if (threshold.min !== null && threshold.max !== null) {
-          if (value >= threshold.min && value <= threshold.max) return green;
+          // Range threshold (pH, Ca_sat) - optimal is in the middle
           const buffer = (threshold.max - threshold.min) * (bufferPercent / 100);
-          if (value < threshold.min) return (threshold.min - value) > buffer ? red : yellow;
-          return (value - threshold.max) > buffer ? red : yellow;
+          const lowerBound = threshold.min - buffer;
+          const upperBound = threshold.max + buffer;
+
+          if (value >= threshold.min && value <= threshold.max) {
+            return '#16a34a'; // In optimal range = green
+          } else if (value < threshold.min) {
+            // Below optimal - calculate position from lowerBound to min
+            const pos = Math.max(0, (value - lowerBound) / (threshold.min - lowerBound));
+            return this.getGradientColor(pos * 0.5, false); // 0-0.5 range (red to yellow)
+          } else {
+            // Above optimal - calculate position from max to upperBound
+            const pos = Math.max(0, 1 - (value - threshold.max) / (upperBound - threshold.max));
+            return this.getGradientColor(pos * 0.5, false); // 0-0.5 range (red to yellow)
+          }
         } else if (threshold.min !== null) {
+          // Minimum threshold (P, K, OM, K_Sat) - higher is better
           const buffer = threshold.min * (bufferPercent / 100);
-          if (value >= threshold.min) return green;
-          return value >= threshold.min - buffer ? yellow : red;
+          const lowerBound = threshold.min - buffer;
+          // Calculate position: 0 at lowerBound, 1 at min (optimal)
+          if (value >= threshold.min) {
+            // Above optimal - calculate gradient up to 2x min
+            const pos = Math.min(1, 0.5 + (value - threshold.min) / (threshold.min * 2) * 0.5);
+            return this.getGradientColor(pos, false);
+          } else {
+            // Below optimal
+            const pos = Math.max(0, (value - lowerBound) / (threshold.min - lowerBound)) * 0.5;
+            return this.getGradientColor(pos, false);
+          }
         } else if (threshold.max !== null) {
+          // Maximum threshold (Mg_sat, H_Sat) - lower is better
           const buffer = threshold.max * (bufferPercent / 100);
-          if (value <= threshold.max) return green;
-          return value <= threshold.max + buffer ? yellow : red;
+          const upperBound = threshold.max + buffer;
+          if (value <= threshold.max) {
+            // Below max (good) - calculate gradient
+            const pos = 0.5 + (1 - value / threshold.max) * 0.5;
+            return this.getGradientColor(Math.min(1, pos), false);
+          } else {
+            // Above max (bad)
+            const pos = Math.max(0, 1 - (value - threshold.max) / (upperBound - threshold.max)) * 0.5;
+            return this.getGradientColor(pos, false);
+          }
         }
         return '#94a3b8';
       },
@@ -711,31 +809,33 @@
         updateMap(); 
         zoomToField(selectedField); 
       });
-      document.getElementById('attributeSelect').addEventListener('change', (e) => { selectedAttribute = e.target.value; updateMap(); updateLegend(); });
+      document.getElementById('attributeSelect').addEventListener('change', (e) => { selectedAttribute = e.target.value; updateYearSelector(); updateCompareYearOptions(); updateMap(); updateLegend(); });
       document.getElementById('yearSelect').addEventListener('change', (e) => { selectedYear = e.target.value; updateCompareYearOptions(); updateMap(); });
       document.getElementById('compareYearSelect').addEventListener('change', (e) => { compareYear = e.target.value; updateMap(); });
-      document.getElementById('singleYearBtn').addEventListener('click', () => { 
-        compareMode = false; 
-        document.getElementById('singleYearBtn').classList.add('active'); 
-        document.getElementById('compareYearsBtn').classList.remove('active'); 
+      document.getElementById('singleYearBtn').addEventListener('click', () => {
+        compareMode = false;
+        document.getElementById('singleYearBtn').classList.add('active');
+        document.getElementById('compareYearsBtn').classList.remove('active');
         document.getElementById('compareYearGroup').style.display = 'none';
+        document.getElementById('compareInfoBar').style.display = 'none';
         updateLegend();
-        updateMap(); 
+        updateMap();
       });
-      document.getElementById('compareYearsBtn').addEventListener('click', () => { 
-        compareMode = true; 
-        document.getElementById('compareYearsBtn').classList.add('active'); 
-        document.getElementById('singleYearBtn').classList.remove('active'); 
+      document.getElementById('compareYearsBtn').addEventListener('click', () => {
+        compareMode = true;
+        document.getElementById('compareYearsBtn').classList.add('active');
+        document.getElementById('singleYearBtn').classList.remove('active');
         document.getElementById('compareYearGroup').style.display = 'block';
+        document.getElementById('compareInfoBar').style.display = 'block';
         updateCompareYearOptions();
         // Auto-select the most recent year before selected year
         const sel = document.getElementById('compareYearSelect');
         if (sel.options.length > 1) {
-          sel.selectedIndex = 1; // First year after "Select Earlier Year"
+          sel.selectedIndex = 1; // First year after "Select baseline year"
           compareYear = sel.value;
         }
         updateLegend();
-        updateMap(); 
+        updateMap();
       });
       document.getElementById('fieldModeBtn').addEventListener('click', toggleFieldMode);
       document.getElementById('refreshBtn').addEventListener('click', () => {
@@ -760,12 +860,13 @@
     function toggleMobileCompare() {
       const btn = document.getElementById('mobileCompareBtn');
       compareMode = !compareMode;
-      
+
       if (compareMode) {
         btn.textContent = '📊 Compare ON';
         btn.classList.add('active');
         document.getElementById('compareYearsBtn').classList.add('active');
         document.getElementById('singleYearBtn').classList.remove('active');
+        document.getElementById('compareInfoBar').style.display = 'block';
         updateCompareYearOptions();
         // Auto-select first available compare year
         const sel = document.getElementById('compareYearSelect');
@@ -778,16 +879,29 @@
         btn.classList.remove('active');
         document.getElementById('singleYearBtn').classList.add('active');
         document.getElementById('compareYearsBtn').classList.remove('active');
+        document.getElementById('compareInfoBar').style.display = 'none';
         compareYear = '';
       }
       updateLegend();
       updateMap();
     }
-    
+
     function updateCompareYearOptions() {
       const sel = document.getElementById('compareYearSelect');
-      sel.innerHTML = '<option value="">Select Earlier Year</option>';
-      const years = Utils.getUniqueYears(sampleData).filter(y => String(y) !== String(selectedYear));
+      sel.innerHTML = '<option value="">Select baseline year...</option>';
+
+      // Filter samples by field and attribute
+      let filteredSamples = selectedField === 'all'
+        ? sampleData
+        : sampleData.filter(s => s.field === selectedField);
+
+      // Only include years that have data for the selected attribute
+      filteredSamples = filteredSamples.filter(s => {
+        const v = s[selectedAttribute];
+        return v !== undefined && v !== null && (selectedAttribute === 'sampleId' || !isNaN(v));
+      });
+
+      const years = Utils.getUniqueYears(filteredSamples).filter(y => String(y) !== String(selectedYear));
       years.forEach(y => { const o = document.createElement('option'); o.value = y; o.textContent = y; sel.appendChild(o); });
     }
     
@@ -795,10 +909,10 @@
       const legendText = document.getElementById('legendText');
       if (compareMode) {
         legendText.textContent = 'Decrease ← → Increase';
-        document.querySelector('#legendBar div').style.background = 'linear-gradient(to right, #ef4444, #f8fafc, #22c55e)';
+        document.querySelector('#legendBar div').style.background = 'linear-gradient(to right, #b91c1c, #f87171, #d1d5db, #86efac, #15803d)';
       } else {
         legendText.textContent = 'Low → High';
-        document.querySelector('#legendBar div').style.background = 'linear-gradient(to right, #ef4444, #eab308, #22c55e)';
+        document.querySelector('#legendBar div').style.background = 'linear-gradient(to right, #dc2626, #f97316, #eab308, #84cc16, #16a34a)';
       }
     }
     
@@ -979,15 +1093,21 @@
       const sel = document.getElementById('yearSelect');
       const val = sel.value;
       sel.innerHTML = '<option value="all">All Years</option>';
-      
+
       // Filter samples by selected field if one is selected
-      const filteredSamples = selectedField === 'all' 
-        ? sampleData 
+      let filteredSamples = selectedField === 'all'
+        ? sampleData
         : sampleData.filter(s => s.field === selectedField);
-      
+
+      // Only include years that have data for the selected attribute
+      filteredSamples = filteredSamples.filter(s => {
+        const v = s[selectedAttribute];
+        return v !== undefined && v !== null && (selectedAttribute === 'sampleId' || !isNaN(v));
+      });
+
       const years = Utils.getUniqueYears(filteredSamples);
       years.forEach(y => { const o = document.createElement('option'); o.value = y; o.textContent = y; sel.appendChild(o); });
-      
+
       // Keep previous selection if still valid, otherwise reset to 'all'
       if (years.includes(parseInt(val))) {
         sel.value = val;
@@ -1205,17 +1325,21 @@
       // Get samples from selected year (later) and compare year (earlier)
       const laterYear = selectedYear;
       const earlierYear = compareYear;
-      
+
+      // Update the compare info bar with year values
+      document.getElementById('compareFromYear').textContent = earlierYear;
+      document.getElementById('compareToYear').textContent = laterYear;
+
       const laterSamples = sampleData.filter(s => {
         if (selectedField !== 'all' && s.field !== selectedField) return false;
         return String(s.year) === String(laterYear);
       });
-      
+
       const earlierSamples = sampleData.filter(s => {
         if (selectedField !== 'all' && s.field !== selectedField) return false;
         return String(s.year) === String(earlierYear);
       });
-      
+
       // Calculate change stats
       const changes = [];
       
@@ -1272,6 +1396,9 @@
         });
       
       // Update stats for compare mode
+      const attrName = CONFIG.NUTRIENT_NAMES[selectedAttribute] || selectedAttribute;
+      const unit = CONFIG.NUTRIENT_UNITS[selectedAttribute] || '';
+
       if (changes.length > 0) {
         const avg = changes.reduce((a, b) => a + b, 0) / changes.length;
         const high = Math.max(...changes);
@@ -1280,6 +1407,16 @@
         document.getElementById('statsAvg').textContent = (avg >= 0 ? '+' : '') + avg.toFixed(1);
         document.getElementById('statsHigh').textContent = (high >= 0 ? '+' : '') + high.toFixed(1);
         document.getElementById('statsLow').textContent = (low >= 0 ? '+' : '') + low.toFixed(1);
+
+        // Update compare info bar summary
+        const sign = avg >= 0 ? '+' : '';
+        const direction = avg > 0.5 ? 'increase' : (avg < -0.5 ? 'decrease' : 'no change');
+        const summaryColor = avg > 0.5 ? '#16a34a' : (avg < -0.5 ? '#dc2626' : '#64748b');
+        document.getElementById('compareSummary').innerHTML =
+          `<span style="font-weight: 600; color: ${summaryColor}">${attrName}: ${sign}${avg.toFixed(1)}${unit ? ' ' + unit : ''} avg ${direction}</span>`;
+      } else {
+        document.getElementById('compareSummary').innerHTML =
+          `<span style="color: #94a3b8;">No matching samples between ${earlierYear} and ${laterYear}</span>`;
       }
     }
 
