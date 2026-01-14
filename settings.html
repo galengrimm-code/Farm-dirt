@@ -148,7 +148,13 @@
         <div class="threshold-row"><span class="name">Buffer Zone</span><span class="note">Yellow warning zone width</span><div class="inputs"><input type="number" id="bufferPercent" value="25"><span class="unit">%</span></div></div>
       </div>
     </div>
-    
+
+    <div class="settings-card">
+      <h3>🔢 Decimal Places</h3>
+      <p style="color: #64748b; margin-bottom: 1rem; font-size: 0.875rem;">Configure decimal precision for each attribute. Changes apply to map markers, analysis tables, charts, and exports.</p>
+      <div id="decimalPlacesGrid" class="nutrient-grid-vis" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));"></div>
+    </div>
+
     <div class="settings-card">
       <h3>📋 Column Mapping</h3>
       <p style="color: #64748b; margin-bottom: 0.5rem; font-size: 0.875rem;">Map column names from your lab files to standard soil attributes. Add aliases so the app recognizes your lab's column headers.</p>
@@ -211,6 +217,35 @@
       NH4: { name: 'Ammonium', defaultVisible: false },
       Soluble_Salts: { name: 'Soluble Salts', defaultVisible: false },
       EC: { name: 'EC', defaultVisible: false }
+    };
+
+    // Default decimal places for each attribute
+    const DEFAULT_DECIMAL_PLACES = {
+      pH: 2,
+      Buffer_pH: 2,
+      OM: 2,
+      P: 0,
+      P2: 0,
+      K: 0,
+      CEC: 1,
+      Ca_sat: 1,
+      Mg_sat: 1,
+      K_Sat: 1,
+      H_Sat: 1,
+      Na_Sat: 1,
+      Zn: 2,
+      Cu: 2,
+      Mn: 1,
+      Fe: 1,
+      Boron: 2,
+      S: 1,
+      Ca: 0,
+      Mg: 0,
+      Na: 0,
+      NO3: 1,
+      NH4: 1,
+      Soluble_Salts: 2,
+      EC: 2
     };
 
     // Default column aliases (must match import.html)
@@ -309,7 +344,7 @@
       if (isSignedIn) { userInfo.textContent = 'Connected'; authBtn.textContent = '✓ Signed In'; authBtn.classList.add('signed-in'); }
       else { userInfo.textContent = ''; authBtn.textContent = 'Sign In to Edit'; authBtn.classList.remove('signed-in'); }
     }
-    function loadSettings() { try { const saved = localStorage.getItem('soilSettings'), settings = saved ? JSON.parse(saved) : defaults; Object.entries(settings).forEach(([k, v]) => { const i = document.getElementById(k); if (i) i.value = v; }); loadColumnMapping(); loadNutrientVisibility(); loadSheetConfig(); loadBackupSettings(); } catch (e) {} }
+    function loadSettings() { try { const saved = localStorage.getItem('soilSettings'), settings = saved ? JSON.parse(saved) : defaults; Object.entries(settings).forEach(([k, v]) => { const i = document.getElementById(k); if (i) i.value = v; }); loadColumnMapping(); loadNutrientVisibility(); loadDecimalPlaces(); loadSheetConfig(); loadBackupSettings(); } catch (e) {} }
 
     // ========== BACKUP SETTINGS ==========
     function loadBackupSettings() {
@@ -388,7 +423,8 @@
         fieldBoundaries: fieldBoundaries,
         settings: JSON.parse(localStorage.getItem('soilSettings') || '{}'),
         columnAliases: JSON.parse(localStorage.getItem('columnAliases') || '{}'),
-        nutrientVisibility: JSON.parse(localStorage.getItem('nutrientVisibility') || '{}')
+        nutrientVisibility: JSON.parse(localStorage.getItem('nutrientVisibility') || '{}'),
+        decimalPlaces: JSON.parse(localStorage.getItem('decimalPlaces') || '{}')
       };
 
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -506,6 +542,44 @@
         if (checkbox) visibility[key] = checkbox.checked;
       }
       localStorage.setItem('nutrientVisibility', JSON.stringify(visibility));
+    }
+
+    // Decimal Places - number input grid
+    function loadDecimalPlaces() {
+      const saved = JSON.parse(localStorage.getItem('decimalPlaces') || '{}');
+      const container = document.getElementById('decimalPlacesGrid');
+
+      // Order: most commonly used attributes first
+      const orderedKeys = ['pH', 'Buffer_pH', 'P', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'P2', 'Na_Sat', 'Na', 'Ca', 'Mg', 'NO3', 'NH4', 'Soluble_Salts', 'EC'];
+
+      let html = '';
+      for (const key of orderedKeys) {
+        const info = ALL_NUTRIENTS[key];
+        if (!info) continue;
+        const decimals = saved[key] !== undefined ? saved[key] : (DEFAULT_DECIMAL_PLACES[key] ?? 1);
+        html += `
+          <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: #f8fafc; border-radius: 0.375rem;">
+            <label for="dec_${key}" style="flex: 1; font-weight: 500; font-size: 0.875rem;">${info.name}</label>
+            <select id="dec_${key}" onchange="saveDecimalPlaces()" style="padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; font-size: 0.875rem;">
+              <option value="0" ${decimals === 0 ? 'selected' : ''}>0</option>
+              <option value="1" ${decimals === 1 ? 'selected' : ''}>1</option>
+              <option value="2" ${decimals === 2 ? 'selected' : ''}>2</option>
+              <option value="3" ${decimals === 3 ? 'selected' : ''}>3</option>
+            </select>
+          </div>
+        `;
+      }
+      container.innerHTML = html;
+    }
+
+    function saveDecimalPlaces() {
+      const decimals = {};
+      const orderedKeys = ['pH', 'Buffer_pH', 'P', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'P2', 'Na_Sat', 'Na', 'Ca', 'Mg', 'NO3', 'NH4', 'Soluble_Salts', 'EC'];
+      for (const key of orderedKeys) {
+        const select = document.getElementById('dec_' + key);
+        if (select) decimals[key] = parseInt(select.value, 10);
+      }
+      localStorage.setItem('decimalPlaces', JSON.stringify(decimals));
     }
 
     function removeAlias(standard, alias) {

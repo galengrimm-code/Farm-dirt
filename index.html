@@ -253,6 +253,35 @@
         Mg: { yellow: 150, green: 300 }
       },
 
+      // Default decimal places for each attribute (can be overridden in settings)
+      DECIMAL_PLACES: {
+        pH: 2,
+        Buffer_pH: 2,
+        OM: 2,
+        P: 0,
+        P2: 0,
+        K: 0,
+        CEC: 1,
+        Ca_sat: 1,
+        Mg_sat: 1,
+        K_Sat: 1,
+        H_Sat: 1,
+        Na_Sat: 1,
+        Zn: 2,
+        Cu: 2,
+        Mn: 1,
+        Fe: 1,
+        Boron: 2,
+        S: 1,
+        Ca: 0,
+        Mg: 0,
+        Na: 0,
+        NO3: 1,
+        NH4: 1,
+        Soluble_Salts: 2,
+        EC: 2
+      },
+
       // All nutrients in display order with default visibility
       ALL_NUTRIENTS: [
         { key: 'sampleId', name: 'Sample ID', defaultVisible: true },
@@ -721,7 +750,29 @@
         if (value === null || value === undefined || isNaN(value)) return '-';
         return Number(value).toFixed(decimals);
       },
-      
+
+      // Get decimal places for an attribute (checks user settings, then CONFIG defaults)
+      getDecimals(attr) {
+        // Check for user-customized settings first
+        const customDecimals = JSON.parse(localStorage.getItem('decimalPlaces') || '{}');
+        if (customDecimals[attr] !== undefined) {
+          return customDecimals[attr];
+        }
+        // Fall back to CONFIG defaults
+        if (CONFIG.DECIMAL_PLACES[attr] !== undefined) {
+          return CONFIG.DECIMAL_PLACES[attr];
+        }
+        // Default to 1 decimal for unknown attributes
+        return 1;
+      },
+
+      // Format a value using the configured decimal places for an attribute
+      formatValue(value, attr) {
+        if (value === null || value === undefined || isNaN(value)) return '-';
+        const decimals = Utils.getDecimals(attr);
+        return Number(value).toFixed(decimals);
+      },
+
       getUniqueYears(samples) {
         return [...new Set(samples.map(s => s.year).filter(y => y))].sort();
       },
@@ -1101,7 +1152,7 @@
       const avg = values.reduce((a, b) => a + b, 0) / values.length;
       const high = Math.max(...values);
       const low = Math.min(...values);
-      const decimals = selectedAttribute === 'pH' ? 2 : 1;
+      const decimals = Utils.getDecimals(selectedAttribute);
 
       statsAvg.textContent = avg.toFixed(decimals) + (unit ? ' ' + unit : '');
       statsHigh.textContent = high.toFixed(decimals) + (unit ? ' ' + unit : '');
@@ -1442,7 +1493,7 @@
             if (hasNoData) {
               tooltipContent = `<strong>${name}</strong><br><em style="color: #9ca3af;">No data for ${CONFIG.NUTRIENT_NAMES[selectedAttribute] || selectedAttribute}</em>`;
             } else if (fieldStats) {
-              tooltipContent = `<strong>${name}</strong><br>Avg ${CONFIG.NUTRIENT_NAMES[selectedAttribute] || selectedAttribute}: ${fieldStats.avg.toFixed(1)} ${CONFIG.NUTRIENT_UNITS[selectedAttribute] || ''}`;
+              tooltipContent = `<strong>${name}</strong><br>Avg ${CONFIG.NUTRIENT_NAMES[selectedAttribute] || selectedAttribute}: ${Utils.formatValue(fieldStats.avg, selectedAttribute)} ${CONFIG.NUTRIENT_UNITS[selectedAttribute] || ''}`;
             } else {
               tooltipContent = name;
             }
@@ -1706,7 +1757,7 @@
           color = Utils.getColor(numValue, selectedAttribute, settings, bufferPct, allValues);
           displayVal = selectedAttribute === 'sampleId'
             ? rawValue
-            : Utils.formatNumber(numValue, selectedAttribute === 'pH' ? 1 : 0);
+            : Utils.formatValue(numValue, selectedAttribute);
         } else {
           // No valid data - skip this sample entirely (don't show on map)
           return;
@@ -1738,7 +1789,7 @@
         if (n.key === 'sampleId') return; // Already shown in header
         const value = sample[n.key];
         if (value === undefined || value === null) return;
-        const displayVal = typeof value === 'number' ? value.toFixed(n.key === 'pH' || n.key === 'Buffer_pH' ? 1 : (value < 10 ? 2 : 1)) : value;
+        const displayVal = typeof value === 'number' ? Utils.formatValue(value, n.key) : value;
         const unit = CONFIG.NUTRIENT_UNITS[n.key] || '';
         const isSelected = n.key === selectedAttribute;
         html += `<tr style="${isSelected ? 'background: #dbeafe; font-weight: 600;' : ''}">`;
@@ -1801,11 +1852,12 @@
           const fontSize = fieldModeActive ? 12 : 10;
           
           let displayVal;
+          const attrDecimals = Utils.getDecimals(selectedAttribute);
           if (change !== null) {
             const sign = change >= 0 ? '+' : '';
-            displayVal = sign + Utils.formatNumber(change, 1);
+            displayVal = sign + Utils.formatNumber(change, attrDecimals);
           } else {
-            displayVal = Utils.formatNumber(value, 1);
+            displayVal = Utils.formatNumber(value, attrDecimals);
           }
           
           const icon = L.divIcon({
@@ -1814,11 +1866,12 @@
           });
           const marker = L.marker([laterSample.lat, laterSample.lon], { icon }).addTo(map);
           
+          const decimals = Utils.getDecimals(selectedAttribute);
           let popupText = `<strong>Sample ${laterSample.sampleId || ''}</strong><br>Field: ${laterSample.field || 'Unknown'}`;
-          popupText += `<br>${earlierYear}: ${earlierValue !== null ? Utils.formatNumber(earlierValue, 1) : 'N/A'}`;
-          popupText += `<br>${laterYear}: ${Utils.formatNumber(value, 1)}`;
+          popupText += `<br>${earlierYear}: ${earlierValue !== null ? Utils.formatNumber(earlierValue, decimals) : 'N/A'}`;
+          popupText += `<br>${laterYear}: ${Utils.formatNumber(value, decimals)}`;
           if (change !== null) {
-            popupText += `<br><strong>Change: ${change >= 0 ? '+' : ''}${Utils.formatNumber(change, 1)} (${percentChange >= 0 ? '+' : ''}${Utils.formatNumber(percentChange, 0)}%)</strong>`;
+            popupText += `<br><strong>Change: ${change >= 0 ? '+' : ''}${Utils.formatNumber(change, decimals)} (${percentChange >= 0 ? '+' : ''}${Utils.formatNumber(percentChange, 0)}%)</strong>`;
             changes.push(change);
           }
           marker.bindPopup(popupText);
@@ -1833,10 +1886,11 @@
         const avg = changes.reduce((a, b) => a + b, 0) / changes.length;
         const high = Math.max(...changes);
         const low = Math.min(...changes);
+        const changeDecimals = Utils.getDecimals(selectedAttribute);
         document.getElementById('statsTitle').textContent = 'Change Stats';
-        document.getElementById('statsAvg').textContent = (avg >= 0 ? '+' : '') + avg.toFixed(1);
-        document.getElementById('statsHigh').textContent = (high >= 0 ? '+' : '') + high.toFixed(1);
-        document.getElementById('statsLow').textContent = (low >= 0 ? '+' : '') + low.toFixed(1);
+        document.getElementById('statsAvg').textContent = (avg >= 0 ? '+' : '') + avg.toFixed(changeDecimals);
+        document.getElementById('statsHigh').textContent = (high >= 0 ? '+' : '') + high.toFixed(changeDecimals);
+        document.getElementById('statsLow').textContent = (low >= 0 ? '+' : '') + low.toFixed(changeDecimals);
         document.getElementById('statsNote').textContent = 'Year-over-year change';
 
         // Update compare info bar summary
@@ -1844,7 +1898,7 @@
         const direction = avg > 0.5 ? 'increase' : (avg < -0.5 ? 'decrease' : 'no change');
         const summaryColor = avg > 0.5 ? '#16a34a' : (avg < -0.5 ? '#dc2626' : '#64748b');
         document.getElementById('compareSummary').innerHTML =
-          `<span style="font-weight: 600; color: ${summaryColor}">${attrName}: ${sign}${avg.toFixed(1)}${unit ? ' ' + unit : ''} avg ${direction}</span>`;
+          `<span style="font-weight: 600; color: ${summaryColor}">${attrName}: ${sign}${avg.toFixed(changeDecimals)}${unit ? ' ' + unit : ''} avg ${direction}</span>`;
       } else {
         document.getElementById('compareSummary').innerHTML =
           `<span style="color: #94a3b8;">No matching samples between ${earlierYear} and ${laterYear}</span>`;

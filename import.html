@@ -275,8 +275,28 @@
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
       API_KEY: 'AIzaSyCOSDbrAlc3ct2-lRvJv1y7V0nV7haWc9E',
-      get SHEET_ID() { return localStorage.getItem('googleSheetId') || '1buu-8KXoM1kRJSOAWtHaAk40seQT5kqGFY9RICYwdRY'; }
+      get SHEET_ID() { return localStorage.getItem('googleSheetId') || '1buu-8KXoM1kRJSOAWtHaAk40seQT5kqGFY9RICYwdRY'; },
+      DECIMAL_PLACES: {
+        pH: 2, Buffer_pH: 2, OM: 2, P: 0, P2: 0, K: 0, CEC: 1,
+        Ca_sat: 1, Mg_sat: 1, K_Sat: 1, H_Sat: 1, Na_Sat: 1,
+        Zn: 2, Cu: 2, Mn: 1, Fe: 1, Boron: 2, S: 1,
+        Ca: 0, Mg: 0, Na: 0, NO3: 1, NH4: 1, Soluble_Salts: 2, EC: 2
+      }
     };
+
+    // Get decimal places for an attribute (checks user settings, then CONFIG defaults)
+    function getDecimals(attr) {
+      const customDecimals = JSON.parse(localStorage.getItem('decimalPlaces') || '{}');
+      if (customDecimals[attr] !== undefined) return customDecimals[attr];
+      if (CONFIG.DECIMAL_PLACES[attr] !== undefined) return CONFIG.DECIMAL_PLACES[attr];
+      return 1;
+    }
+
+    // Format a value using the configured decimal places for an attribute
+    function formatValue(value, attr) {
+      if (value === null || value === undefined || isNaN(value)) return '-';
+      return Number(value).toFixed(getDecimals(attr));
+    }
 
     let tokenClient;
     let accessToken = null;
@@ -2283,7 +2303,7 @@
                 <tr>
                   <td>${s.field || ''}</td>
                   <td>${s.year || ''}</td>
-                  ${visibleNutrients.slice(0, 12).map(n => `<td>${s[n] !== undefined ? (typeof s[n] === 'number' ? s[n].toFixed(1) : s[n]) : ''}</td>`).join('')}
+                  ${visibleNutrients.slice(0, 12).map(n => `<td>${s[n] !== undefined ? (typeof s[n] === 'number' ? formatValue(s[n], n) : s[n]) : ''}</td>`).join('')}
                   <td>${s.yieldCorrelations ? Object.values(s.yieldCorrelations)[0]?.avgYield?.toFixed(0) || '' : ''}</td>
                 </tr>
               `).join('')}

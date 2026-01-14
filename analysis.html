@@ -271,11 +271,33 @@
       },
       
       LOWER_IS_BETTER: ['Mg_sat', 'H_Sat', 'Na_Sat', 'Soluble_Salts'],
-      
+
       // Default visibility for nutrients (used if no settings saved)
-      DEFAULT_VISIBLE: ['pH', 'P', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH']
+      DEFAULT_VISIBLE: ['pH', 'P', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH'],
+
+      // Default decimal places for each attribute
+      DECIMAL_PLACES: {
+        pH: 2, Buffer_pH: 2, OM: 2, P: 0, P2: 0, K: 0, CEC: 1,
+        Ca_sat: 1, Mg_sat: 1, K_Sat: 1, H_Sat: 1, Na_Sat: 1,
+        Zn: 2, Cu: 2, Mn: 1, Fe: 1, Boron: 2, S: 1,
+        Ca: 0, Mg: 0, Na: 0, NO3: 1, NH4: 1, Soluble_Salts: 2, EC: 2
+      }
     };
-    
+
+    // Get decimal places for an attribute (checks user settings, then CONFIG defaults)
+    function getDecimals(attr) {
+      const customDecimals = JSON.parse(localStorage.getItem('decimalPlaces') || '{}');
+      if (customDecimals[attr] !== undefined) return customDecimals[attr];
+      if (CONFIG.DECIMAL_PLACES[attr] !== undefined) return CONFIG.DECIMAL_PLACES[attr];
+      return 1;
+    }
+
+    // Format a value using the configured decimal places for an attribute
+    function formatValue(value, attr) {
+      if (value === null || value === undefined || isNaN(value)) return '-';
+      return Number(value).toFixed(getDecimals(attr));
+    }
+
     // Get visible nutrients based on settings
     function getVisibleNutrients() {
       const saved = JSON.parse(localStorage.getItem('nutrientVisibility') || '{}');
@@ -630,7 +652,7 @@
         
         const name = CONFIG.NUTRIENT_NAMES[attr] || attr;
         const unit = CONFIG.NUTRIENT_UNITS[attr] || '';
-        const decimals = (attr === 'pH' || attr === 'Buffer_pH') ? 2 : 1;
+        const decimals = getDecimals(attr);
         const isLowerBetter = CONFIG.LOWER_IS_BETTER.includes(attr);
         
         let pointChange = 0, pctChange = 0, cardClass = '', pctClass = 'neutral';
@@ -740,7 +762,7 @@
             const pctChange = first.avg !== 0 ? (avgChange / first.avg) * 100 : 0;
             const isLowerBetter = CONFIG.LOWER_IS_BETTER.includes(attr);
             const isPositive = isLowerBetter ? avgChange < 0 : avgChange > 0;
-            const decimals = (attr === 'pH' || attr === 'Buffer_pH') ? 2 : 1;
+            const decimals = getDecimals(attr);
             const unit = CONFIG.NUTRIENT_UNITS[attr] || '';
             const name = CONFIG.NUTRIENT_NAMES[attr] || attr;
 
@@ -750,7 +772,7 @@
               color = isPositive ? '#22c55e' : '#ef4444';
             }
 
-            const graph = createDualLineGraph(yearData, color);
+            const graph = createDualLineGraph(yearData, color, attr);
 
             html += `
               <div class="trend-card ${cardClass}">
@@ -870,7 +892,7 @@
             const pctChange = first.avg !== 0 ? (avgChange / first.avg) * 100 : 0;
             const isLowerBetter = CONFIG.LOWER_IS_BETTER.includes(attr);
             const isPositive = isLowerBetter ? avgChange < 0 : avgChange > 0;
-            const decimals = (attr === 'pH' || attr === 'Buffer_pH') ? 2 : 1;
+            const decimals = getDecimals(attr);
             const name = CONFIG.NUTRIENT_NAMES[attr] || attr;
 
             let cardClass = 'neutral', color = '#64748b';
@@ -1024,8 +1046,9 @@
       </svg>`;
     }
 
-    function createLineGraph(yearData, color) {
+    function createLineGraph(yearData, color, attr = 'P') {
       if (yearData.length < 1) return '';
+      const decimals = getDecimals(attr);
       const values = yearData.map(d => d.avg);
       const minVal = Math.min(...values) * 0.9, maxVal = Math.max(...values) * 1.1;
       const range = maxVal - minVal || 1;
@@ -1039,15 +1062,16 @@
       });
 
       const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
-      const dots = pts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="6" fill="${color}" stroke="white" stroke-width="2"/><text x="${p.x}" y="${height - 5}" text-anchor="middle" font-size="11" fill="#64748b">${p.year}</text><text x="${p.x}" y="${p.y - 12}" text-anchor="middle" font-size="12" font-weight="700" fill="#1e293b">${p.val.toFixed(1)}</text>`).join('');
+      const dots = pts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="6" fill="${color}" stroke="white" stroke-width="2"/><text x="${p.x}" y="${height - 5}" text-anchor="middle" font-size="11" fill="#64748b">${p.year}</text><text x="${p.x}" y="${p.y - 12}" text-anchor="middle" font-size="12" font-weight="700" fill="#1e293b">${p.val.toFixed(decimals)}</text>`).join('');
 
       return `<svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet"><path d="${line}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round"/>${dots}</svg>`;
     }
 
-    function createDualLineGraph(yearData, avgColor) {
+    function createDualLineGraph(yearData, avgColor, attr = 'P') {
       if (yearData.length < 1) return '';
       const medianColor = '#8b5cf6'; // Purple for median
       const numYears = yearData.length;
+      const decimals = getDecimals(attr);
 
       // Get all values to determine scale
       const allValues = [...yearData.map(d => d.avg), ...yearData.map(d => d.median)];
@@ -1104,7 +1128,7 @@
           const gap = Math.abs(p.y - medianY);
           let offset = gap < 20 ? (p.y < medianY ? -12 : 16) : -12;
           const fontSize = numYears > 6 ? 9 : 10;
-          return `<text x="${p.x}" y="${p.y + offset}" text-anchor="middle" font-size="${fontSize}" font-weight="700" fill="${avgColor}">${p.val.toFixed(1)}</text>`;
+          return `<text x="${p.x}" y="${p.y + offset}" text-anchor="middle" font-size="${fontSize}" font-weight="700" fill="${avgColor}">${p.val.toFixed(decimals)}</text>`;
         }).join('');
 
         medianLabels = medianPts.map((p, i) => {
@@ -1112,7 +1136,7 @@
           const gap = Math.abs(p.y - avgY);
           let offset = gap < 20 ? (p.y <= avgY ? -12 : 16) : 16;
           const fontSize = numYears > 6 ? 9 : 10;
-          return `<text x="${p.x}" y="${p.y + offset}" text-anchor="middle" font-size="${fontSize}" font-weight="700" fill="${medianColor}">${p.val.toFixed(1)}</text>`;
+          return `<text x="${p.x}" y="${p.y + offset}" text-anchor="middle" font-size="${fontSize}" font-weight="700" fill="${medianColor}">${p.val.toFixed(decimals)}</text>`;
         }).join('');
       }
 
@@ -1167,7 +1191,7 @@
       
       const name = CONFIG.NUTRIENT_NAMES[attr] || attr;
       const unit = CONFIG.NUTRIENT_UNITS[attr] || '';
-      const decimals = (attr === 'pH' || attr === 'Buffer_pH') ? 2 : 1;
+      const decimals = getDecimals(attr);
       const maxAvg = Math.max(...fieldStats.map(f => f.avg));
       const minAvg = Math.min(...fieldStats.map(f => f.avg));
       
