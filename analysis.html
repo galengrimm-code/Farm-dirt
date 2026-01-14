@@ -221,9 +221,7 @@
         <div class="control-group">
           <label>Crop</label>
           <select id="yieldCropSelect">
-            <option value="all">All Crops</option>
             <option value="corn">🌽 Corn</option>
-            <option value="soybeans">🫘 Soybeans</option>
             <option value="amylose">🍚 Amylose</option>
           </select>
         </div>
@@ -337,8 +335,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.4";
-    const BUILD_DATE = "2026-01-14T15:43:21";
+    const APP_VERSION = "v1.0.5";
+    const BUILD_DATE = "2026-01-14T16:03:03";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -584,13 +582,36 @@
       spatialNutrientSel.innerHTML = '';
       visibleNutrients.forEach(n => { spatialNutrientSel.innerHTML += `<option value="${n}">${CONFIG.NUTRIENT_NAMES[n] || n}</option>`; });
 
-      const spatialBaseYearSel = document.getElementById('spatialBaseYearSelect');
-      spatialBaseYearSel.innerHTML = '';
-      years.forEach(y => { spatialBaseYearSel.innerHTML += `<option value="${y}">${y}</option>`; });
+      // Spatial year selectors start empty - will populate when field is selected
+      document.getElementById('spatialBaseYearSelect').innerHTML = '<option value="">Select field first</option>';
+      document.getElementById('spatialCompareYearSelect').innerHTML = '<option value="">Select field first</option>';
+    }
 
+    function updateSpatialYearSelectors(field) {
+      // Get years that have data for the selected field
+      const fieldYears = [...new Set(
+        sampleData
+          .filter(s => s.field === field && s.year)
+          .map(s => s.year)
+      )].sort((a, b) => a - b); // Sort ascending (oldest first for base year)
+
+      const spatialBaseYearSel = document.getElementById('spatialBaseYearSelect');
       const spatialCompareYearSel = document.getElementById('spatialCompareYearSelect');
+
+      if (fieldYears.length === 0) {
+        spatialBaseYearSel.innerHTML = '<option value="">No data for field</option>';
+        spatialCompareYearSel.innerHTML = '<option value="">No data for field</option>';
+        return;
+      }
+
+      // Base year dropdown - oldest first (ascending)
+      spatialBaseYearSel.innerHTML = '';
+      fieldYears.forEach(y => { spatialBaseYearSel.innerHTML += `<option value="${y}">${y}</option>`; });
+
+      // Compare year dropdown - includes "All Years" option, newest first (descending)
+      const descendingYears = [...fieldYears].sort((a, b) => b - a);
       spatialCompareYearSel.innerHTML = '<option value="all">All Years</option>';
-      years.forEach(y => { spatialCompareYearSel.innerHTML += `<option value="${y}">${y}</option>`; });
+      descendingYears.forEach(y => { spatialCompareYearSel.innerHTML += `<option value="${y}">${y}</option>`; });
     }
 
     function getSoilYearsWithYield() {
@@ -636,7 +657,10 @@
       document.getElementById('soilYearSelect').addEventListener('change', updateYieldAnalysis);
       document.getElementById('yieldFieldSelect').addEventListener('change', updateYieldAnalysis);
       // Spatial Change Analysis listeners
-      document.getElementById('spatialFieldSelect').addEventListener('change', updateSpatialAnalysis);
+      document.getElementById('spatialFieldSelect').addEventListener('change', (e) => {
+        updateSpatialYearSelectors(e.target.value);
+        updateSpatialAnalysis();
+      });
       document.getElementById('spatialNutrientSelect').addEventListener('change', updateSpatialAnalysis);
       document.getElementById('spatialBaseYearSelect').addEventListener('change', updateSpatialAnalysis);
       document.getElementById('spatialCompareYearSelect').addEventListener('change', updateSpatialAnalysis);
@@ -1563,15 +1587,17 @@
         ? sortedYieldYears
         : [parseInt(yearFilter)];
 
-      // Get yield search radius values
+      // Get yield search radius values for selected crop only
       const radiusValues = new Set();
       samplesWithYield.forEach(sample => {
         Object.values(sample.yieldCorrelations).forEach(yieldInfo => {
-          if (yieldInfo.radiusFt) radiusValues.add(yieldInfo.radiusFt);
+          if (yieldInfo.radiusFt && yieldInfo.crop === cropFilter) {
+            radiusValues.add(yieldInfo.radiusFt);
+          }
         });
       });
       const radiusNote = radiusValues.size > 0
-        ? `<br><strong>Yield Search Radius:</strong> ${[...radiusValues].sort((a,b) => a-b).join(', ')} ft`
+        ? `<br><strong>Yield Search Radius (${cropFilter}):</strong> ${[...radiusValues].sort((a,b) => a-b).join(', ')} ft`
         : '';
 
       const getSortIcon = (col) => {
@@ -2405,18 +2431,49 @@
       }
       report.push('');
 
-      // Show radius information
-      report.push(`STEP 3: YIELD SEARCH RADIUS`);
+      // Show radius information for selected crop
+      report.push(`STEP 3: YIELD SEARCH RADIUS (${cropFilter})`);
       const radiusValues = new Set();
       samplesWithYield.forEach(sample => {
         Object.values(sample.yieldCorrelations).forEach(yieldInfo => {
-          if (yieldInfo.radiusFt) radiusValues.add(yieldInfo.radiusFt);
+          if (yieldInfo.radiusFt && yieldInfo.crop === cropFilter) {
+            radiusValues.add(yieldInfo.radiusFt);
+          }
         });
       });
       if (radiusValues.size > 0) {
-        report.push(`  Radius values found: ${[...radiusValues].sort((a,b) => a-b).join(', ')} ft`);
+        report.push(`  Radius values for ${cropFilter}: ${[...radiusValues].sort((a,b) => a-b).join(', ')} ft`);
       } else {
-        report.push(`  No radius information stored (older import)`);
+        report.push(`  No radius information stored for ${cropFilter} (older import or no data)`);
+      }
+      report.push('');
+
+      // Show crop breakdown
+      report.push(`STEP 3.5: CROP DATA BREAKDOWN`);
+      const cropCounts = {};
+      const cropsByYear = {};
+      samplesWithYield.forEach(sample => {
+        Object.entries(sample.yieldCorrelations).forEach(([year, yieldInfo]) => {
+          const crop = yieldInfo.crop || 'unknown';
+          cropCounts[crop] = (cropCounts[crop] || 0) + 1;
+          if (!cropsByYear[year]) cropsByYear[year] = {};
+          cropsByYear[year][crop] = (cropsByYear[year][crop] || 0) + 1;
+        });
+      });
+      report.push(`  Crops stored in database:`);
+      Object.entries(cropCounts).sort((a,b) => b[1] - a[1]).forEach(([crop, count]) => {
+        const marker = (cropFilter === 'all' || crop === cropFilter) ? '✓' : '✗';
+        report.push(`    ${marker} ${crop}: ${count} yield entries ${cropFilter !== 'all' && crop !== cropFilter ? '(filtered out)' : '(included)'}`);
+      });
+      report.push(`  Crops by year:`);
+      Object.keys(cropsByYear).sort().forEach(year => {
+        const crops = Object.entries(cropsByYear[year]).map(([c, n]) => `${c}:${n}`).join(', ');
+        report.push(`    ${year}: ${crops}`);
+      });
+      report.push(`  Current crop filter: "${cropFilter}"`);
+      if (cropFilter !== 'all') {
+        const filteredCount = cropCounts[cropFilter] || 0;
+        report.push(`  → Only using ${filteredCount} entries matching "${cropFilter}"`);
       }
       report.push('');
 
