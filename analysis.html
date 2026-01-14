@@ -244,14 +244,30 @@
 
       <!-- Scatter Plot Section -->
       <div id="scatterSection" style="display: none; margin-top: 1.5rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
           <h3 style="margin: 0; color: #1e293b;">Scatter Plot: Nutrient vs Yield</h3>
-          <div>
-            <label style="margin-right: 0.5rem;">Nutrient:</label>
-            <select id="scatterNutrientSelect" onchange="drawScatterPlot()" style="padding: 0.375rem 0.75rem; border-radius: 0.375rem; border: 1px solid #cbd5e1;"></select>
+          <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+            <div>
+              <label style="margin-right: 0.5rem;">Nutrient:</label>
+              <select id="scatterNutrientSelect" onchange="drawScatterPlot()" style="padding: 0.375rem 0.75rem; border-radius: 0.375rem; border: 1px solid #cbd5e1;"></select>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <label>Yield Threshold:</label>
+              <input type="range" id="yieldThresholdSlider" min="100" max="400" value="200" step="10" onchange="updateThresholdDisplay(); drawScatterPlot();" style="width: 120px;">
+              <input type="number" id="yieldThresholdInput" value="200" min="50" max="500" step="5" onchange="syncThresholdSlider(); drawScatterPlot();" style="width: 70px; padding: 0.25rem; border-radius: 0.25rem; border: 1px solid #cbd5e1;">
+              <span style="color: #64748b;">bu/ac</span>
+            </div>
           </div>
         </div>
-        <canvas id="scatterCanvas" width="800" height="400" style="background: white; border: 1px solid #e2e8f0; border-radius: 0.375rem; max-width: 100%;"></canvas>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 600px;">
+            <canvas id="scatterCanvas" width="900" height="500" style="background: white; border: 1px solid #e2e8f0; border-radius: 0.375rem; width: 100%; height: auto;"></canvas>
+          </div>
+          <div id="thresholdAnalysis" style="min-width: 280px; background: white; border: 1px solid #e2e8f0; border-radius: 0.375rem; padding: 1rem;">
+            <h4 style="margin: 0 0 0.75rem 0; color: #1e293b; font-size: 0.95rem;">Threshold Analysis</h4>
+            <div id="thresholdContent" style="font-size: 0.85rem; color: #475569;"></div>
+          </div>
+        </div>
         <div id="scatterStats" style="margin-top: 0.75rem; font-size: 0.875rem; color: #64748b;"></div>
       </div>
 
@@ -1725,10 +1741,24 @@
       return dataPoints;
     }
 
+    // Threshold slider sync functions
+    function updateThresholdDisplay() {
+      const slider = document.getElementById('yieldThresholdSlider');
+      const input = document.getElementById('yieldThresholdInput');
+      input.value = slider.value;
+    }
+
+    function syncThresholdSlider() {
+      const slider = document.getElementById('yieldThresholdSlider');
+      const input = document.getElementById('yieldThresholdInput');
+      slider.value = Math.max(100, Math.min(400, input.value));
+    }
+
     function drawScatterPlot() {
       const canvas = document.getElementById('scatterCanvas');
       const ctx = canvas.getContext('2d');
       const nutrient = document.getElementById('scatterNutrientSelect').value;
+      const yieldThreshold = parseFloat(document.getElementById('yieldThresholdInput').value) || 200;
       const dataPoints = getYieldDataPoints();
 
       // Filter for valid data
@@ -1747,6 +1777,7 @@
         ctx.font = '14px system-ui';
         ctx.textAlign = 'center';
         ctx.fillText('Not enough data points', canvas.width / 2, canvas.height / 2);
+        document.getElementById('thresholdContent').innerHTML = '<p style="color: #94a3b8;">Not enough data</p>';
         return;
       }
 
@@ -1759,13 +1790,33 @@
       const yMax = Math.max(...yValues);
 
       // Padding for axes
-      const padding = { left: 60, right: 30, top: 30, bottom: 50 };
+      const padding = { left: 70, right: 40, top: 40, bottom: 60 };
       const plotWidth = canvas.width - padding.left - padding.right;
       const plotHeight = canvas.height - padding.top - padding.bottom;
 
       // Scale functions
       const xScale = (val) => padding.left + ((val - xMin) / (xMax - xMin || 1)) * plotWidth;
       const yScale = (val) => canvas.height - padding.bottom - ((val - yMin) / (yMax - yMin || 1)) * plotHeight;
+
+      // Calculate regression
+      const n = xValues.length;
+      const meanX = xValues.reduce((a, b) => a + b, 0) / n;
+      const meanY = yValues.reduce((a, b) => a + b, 0) / n;
+      const ssX = xValues.reduce((sum, xi) => sum + (xi - meanX) ** 2, 0);
+      const ssY = yValues.reduce((sum, yi) => sum + (yi - meanY) ** 2, 0);
+      const ssXY = xValues.reduce((sum, xi, i) => sum + (xi - meanX) * (yValues[i] - meanY), 0);
+      const slope = ssX > 0 ? ssXY / ssX : 0;
+      const intercept = meanY - slope * meanX;
+      const correlation = calculateCorrelation(xValues, yValues);
+      const r = correlation ? correlation.r : 0;
+      const r2 = r * r;
+
+      // Calculate standard error for confidence bands
+      const predictions = xValues.map(x => slope * x + intercept);
+      const residuals = yValues.map((y, i) => y - predictions[i]);
+      const sse = residuals.reduce((sum, r) => sum + r * r, 0);
+      const mse = sse / (n - 2);
+      const se = Math.sqrt(mse);
 
       // Draw axes
       ctx.strokeStyle = '#cbd5e1';
@@ -1778,17 +1829,117 @@
 
       // Draw grid lines
       ctx.strokeStyle = '#f1f5f9';
+      ctx.lineWidth = 1;
       for (let i = 0; i <= 5; i++) {
         const y = padding.top + (i * plotHeight / 5);
         ctx.beginPath();
         ctx.moveTo(padding.left, y);
         ctx.lineTo(canvas.width - padding.right, y);
         ctx.stroke();
+        const x = padding.left + (i * plotWidth / 5);
+        ctx.beginPath();
+        ctx.moveTo(x, padding.top);
+        ctx.lineTo(x, canvas.height - padding.bottom);
+        ctx.stroke();
+      }
+
+      // Draw confidence bands (95% CI)
+      if (n > 5 && ssX > 0) {
+        const tValue = 1.96; // ~95% CI
+        ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
+        ctx.beginPath();
+        const bandPoints = 50;
+        // Upper band
+        for (let i = 0; i <= bandPoints; i++) {
+          const x = xMin + (i / bandPoints) * (xMax - xMin);
+          const yPred = slope * x + intercept;
+          const seY = se * Math.sqrt(1 + 1/n + (x - meanX)**2 / ssX);
+          const yUpper = yPred + tValue * seY;
+          const px = xScale(x);
+          const py = yScale(Math.min(yMax * 1.1, Math.max(yMin * 0.9, yUpper)));
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        // Lower band (reverse)
+        for (let i = bandPoints; i >= 0; i--) {
+          const x = xMin + (i / bandPoints) * (xMax - xMin);
+          const yPred = slope * x + intercept;
+          const seY = se * Math.sqrt(1 + 1/n + (x - meanX)**2 / ssX);
+          const yLower = yPred - tValue * seY;
+          const px = xScale(x);
+          const py = yScale(Math.min(yMax * 1.1, Math.max(yMin * 0.9, yLower)));
+          ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Draw yield threshold line
+      if (yieldThreshold >= yMin && yieldThreshold <= yMax) {
+        const thresholdY = yScale(yieldThreshold);
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 4]);
+        ctx.beginPath();
+        ctx.moveTo(padding.left, thresholdY);
+        ctx.lineTo(canvas.width - padding.right, thresholdY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Label the threshold line
+        ctx.fillStyle = '#92400e';
+        ctx.font = 'bold 12px system-ui';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${yieldThreshold} bu/ac threshold`, padding.left + 5, thresholdY - 5);
+      }
+
+      // Separate points above/below threshold
+      const aboveThreshold = validPoints.filter(p => p.avgYield >= yieldThreshold);
+      const belowThreshold = validPoints.filter(p => p.avgYield < yieldThreshold);
+
+      // Draw points below threshold (gray/muted)
+      belowThreshold.forEach(p => {
+        const x = xScale(parseFloat(p[nutrient]));
+        const y = yScale(p.avgYield);
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.4)';
+        ctx.fill();
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
+
+      // Draw points above threshold (highlighted)
+      aboveThreshold.forEach(p => {
+        const x = xScale(parseFloat(p[nutrient]));
+        const y = yScale(p.avgYield);
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(34, 197, 94, 0.7)';
+        ctx.fill();
+        ctx.strokeStyle = '#16a34a';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
+
+      // Draw trend line
+      if (ssX > 0) {
+        const y1 = slope * xMin + intercept;
+        const y2 = slope * xMax + intercept;
+
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(xScale(xMin), yScale(y1));
+        ctx.lineTo(xScale(xMax), yScale(y2));
+        ctx.stroke();
       }
 
       // Draw axis labels
       ctx.fillStyle = '#64748b';
-      ctx.font = '11px system-ui';
+      ctx.font = '12px system-ui';
       ctx.textAlign = 'center';
 
       // X-axis labels
@@ -1797,9 +1948,11 @@
         const x = xScale(val);
         ctx.fillText(val.toFixed(1), x, canvas.height - padding.bottom + 20);
       }
-      ctx.fillText(`${CONFIG.NUTRIENT_NAMES[nutrient] || nutrient}`, canvas.width / 2, canvas.height - 10);
+      ctx.font = 'bold 13px system-ui';
+      ctx.fillText(`${CONFIG.NUTRIENT_NAMES[nutrient] || nutrient}`, canvas.width / 2, canvas.height - 12);
 
       // Y-axis labels
+      ctx.font = '12px system-ui';
       ctx.textAlign = 'right';
       for (let i = 0; i <= 5; i++) {
         const val = yMin + (i * (yMax - yMin) / 5);
@@ -1807,63 +1960,152 @@
         ctx.fillText(val.toFixed(0), padding.left - 10, y + 4);
       }
       ctx.save();
-      ctx.translate(15, canvas.height / 2);
+      ctx.translate(18, canvas.height / 2);
       ctx.rotate(-Math.PI / 2);
       ctx.textAlign = 'center';
+      ctx.font = 'bold 13px system-ui';
       ctx.fillText('Yield (bu/ac)', 0, 0);
       ctx.restore();
 
-      // Calculate correlation for color
-      const correlation = calculateCorrelation(xValues, yValues);
-      const r = correlation ? correlation.r : 0;
+      // Draw equation and R² on chart
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 13px system-ui';
+      ctx.textAlign = 'left';
+      const eqY = padding.top + 20;
+      const slopeSign = slope >= 0 ? '+' : '';
+      ctx.fillText(`y = ${slope.toFixed(2)}x ${slopeSign}${intercept.toFixed(1)}`, padding.left + 10, eqY);
+      ctx.fillText(`R² = ${(r2 * 100).toFixed(1)}%`, padding.left + 10, eqY + 18);
+      ctx.font = '12px system-ui';
+      ctx.fillStyle = '#64748b';
+      ctx.fillText(`n = ${n}`, padding.left + 10, eqY + 36);
 
-      // Draw points
-      validPoints.forEach(p => {
-        const x = xScale(parseFloat(p[nutrient]));
-        const y = yScale(p.avgYield);
+      // Draw legend
+      const legendX = canvas.width - padding.right - 180;
+      const legendY = padding.top + 10;
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.fillRect(legendX - 10, legendY - 5, 190, 85);
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(legendX - 10, legendY - 5, 190, 85);
 
-        ctx.beginPath();
-        ctx.arc(x, y, 5, 0, Math.PI * 2);
-        ctx.fillStyle = r >= 0 ? 'rgba(34, 197, 94, 0.6)' : 'rgba(239, 68, 68, 0.6)';
-        ctx.fill();
-        ctx.strokeStyle = r >= 0 ? '#16a34a' : '#dc2626';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      });
+      ctx.font = '11px system-ui';
+      ctx.textAlign = 'left';
 
-      // Draw trend line if significant correlation
-      if (correlation && Math.abs(r) > 0.1) {
-        const meanX = xValues.reduce((a, b) => a + b, 0) / xValues.length;
-        const meanY = yValues.reduce((a, b) => a + b, 0) / yValues.length;
-        const slope = xValues.reduce((sum, xi, i) => sum + (xi - meanX) * (yValues[i] - meanY), 0) /
-                      xValues.reduce((sum, xi) => sum + (xi - meanX) ** 2, 0);
-        const intercept = meanY - slope * meanX;
+      // Above threshold legend
+      ctx.beginPath();
+      ctx.arc(legendX + 6, legendY + 10, 5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.7)';
+      ctx.fill();
+      ctx.strokeStyle = '#16a34a';
+      ctx.stroke();
+      ctx.fillStyle = '#1e293b';
+      ctx.fillText(`Above ${yieldThreshold} bu/ac (${aboveThreshold.length})`, legendX + 18, legendY + 14);
 
-        const x1 = xMin;
-        const x2 = xMax;
-        const y1 = slope * x1 + intercept;
-        const y2 = slope * x2 + intercept;
+      // Below threshold legend
+      ctx.beginPath();
+      ctx.arc(legendX + 6, legendY + 30, 4, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(148, 163, 184, 0.4)';
+      ctx.fill();
+      ctx.strokeStyle = '#94a3b8';
+      ctx.stroke();
+      ctx.fillStyle = '#64748b';
+      ctx.fillText(`Below ${yieldThreshold} bu/ac (${belowThreshold.length})`, legendX + 18, legendY + 34);
 
-        ctx.strokeStyle = r >= 0 ? '#22c55e' : '#ef4444';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        ctx.beginPath();
-        ctx.moveTo(xScale(x1), yScale(y1));
-        ctx.lineTo(xScale(x2), yScale(y2));
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
+      // Trend line legend
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(legendX, legendY + 50);
+      ctx.lineTo(legendX + 20, legendY + 50);
+      ctx.stroke();
+      ctx.fillStyle = '#1e293b';
+      ctx.fillText('Trend line', legendX + 28, legendY + 54);
 
-      // Update stats
+      // Confidence band legend
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.3)';
+      ctx.fillRect(legendX, legendY + 63, 20, 10);
+      ctx.fillStyle = '#64748b';
+      ctx.fillText('95% prediction interval', legendX + 28, legendY + 72);
+
+      // Update threshold analysis panel
+      updateThresholdAnalysis(nutrient, validPoints, yieldThreshold, aboveThreshold, belowThreshold);
+
+      // Update stats bar
       const statsDiv = document.getElementById('scatterStats');
+      const corrDirection = r >= 0 ? '↗ Positive' : '↘ Negative';
+      const corrColor = r >= 0 ? '#16a34a' : '#dc2626';
       statsDiv.innerHTML = `
         <strong>${CONFIG.NUTRIENT_NAMES[nutrient] || nutrient}:</strong>
         n=${validPoints.length} |
         r=${r.toFixed(3)} |
-        R²=${(r * r * 100).toFixed(1)}% |
-        Range: ${xMin.toFixed(1)} - ${xMax.toFixed(1)} |
-        Yield Range: ${yMin.toFixed(0)} - ${yMax.toFixed(0)} bu/ac
-        ${r >= 0 ? '<span style="color: #16a34a;">↗ Positive correlation</span>' : '<span style="color: #dc2626;">↘ Negative correlation</span>'}
+        R²=${(r2 * 100).toFixed(1)}% |
+        ${nutrient} Range: ${xMin.toFixed(1)} - ${xMax.toFixed(1)} |
+        Yield Range: ${yMin.toFixed(0)} - ${yMax.toFixed(0)} bu/ac |
+        <span style="color: ${corrColor};">${corrDirection} correlation</span>
+      `;
+    }
+
+    function updateThresholdAnalysis(nutrient, validPoints, threshold, aboveThreshold, belowThreshold) {
+      const content = document.getElementById('thresholdContent');
+      const nutrientName = CONFIG.NUTRIENT_NAMES[nutrient] || nutrient;
+
+      if (aboveThreshold.length === 0) {
+        content.innerHTML = `
+          <p style="color: #dc2626; font-weight: 600;">No samples above ${threshold} bu/ac</p>
+          <p>Try lowering the yield threshold to analyze high-yielding samples.</p>
+        `;
+        return;
+      }
+
+      // Calculate stats for points above threshold
+      const aboveNutrientValues = aboveThreshold.map(p => parseFloat(p[nutrient]));
+      const minAbove = Math.min(...aboveNutrientValues);
+      const maxAbove = Math.max(...aboveNutrientValues);
+      const avgAbove = aboveNutrientValues.reduce((a, b) => a + b, 0) / aboveNutrientValues.length;
+      const p10Above = aboveNutrientValues.sort((a, b) => a - b)[Math.floor(aboveNutrientValues.length * 0.1)] || minAbove;
+
+      // Calculate stats for points below threshold
+      let belowStats = '';
+      if (belowThreshold.length > 0) {
+        const belowNutrientValues = belowThreshold.map(p => parseFloat(p[nutrient]));
+        const avgBelow = belowNutrientValues.reduce((a, b) => a + b, 0) / belowNutrientValues.length;
+        const diff = avgAbove - avgBelow;
+        const diffPct = avgBelow > 0 ? ((diff / avgBelow) * 100).toFixed(0) : 'N/A';
+        belowStats = `
+          <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0;">
+            <div style="font-weight: 600; color: #64748b; margin-bottom: 0.5rem;">Below ${threshold} bu/ac:</div>
+            <div>Avg ${nutrient}: <strong>${avgBelow.toFixed(1)}</strong></div>
+            <div style="margin-top: 0.5rem; color: ${diff >= 0 ? '#16a34a' : '#dc2626'};">
+              Difference: ${diff >= 0 ? '+' : ''}${diff.toFixed(1)} (${diffPct}%)
+            </div>
+          </div>
+        `;
+      }
+
+      content.innerHTML = `
+        <div style="background: #f0fdf4; border: 1px solid #22c55e; border-radius: 0.375rem; padding: 0.75rem; margin-bottom: 0.75rem;">
+          <div style="font-weight: 700; color: #166534; margin-bottom: 0.5rem;">
+            🎯 For yields ≥ ${threshold} bu/ac:
+          </div>
+          <div style="font-size: 0.8rem; color: #166534;">
+            <strong>Minimum ${nutrient}:</strong> ${minAbove.toFixed(1)}<br>
+            <strong>10th percentile:</strong> ${p10Above.toFixed(1)}<br>
+            <strong>Average ${nutrient}:</strong> ${avgAbove.toFixed(1)}<br>
+            <strong>Maximum ${nutrient}:</strong> ${maxAbove.toFixed(1)}
+          </div>
+        </div>
+
+        <div style="font-size: 0.8rem; color: #475569;">
+          <strong>${aboveThreshold.length}</strong> samples above threshold<br>
+          <strong>${belowThreshold.length}</strong> samples below threshold
+        </div>
+
+        ${belowStats}
+
+        <div style="margin-top: 0.75rem; padding: 0.5rem; background: #fef3c7; border-radius: 0.25rem; font-size: 0.75rem; color: #92400e;">
+          <strong>Interpretation:</strong> For high yields (≥${threshold} bu/ac), the minimum ${nutrientName} observed was <strong>${minAbove.toFixed(1)}</strong>.
+          This suggests ${nutrient} levels below this may limit yield potential.
+        </div>
       `;
     }
 
