@@ -69,8 +69,12 @@
       select, input { font-size: 14px !important; padding: 0.5rem; min-width: 0; width: 100%; }
       .legend { display: none; } /* Hide legend on mobile */
       .mobile-toolbar { display: flex !important; }
-      .stats-box { bottom: 60px !important; right: 0.5rem !important; font-size: 0.75rem !important; padding: 0.5rem !important; min-width: 100px !important; }
+      .stats-box { bottom: 60px !important; right: 0.5rem !important; font-size: 0.75rem !important; padding: 0 !important; min-width: 100px !important; }
       .stats-box h4 { font-size: 0.7rem !important; }
+      .stats-box .stats-header { display: flex !important; cursor: pointer; padding: 0.4rem 0.5rem; }
+      .stats-box .stats-content { padding: 0 0.5rem 0.5rem 0.5rem; }
+      .stats-box.collapsed .stats-content { display: none !important; }
+      .stats-box .stats-toggle { display: inline !important; }
       #compareYearStack { display: none !important; } /* Hide compare stack on mobile - use bottom bar */
     }
     .mobile-toolbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #e2e8f0; padding: 0.5rem; z-index: 1000; justify-content: space-around; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
@@ -184,12 +188,17 @@
     
     <div class="main-content" style="position: relative;">
       <div id="map"></div>
-      <div id="statsBox" style="position: absolute; top: 80px; right: 10px; background: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1000; font-size: 13px; min-width: 140px;">
-        <div style="font-weight: 600; margin-bottom: 6px; color: #374151;" id="statsTitle">Field Attribute Stats</div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 3px;"><span style="color: #64748b;">Avg:</span> <span id="statsAvg" style="font-weight: 600;">-</span></div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 3px;"><span style="color: #64748b;">High:</span> <span id="statsHigh" style="font-weight: 600; color: #22c55e;">-</span></div>
-        <div style="display: flex; justify-content: space-between;"><span style="color: #64748b;">Low:</span> <span id="statsLow" style="font-weight: 600; color: #ef4444;">-</span></div>
-        <div id="statsNote" style="margin-top: 6px; font-size: 11px; color: #94a3b8; font-style: italic;"></div>
+      <div id="statsBox" class="stats-box" style="position: absolute; top: 80px; right: 10px; background: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1000; font-size: 13px; min-width: 140px;">
+        <div class="stats-header" onclick="toggleStatsBox()" style="font-weight: 600; margin-bottom: 6px; color: #374151; display: flex; justify-content: space-between; align-items: center;">
+          <span id="statsTitle">Field Attribute Stats</span>
+          <span class="stats-toggle" style="display: none; font-size: 10px; color: #94a3b8;">▼</span>
+        </div>
+        <div class="stats-content">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 3px;"><span style="color: #64748b;">Avg:</span> <span id="statsAvg" style="font-weight: 600;">-</span></div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 3px;"><span style="color: #64748b;">High:</span> <span id="statsHigh" style="font-weight: 600; color: #22c55e;">-</span></div>
+          <div style="display: flex; justify-content: space-between;"><span style="color: #64748b;">Low:</span> <span id="statsLow" style="font-weight: 600; color: #ef4444;">-</span></div>
+          <div id="statsNote" style="margin-top: 6px; font-size: 11px; color: #94a3b8; font-style: italic;"></div>
+        </div>
       </div>
       <div id="zoomIndicator" style="position: absolute; bottom: 30px; left: 10px; background: white; padding: 6px 10px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); z-index: 1000; font-size: 11px; font-weight: 500;">
         <div style="display: flex; align-items: center; gap: 8px;">
@@ -209,8 +218,8 @@
   
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.11";
-    const BUILD_DATE = "2026-01-14T16:44:05";
+    const APP_VERSION = "v1.0.12";
+    const BUILD_DATE = "2026-01-14T16:59:09";
 
     // ========== CONFIG ==========
     const CONFIG = {
@@ -2019,6 +2028,18 @@
     function stopGPS() {
       if (gpsWatchId) { navigator.geolocation.clearWatch(gpsWatchId); gpsWatchId = null; }
       if (gpsMarker) { map.removeLayer(gpsMarker); map.removeLayer(gpsCircle); gpsMarker = null; gpsCircle = null; }
+    }
+
+    function toggleStatsBox() {
+      const statsBox = document.getElementById('statsBox');
+      const toggle = statsBox.querySelector('.stats-toggle');
+      if (statsBox.classList.contains('collapsed')) {
+        statsBox.classList.remove('collapsed');
+        toggle.textContent = '▼';
+      } else {
+        statsBox.classList.add('collapsed');
+        toggle.textContent = '▶';
+      }
     }
 
     function updateBackupFooter() {
