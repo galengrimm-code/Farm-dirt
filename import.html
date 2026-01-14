@@ -106,7 +106,10 @@
         <div class="summary-item"><div class="number" id="fieldCount">0</div><div class="label">Fields</div></div>
         <div class="summary-item"><div class="number" id="sampleCount">0</div><div class="label">Samples</div></div>
         <div class="summary-item"><div class="number" id="yearCount">0</div><div class="label">Years</div><div class="year-list" id="yearList" style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;"></div></div>
-        <div class="summary-item" style="min-width: 200px;"><div class="number" id="yieldCount">0</div><div class="label">Samples w/ Yield</div><div id="yieldFieldList" style="margin-top: 0.5rem;"></div></div>
+        <div class="summary-item"><div class="number" id="yieldCount">0</div><div class="label">Samples w/ Yield</div><div id="yieldFieldSummary" style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;"></div></div>
+      </div>
+      <div id="yieldFieldListContainer" style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: #fffbeb; border: 1px solid #f59e0b; border-radius: 0.5rem;">
+        <div id="yieldFieldList"></div>
       </div>
       <div id="backupStatus" style="margin-top: 1rem; padding: 0.75rem; border-radius: 0.375rem; font-size: 0.8125rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;"></div>
     </div>
@@ -275,8 +278,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.10";
-    const BUILD_DATE = "2026-01-14T16:34:41";
+    const APP_VERSION = "v1.0.11";
+    const BUILD_DATE = "2026-01-14T16:44:05";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -744,23 +747,42 @@
         });
       });
 
-      // Generate organized HTML
       const sortedFields = Object.keys(fieldYieldInfo).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-      let yieldListHtml = '';
+      const container = document.getElementById('yieldFieldListContainer');
+      const summaryEl = document.getElementById('yieldFieldSummary');
+
       if (sortedFields.length > 0) {
-        yieldListHtml = '<div style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.25rem;">';
+        // Show collapsible summary
+        summaryEl.innerHTML = `across ${sortedFields.length} fields <a href="#" onclick="toggleYieldFieldList(event)" style="color: #f59e0b; text-decoration: none;" id="yieldFieldToggle">Show ▼</a>`;
+
+        // Generate field tags for expanded view
+        let yieldListHtml = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.35rem;">';
         sortedFields.forEach(field => {
           const info = fieldYieldInfo[field];
           const crops = [...info.crops].map(c => c === 'corn' ? '🌽' : c === 'amylose' ? '🍚' : c === 'soybeans' ? '🫘' : '').join('');
-          const years = [...info.years].sort();
-          const yearStr = years.length === 1 ? years[0] : `${years[0]}-${years[years.length-1]}`;
-          yieldListHtml += `<span style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 0.25rem; padding: 0.15rem 0.4rem; font-size: 0.7rem; color: #92400e; white-space: nowrap;">
+          yieldListHtml += `<span style="background: white; border: 1px solid #fbbf24; border-radius: 0.25rem; padding: 0.2rem 0.4rem; font-size: 0.7rem; color: #92400e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             <strong>${field}</strong> ${crops} <span style="color: #b45309;">${info.count}</span>
           </span>`;
         });
         yieldListHtml += '</div>';
+        document.getElementById('yieldFieldList').innerHTML = yieldListHtml;
+      } else {
+        summaryEl.innerHTML = '';
+        container.style.display = 'none';
       }
-      document.getElementById('yieldFieldList').innerHTML = yieldListHtml;
+    }
+
+    function toggleYieldFieldList(e) {
+      e.preventDefault();
+      const container = document.getElementById('yieldFieldListContainer');
+      const toggle = document.getElementById('yieldFieldToggle');
+      if (container.style.display === 'none') {
+        container.style.display = 'block';
+        toggle.textContent = 'Hide ▲';
+      } else {
+        container.style.display = 'none';
+        toggle.textContent = 'Show ▼';
+      }
     }
 
     async function uploadBoundaries() {
