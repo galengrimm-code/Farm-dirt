@@ -382,7 +382,7 @@
     let backupDownloadedThisSession = false;
 
     document.addEventListener('DOMContentLoaded', async () => {
-      loadLocalData(); updateSummary(); updateBackupStatus(); updateBackupFooter();
+      await loadLocalData(); updateSummary(); updateBackupStatus(); updateBackupFooter();
       try { await SheetsAPI.init(); SheetsAPI.onSignInChange = handleSignInChange; handleSignInChange(SheetsAPI.isSignedIn); } catch (e) { console.warn(e); }
       document.getElementById('uploadBoundaryBtn').addEventListener('click', uploadBoundaries);
       document.getElementById('uploadSampleBtn').addEventListener('click', uploadSamples);
