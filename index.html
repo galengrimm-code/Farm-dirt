@@ -228,7 +228,11 @@
         Na: 'ppm', Ca: 'ppm', Mg: 'ppm', NO3: 'ppm', NH4: 'ppm', Soluble_Salts: 'mmhos/cm', EC: 'dS/m'
       },
       LOWER_IS_BETTER: ['Mg_sat', 'H_Sat', 'Na_Sat', 'Soluble_Salts'],
-      
+
+      // Attributes where 0 typically means "no data" rather than actual zero
+      // For these, we filter out 0 values from display and calculations
+      ZERO_MEANS_NO_DATA: ['P', 'P2', 'K', 'OM', 'CEC', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Ca', 'Mg', 'Na', 'NO3', 'NH4'],
+
       // All nutrients in display order with default visibility
       ALL_NUTRIENTS: [
         { key: 'sampleId', name: 'Sample ID', defaultVisible: true },
@@ -717,9 +721,28 @@
       },
       
       calculateFieldAverage(samples, nutrient) {
-        const values = samples.map(s => s[nutrient]).filter(v => v !== undefined && v !== null && !isNaN(v));
+        const values = samples.map(s => s[nutrient]).filter(v => this.isValidValue(v, nutrient));
         if (values.length === 0) return null;
         return values.reduce((a, b) => a + b, 0) / values.length;
+      },
+
+      // Check if a value represents actual data (not missing/placeholder)
+      // For certain attributes, 0 typically means "not tested" rather than actual zero
+      isValidValue(value, attribute) {
+        if (value === undefined || value === null || value === '') return false;
+        const num = parseFloat(value);
+        if (isNaN(num) || !isFinite(num)) return false;
+        // For attributes where 0 means "no data", filter out zeros
+        if (num === 0 && CONFIG.ZERO_MEANS_NO_DATA.includes(attribute)) {
+          return false;
+        }
+        return true;
+      },
+
+      // Get numeric value or null if invalid
+      getNumericValue(value, attribute) {
+        if (!this.isValidValue(value, attribute)) return null;
+        return parseFloat(value);
       }
     };
 
@@ -1439,15 +1462,10 @@
           fieldSamples = fieldSamples.filter(s => String(s.year) === String(selectedYear));
         }
 
-        // Robust value extraction - handle strings, empty values, and convert to numbers
+        // Robust value extraction - handle strings, empty values, zeros for no-data attributes
         const values = fieldSamples
-          .map(s => {
-            const raw = s[selectedAttribute];
-            if (raw === undefined || raw === null || raw === '') return NaN;
-            const num = parseFloat(raw);
-            return num;
-          })
-          .filter(v => !isNaN(v) && isFinite(v));
+          .map(s => Utils.getNumericValue(s[selectedAttribute], selectedAttribute))
+          .filter(v => v !== null);
 
         if (values.length > 0) {
           const sum = values.reduce((a, b) => a + b, 0);
@@ -1530,19 +1548,15 @@
       }
       // If allFieldAvgs.length === 0, all fields are grey (no data)
 
-      // Update stats box with all samples
+      // Update stats box with all samples (using helper to filter out zeros for no-data attributes)
       let filtered = sampleData.filter(s => {
         if (selectedField !== 'all' && s.field !== selectedField) return false;
         if (selectedYear !== 'all' && String(s.year) !== String(selectedYear)) return false;
         return true;
       });
       const allValues = filtered
-        .map(s => {
-          const raw = s[selectedAttribute];
-          if (raw === undefined || raw === null || raw === '') return NaN;
-          return parseFloat(raw);
-        })
-        .filter(v => !isNaN(v) && isFinite(v));
+        .map(s => Utils.getNumericValue(s[selectedAttribute], selectedAttribute))
+        .filter(v => v !== null);
       updateStats(allValues);
 
       // Draw boundaries with shading
@@ -1565,26 +1579,41 @@
         console.log('Years in filtered samples:', years);
       }
 
-      // Get all values for median-based coloring and stats
-      const allValues = filtered.map(s => s[selectedAttribute]).filter(v => v !== undefined && v !== null && !isNaN(v));
+      // Get all VALID values for median-based coloring and stats (filters out 0s for nutrients where 0 = no data)
+      const allValues = filtered
+        .map(s => Utils.getNumericValue(s[selectedAttribute], selectedAttribute))
+        .filter(v => v !== null);
 
       // Update stats box
       updateStats(allValues);
-      
+
       // Render point markers
       filtered.forEach(sample => {
-        const value = sample[selectedAttribute];
-        if (value === undefined || value === null) return;
+        const rawValue = sample[selectedAttribute];
+        const numValue = Utils.getNumericValue(rawValue, selectedAttribute);
+        const hasValidData = numValue !== null;
+
+        // Skip samples with no GPS
+        if (!sample.lat || !sample.lon) return;
+
         const bufferPct = settings.bufferPercent || 25;
-        const color = Utils.getColor(value, selectedAttribute, settings, bufferPct, allValues);
         const size = fieldModeActive ? 44 : 32;
         const fontSize = fieldModeActive ? 14 : 11;
-        // For sampleId, display as-is; for other attributes, format as number
-        const displayVal = selectedAttribute === 'sampleId' 
-          ? value 
-          : Utils.formatNumber(value, selectedAttribute === 'pH' ? 1 : 0);
+
+        let color, displayVal;
+        if (hasValidData) {
+          color = Utils.getColor(numValue, selectedAttribute, settings, bufferPct, allValues);
+          displayVal = selectedAttribute === 'sampleId'
+            ? rawValue
+            : Utils.formatNumber(numValue, selectedAttribute === 'pH' ? 1 : 0);
+        } else {
+          // No valid data - show grey marker with "–"
+          color = '#9ca3af';
+          displayVal = '–';
+        }
+
         const icon = L.divIcon({
-          html: `<div class="sample-marker" style="width:${size}px;height:${size}px;background:${color};font-size:${fontSize}px;line-height:${size}px;">${displayVal}</div>`,
+          html: `<div class="sample-marker" style="width:${size}px;height:${size}px;background:${color};font-size:${fontSize}px;line-height:${size}px;${!hasValidData ? 'opacity:0.6;' : ''}">${displayVal}</div>`,
           className: '', iconSize: [size, size], iconAnchor: [size/2, size/2]
         });
         const marker = L.marker([sample.lat, sample.lon], { icon }).addTo(map);
