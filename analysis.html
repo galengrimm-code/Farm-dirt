@@ -230,6 +230,12 @@
           <select id="yieldYearSelect"></select>
         </div>
         <div class="control-group">
+          <label>Soil Sample Year</label>
+          <select id="soilYearSelect">
+            <option value="recent">Most Recent</option>
+          </select>
+        </div>
+        <div class="control-group">
           <label>Field</label>
           <select id="yieldFieldSelect">
             <option value="all">All Fields</option>
@@ -294,8 +300,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.2";
-    const BUILD_DATE = "2026-01-14T15:10:29";
+    const APP_VERSION = "v1.0.3";
+    const BUILD_DATE = "2026-01-14T15:37:37";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -519,12 +525,29 @@
       const yieldYears = getYieldYears();
       yieldYearSel.innerHTML = '<option value="avg">All Years (Average)</option><option value="combined">All Years (Combined)</option>';
       yieldYears.forEach(y => { yieldYearSel.innerHTML += `<option value="${y}">${y}</option>`; });
-      
+
+      // Soil sample year selector
+      const soilYearSel = document.getElementById('soilYearSelect');
+      const soilYears = getSoilYearsWithYield();
+      soilYearSel.innerHTML = '<option value="recent">Most Recent (default)</option><option value="all">All Years</option>';
+      soilYears.forEach(y => { soilYearSel.innerHTML += `<option value="${y}">${y}</option>`; });
+
       const yieldFieldSel = document.getElementById('yieldFieldSelect');
       yieldFieldSel.innerHTML = '<option value="all">All Fields</option>';
       // Only show fields that have yield data
       const fieldsWithYield = [...new Set(sampleData.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0).map(s => s.field).filter(f => f && f !== 'Unknown'))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
       fieldsWithYield.forEach(f => { yieldFieldSel.innerHTML += `<option value="${f}">${f}</option>`; });
+    }
+
+    function getSoilYearsWithYield() {
+      // Get soil sample years that have yield correlations
+      const years = new Set();
+      sampleData.forEach(s => {
+        if (s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0 && s.year) {
+          years.add(s.year);
+        }
+      });
+      return [...years].sort((a, b) => b - a);
     }
     
     function getYieldYears() {
@@ -556,6 +579,7 @@
       document.getElementById('rankingYearSelect').addEventListener('change', updateRankings);
       document.getElementById('yieldCropSelect').addEventListener('change', updateYieldAnalysis);
       document.getElementById('yieldYearSelect').addEventListener('change', updateYieldAnalysis);
+      document.getElementById('soilYearSelect').addEventListener('change', updateYieldAnalysis);
       document.getElementById('yieldFieldSelect').addEventListener('change', updateYieldAnalysis);
     }
 
@@ -1305,6 +1329,7 @@
       const container = document.getElementById('yieldContent');
       const cropFilter = document.getElementById('yieldCropSelect').value;
       const yearFilter = document.getElementById('yieldYearSelect').value;
+      const soilYearFilter = document.getElementById('soilYearSelect').value;
       const fieldFilter = document.getElementById('yieldFieldSelect').value;
 
       // Get samples with yield correlations
@@ -1320,21 +1345,36 @@
         samplesWithYield = samplesWithYield.filter(s => s.field === fieldFilter);
       }
 
-      // Use only the most recent soil sample at each location
-      // Group by approximate location (rounded to 5 decimal places ~1m precision)
-      const locationMap = new Map();
-      samplesWithYield.forEach(sample => {
-        const locKey = `${sample.lat.toFixed(5)},${sample.lon.toFixed(5)}`;
-        const existing = locationMap.get(locKey);
-        if (!existing || (sample.year && sample.year > existing.year)) {
-          locationMap.set(locKey, sample);
-        }
-      });
-      samplesWithYield = Array.from(locationMap.values());
+      // Filter by soil sample year
+      let soilYearDescription = '';
+      if (soilYearFilter === 'recent') {
+        // Use only the most recent soil sample at each location
+        // Group by approximate location (rounded to 5 decimal places ~1m precision)
+        const locationMap = new Map();
+        samplesWithYield.forEach(sample => {
+          const locKey = `${sample.lat.toFixed(5)},${sample.lon.toFixed(5)}`;
+          const existing = locationMap.get(locKey);
+          if (!existing || (sample.year && sample.year > existing.year)) {
+            locationMap.set(locKey, sample);
+          }
+        });
+        samplesWithYield = Array.from(locationMap.values());
+        soilYearDescription = 'Most recent at each location';
+      } else if (soilYearFilter === 'all') {
+        // Use all soil samples (may have multiple per location)
+        soilYearDescription = 'All years (may include duplicates)';
+      } else {
+        // Filter to specific soil sample year
+        const selectedYear = parseInt(soilYearFilter);
+        samplesWithYield = samplesWithYield.filter(s => s.year === selectedYear);
+        soilYearDescription = `${selectedYear} only`;
+      }
 
-      // Get soil sample year range
+      // Get soil sample year range (after filtering)
       const soilYears = [...new Set(samplesWithYield.map(s => s.year).filter(y => y))].sort();
-      const soilYearRange = soilYears.length > 0 ? `${Math.min(...soilYears)}-${Math.max(...soilYears)}` : 'N/A';
+      const soilYearRange = soilYears.length > 0
+        ? (soilYears.length === 1 ? `${soilYears[0]}` : `${Math.min(...soilYears)}-${Math.max(...soilYears)}`)
+        : 'N/A';
 
       // Get all available yield years (before filtering)
       const allYieldYears = new Set();
@@ -1492,7 +1532,7 @@
       let html = `
         <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem; color: #0369a1;">
           <strong>Data Selection:</strong><br>
-          <strong>Soil Samples:</strong> Most recent sample at each location (${soilYearRange})<br>
+          <strong>Soil Samples:</strong> ${soilYearDescription} (${soilYearRange})<br>
           <strong>Yield Years:</strong> ${usedYieldYears.join(', ')}
           ${yearFilter === 'avg' ? ' <em>(averaged at each location)</em>' : yearFilter === 'combined' ? ' <em>(each year = separate data point)</em>' : ''}${radiusNote}
         </div>
@@ -2210,6 +2250,7 @@
     function generateDebugReport() {
       const cropFilter = document.getElementById('yieldCropSelect').value;
       const yearFilter = document.getElementById('yieldYearSelect').value;
+      const soilYearFilter = document.getElementById('soilYearSelect').value;
       const fieldFilter = document.getElementById('yieldFieldSelect').value;
 
       let report = [];
@@ -2223,7 +2264,8 @@
 
       report.push(`FILTERS APPLIED:`);
       report.push(`  Crop: ${cropFilter}`);
-      report.push(`  Year: ${yearFilter}`);
+      report.push(`  Yield Year: ${yearFilter}`);
+      report.push(`  Soil Sample Year: ${soilYearFilter}`);
       report.push(`  Field: ${fieldFilter}`);
       report.push('');
 
@@ -2232,21 +2274,32 @@
         samplesWithYield = samplesWithYield.filter(s => s.field === fieldFilter);
       }
 
-      // Use only most recent soil sample at each location
-      const locationMap = new Map();
-      samplesWithYield.forEach(sample => {
-        const locKey = `${sample.lat.toFixed(5)},${sample.lon.toFixed(5)}`;
-        const existing = locationMap.get(locKey);
-        if (!existing || (sample.year && sample.year > existing.year)) {
-          locationMap.set(locKey, sample);
-        }
-      });
-      samplesWithYield = Array.from(locationMap.values());
+      // Filter by soil sample year
+      let soilYearDescription = '';
+      if (soilYearFilter === 'recent') {
+        // Use only most recent soil sample at each location
+        const locationMap = new Map();
+        samplesWithYield.forEach(sample => {
+          const locKey = `${sample.lat.toFixed(5)},${sample.lon.toFixed(5)}`;
+          const existing = locationMap.get(locKey);
+          if (!existing || (sample.year && sample.year > existing.year)) {
+            locationMap.set(locKey, sample);
+          }
+        });
+        samplesWithYield = Array.from(locationMap.values());
+        soilYearDescription = 'Most recent at each location';
+      } else if (soilYearFilter === 'all') {
+        soilYearDescription = 'All years (may include duplicates)';
+      } else {
+        const selectedYear = parseInt(soilYearFilter);
+        samplesWithYield = samplesWithYield.filter(s => s.year === selectedYear);
+        soilYearDescription = `${selectedYear} only`;
+      }
 
       report.push(`STEP 1: DATA SELECTION`);
       report.push(`  Total samples in database: ${sampleData.length}`);
       report.push(`  Samples with yield data: ${samplesWithYield.length}`);
-      report.push(`  Using most recent soil sample at each unique location`);
+      report.push(`  Soil year filter: ${soilYearDescription}`);
       report.push('');
 
       // Build data points based on yearFilter mode
