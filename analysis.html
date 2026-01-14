@@ -440,7 +440,10 @@
     }
 
     function getStats(samples, attr) {
-      const values = samples.map(s => s[attr]).filter(v => v !== undefined && v !== null && !isNaN(v));
+      // Filter to only valid numeric values - exclude undefined, null, empty strings, and NaN
+      const values = samples.map(s => s[attr])
+        .filter(v => v !== undefined && v !== null && v !== '' && !isNaN(parseFloat(v)))
+        .map(v => parseFloat(v));
       if (values.length === 0) return null;
       const sorted = [...values].sort((a, b) => a - b);
       const mid = Math.floor(sorted.length / 2);
