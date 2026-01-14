@@ -1621,11 +1621,35 @@
       console.log(`  Total accounted: ${sortedFields.reduce((sum, [_, c]) => sum + c, 0) + orphanedYieldPoints} / ${yearYield.length}`);
 
       // Initialize field stats from fields that have yield points
+      // Also gather soil sample inventory for each field
       Object.keys(yieldPointsPerField).forEach(field => {
+        // Get soil sample inventory for this field
+        const fieldSamples = sampleData.filter(s => s.field === field);
+        const samplesByYear = {};
+        fieldSamples.forEach(s => {
+          const yr = parseInt(s.year);
+          if (!isNaN(yr)) {
+            samplesByYear[yr] = (samplesByYear[yr] || 0) + 1;
+          }
+        });
+        const mostRecentYear = Object.keys(samplesByYear).map(Number).filter(y => y <= yieldYear_int).sort((a, b) => b - a)[0] || null;
+
         fieldStats[field] = {
           yieldPoints: yieldPointsPerField[field],
           matchedPoints: 0,
-          sampleAges: { sameYear: 0, oneYearOld: 0, twoThreeYears: 0, stale: 0 }
+          sampleAges: { sameYear: 0, oneYearOld: 0, twoThreeYears: 0, stale: 0 },
+          // NEW: Detailed diagnostics
+          sampleInventory: samplesByYear,  // { 2019: 45, 2021: 52, ... }
+          totalSoilSamples: fieldSamples.length,
+          mostRecentSampleYear: mostRecentYear,
+          sampleAgeFromYield: mostRecentYear ? yieldYear_int - mostRecentYear : null,
+          // Track WHY yield points didn't match
+          unmatchReasons: {
+            noSampleWithinRadius: 0,      // No soil sample within search radius at all
+            onlyFutureSamples: 0          // Had samples nearby but all from years after yield
+          },
+          // Coverage: yield points that have ANY nearby sample (regardless of year)
+          yieldPointsWithNearbySample: 0
         };
       });
 
@@ -1674,6 +1698,12 @@
             return !isNaN(sampleYear) && sampleYear <= yieldYear_int;
           })
           .sort((a, b) => parseInt(b.sample.year) - parseInt(a.sample.year)); // Most recent first
+
+        // Track coverage: did this yield point have ANY nearby sample?
+        const hasAnySampleNearby = nearbySamples.length > 0;
+        if (hasAnySampleNearby && yieldField && fieldStats[yieldField]) {
+          fieldStats[yieldField].yieldPointsWithNearbySample++;
+        }
 
         if (validSamples.length > 0) {
           // Use the most recent sample
@@ -1725,12 +1755,21 @@
           // No matching sample found
           sampleAgeStats.noMatch++;
 
-          // Determine reason
-          let reason = 'No soil samples within radius';
+          // Determine reason and track per-field
+          let reason;
           if (nearbySamples.length > 0) {
             // Had samples but all were from after yield year
             const futureYears = [...new Set(nearbySamples.map(s => s.sample.year))].sort();
             reason = `Only future samples found (${futureYears.join(', ')})`;
+            if (yieldField && fieldStats[yieldField]) {
+              fieldStats[yieldField].unmatchReasons.onlyFutureSamples++;
+            }
+          } else {
+            // No samples within search radius at all
+            reason = 'No soil samples within radius';
+            if (yieldField && fieldStats[yieldField]) {
+              fieldStats[yieldField].unmatchReasons.noSampleWithinRadius++;
+            }
           }
 
           unmatchedYieldPoints.push({
@@ -1747,10 +1786,12 @@
         if (yIdx % 2000 === 1999) await breathe();
       }
 
-      // Calculate match rates per field
+      // Calculate match rates and coverage per field
       for (const field of Object.keys(fieldStats)) {
         const stats = fieldStats[field];
         stats.matchRate = stats.yieldPoints > 0 ? Math.round((stats.matchedPoints / stats.yieldPoints) * 100) : 0;
+        // Coverage: what % of yield points had ANY soil sample nearby (max theoretical match rate)
+        stats.coverageRate = stats.yieldPoints > 0 ? Math.round((stats.yieldPointsWithNearbySample / stats.yieldPoints) * 100) : 0;
       }
 
       // Save updated samples
@@ -1877,30 +1918,59 @@
         </div>
       `;
 
-      // Per-field breakdown with sample age info
+      // Per-field breakdown with detailed diagnostics
       const fieldRows = Object.entries(results.fieldStats)
         .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
         .map(([field, stats]) => {
           const isLowMatch = stats.matchRate < 80;
           const rateColor = stats.matchRate === 100 ? '#16a34a' : (isLowMatch ? '#dc2626' : '#d97706');
           const rateBg = stats.matchRate === 100 ? '#f0fdf4' : (isLowMatch ? '#fef2f2' : '#fffbeb');
-          const ages = stats.sampleAges || {};
-          const hasFieldStale = (ages.stale || 0) > 0;
+
+          // Sample inventory display
+          const inventory = stats.sampleInventory || {};
+          const invYears = Object.keys(inventory).map(Number).sort((a,b) => b - a);
+          const invDisplay = invYears.length > 0
+            ? invYears.map(y => `${y}: ${inventory[y]}`).join(', ')
+            : '<span style="color:#dc2626;">None</span>';
+
+          // Coverage vs match explanation
+          const coverageRate = stats.coverageRate || 0;
+          const unmatchReasons = stats.unmatchReasons || {};
+          const noNearby = unmatchReasons.noSampleWithinRadius || 0;
+          const futureOnly = unmatchReasons.onlyFutureSamples || 0;
+
+          // Diagnostic insight
+          let diagnostic = '';
+          if (stats.matchRate < coverageRate) {
+            diagnostic = `<span style="color:#d97706;">↳ ${futureOnly.toLocaleString()} pts have samples but from future years</span>`;
+          } else if (coverageRate < 100) {
+            diagnostic = `<span style="color:#dc2626;">↳ ${noNearby.toLocaleString()} pts have no sample within ${results.radiusFeet}ft</span>`;
+          }
+
           return `
-            <tr style="border-bottom: 1px solid #e2e8f0;">
-              <td style="padding: 0.5rem; font-weight: 600;">${field}</td>
-              <td style="padding: 0.5rem; text-align: center; color: #64748b;">${stats.yieldPoints.toLocaleString()}</td>
-              <td style="padding: 0.5rem; text-align: center; color: #16a34a;">${stats.matchedPoints}</td>
-              <td style="padding: 0.5rem; text-align: center;">
-                <span style="background: ${rateBg}; color: ${rateColor}; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">
-                  ${isLowMatch ? '⚠️ ' : ''}${stats.matchRate}%
-                </span>
+            <tr style="border-bottom: 1px solid #e2e8f0; vertical-align: top;">
+              <td style="padding: 0.75rem 0.5rem;">
+                <div style="font-weight: 600;">${field}</div>
+                <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.25rem;">
+                  Samples: ${invDisplay}
+                </div>
               </td>
-              <td style="padding: 0.5rem; text-align: center; font-size: 0.75rem;">
-                <span style="color: #166534;">${ages.sameYear || 0}</span> /
-                <span style="color: #1e40af;">${ages.oneYearOld || 0}</span> /
-                <span style="color: #92400e;">${ages.twoThreeYears || 0}</span> /
-                <span style="color: ${hasFieldStale ? '#dc2626' : '#64748b'};">${ages.stale || 0}</span>
+              <td style="padding: 0.75rem 0.5rem; text-align: center;">
+                <div style="color: #1e293b; font-weight: 500;">${stats.yieldPoints.toLocaleString()}</div>
+                <div style="font-size: 0.7rem; color: #64748b;">yield pts</div>
+              </td>
+              <td style="padding: 0.75rem 0.5rem; text-align: center;">
+                <div style="font-size: 0.8rem;">
+                  <span style="color: #3b82f6;" title="Coverage: yield points with ANY nearby sample">${coverageRate}%</span>
+                  <span style="color: #94a3b8;">→</span>
+                  <span style="background: ${rateBg}; color: ${rateColor}; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-weight: 600;">
+                    ${stats.matchRate}%
+                  </span>
+                </div>
+                <div style="font-size: 0.65rem; color: #64748b;">coverage → match</div>
+              </td>
+              <td style="padding: 0.75rem 0.5rem; text-align: left; font-size: 0.75rem; max-width: 180px;">
+                ${diagnostic || '<span style="color:#16a34a;">✓ Good coverage</span>'}
               </td>
             </tr>
           `;
@@ -1908,14 +1978,21 @@
 
       document.getElementById('yieldTabFields').innerHTML = `
         ${ageBreakdownHtml}
+        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #eff6ff; border-radius: 0.375rem; border: 1px solid #bfdbfe;">
+          <div style="font-weight: 600; color: #1e40af; margin-bottom: 0.5rem;">Understanding Match Rates</div>
+          <div style="font-size: 0.8rem; color: #1e40af;">
+            <strong>Coverage %</strong> = yield points with ANY soil sample within ${results.radiusFeet}ft (max possible match)<br>
+            <strong>Match %</strong> = yield points matched to samples from ${results.yieldYear} or earlier<br>
+            <em>If coverage >> match: your samples are newer than yield data (e.g., 2024 samples can't match 2023 yield)</em>
+          </div>
+        </div>
         <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
           <thead>
             <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
-              <th style="padding: 0.5rem; text-align: left;">Field</th>
-              <th style="padding: 0.5rem; text-align: center;">Yield Pts</th>
-              <th style="padding: 0.5rem; text-align: center;">Matched</th>
-              <th style="padding: 0.5rem; text-align: center;">Rate</th>
-              <th style="padding: 0.5rem; text-align: center; font-size: 0.7rem;">Age (0/1/2-3/4+)</th>
+              <th style="padding: 0.5rem; text-align: left;">Field & Sample Inventory</th>
+              <th style="padding: 0.5rem; text-align: center;">Yield Data</th>
+              <th style="padding: 0.5rem; text-align: center;">Coverage → Match</th>
+              <th style="padding: 0.5rem; text-align: left;">Diagnostic</th>
             </tr>
           </thead>
           <tbody>${fieldRows}</tbody>
