@@ -382,6 +382,7 @@
       // History field selector
       const historyFieldSel = document.getElementById('historyFieldSelect');
       historyFieldSel.innerHTML = '<option value="">Select a field...</option>';
+      historyFieldSel.innerHTML += '<option value="__all__" style="font-weight: bold;">📊 All Fields (Operation Average)</option>';
       fields.forEach(f => { historyFieldSel.innerHTML += `<option value="${f}">${f}</option>`; });
       
       // Rankings selectors
@@ -682,6 +683,12 @@
         return;
       }
 
+      // Handle "All Fields" operation-wide trends
+      if (fieldName === '__all__') {
+        renderOperationTrends(container);
+        return;
+      }
+
       console.log('=== Field Trends Debug ===');
       console.log('Selected field:', JSON.stringify(fieldName), 'length:', fieldName.length);
 
@@ -700,7 +707,7 @@
         container.innerHTML = '<div class="no-data">No data available for this field</div>';
         return;
       }
-      
+
       let html = `<div style="background:#f8fafc;border:2px solid #cbd5e1;border-radius:0.5rem;padding:1rem;margin-bottom:1rem;"><h3 style="margin:0 0 0.25rem 0;">${fieldName}</h3><p style="margin:0;color:#64748b;">Years: ${years.join(', ')} (${fieldSamples.length} samples)</p></div>`;
 
       try {
@@ -771,6 +778,228 @@
         console.error('Error in updateHistory:', error);
         container.innerHTML = `<div class="no-data" style="color: red;">Error loading data: ${error.message}</div>`;
       }
+    }
+
+    // Operation-wide trends (All Fields)
+    function renderOperationTrends(container) {
+      const years = [...new Set(sampleData.map(s => s.year).filter(y => y))].sort();
+      const allFields = [...new Set(sampleData.map(s => s.field).filter(f => f && f !== 'Unknown' && f !== 'Unassigned'))];
+
+      if (years.length < 1) {
+        container.innerHTML = '<div class="no-data">No data available</div>';
+        return;
+      }
+
+      // Calculate per-year statistics
+      const yearStats = years.map(year => {
+        const yearSamples = sampleData.filter(s => String(s.year) === String(year));
+        const fieldsInYear = [...new Set(yearSamples.map(s => s.field).filter(f => f && f !== 'Unknown' && f !== 'Unassigned'))];
+        return {
+          year,
+          sampleCount: yearSamples.length,
+          fieldCount: fieldsInYear.length,
+          fields: fieldsInYear
+        };
+      });
+
+      const totalSamples = sampleData.length;
+      const operationName = localStorage.getItem('operationName') || 'Operation';
+
+      let html = `
+        <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 2px solid #3b82f6; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
+          <h3 style="margin: 0 0 0.5rem 0; color: #1e40af;">📊 ${operationName} - All Fields Average</h3>
+          <p style="margin: 0 0 0.5rem 0; color: #64748b; font-size: 0.875rem;">
+            Operation-wide nutrient trends across <strong>${allFields.length} fields</strong> and <strong>${totalSamples.toLocaleString()} total samples</strong>
+          </p>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.75rem;">
+            ${yearStats.map(ys => `
+              <span style="background: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; border: 1px solid #93c5fd;">
+                <strong>${ys.year}:</strong> ${ys.sampleCount} samples, ${ys.fieldCount} fields
+              </span>
+            `).join('')}
+          </div>
+        </div>
+      `;
+
+      try {
+        const visibleNutrients = getVisibleNutrients();
+
+        visibleNutrients.forEach(attr => {
+          try {
+            const yearData = [];
+            let hasData = false;
+
+            years.forEach(year => {
+              const yearSamples = sampleData.filter(s => String(s.year) === String(year));
+              const stats = getStats(yearSamples, attr);
+
+              // Calculate per-field averages for range band
+              const fieldsInYear = [...new Set(yearSamples.map(s => s.field).filter(f => f && f !== 'Unknown' && f !== 'Unassigned'))];
+              const fieldAvgs = fieldsInYear.map(field => {
+                const fieldSamples = yearSamples.filter(s => s.field === field);
+                const fieldStats = getStats(fieldSamples, attr);
+                return fieldStats ? fieldStats.avg : null;
+              }).filter(v => v !== null);
+
+              if (stats) {
+                yearData.push({
+                  year,
+                  avg: stats.avg,
+                  median: stats.median,
+                  count: stats.count,
+                  fieldCount: fieldsInYear.length,
+                  minFieldAvg: fieldAvgs.length > 0 ? Math.min(...fieldAvgs) : stats.avg,
+                  maxFieldAvg: fieldAvgs.length > 0 ? Math.max(...fieldAvgs) : stats.avg
+                });
+                hasData = true;
+              }
+            });
+
+            if (!hasData || yearData.length < 1) return;
+
+            const first = yearData[0], last = yearData[yearData.length - 1];
+            const avgChange = last.avg - first.avg;
+            const medianChange = last.median - first.median;
+            const pctChange = first.avg !== 0 ? (avgChange / first.avg) * 100 : 0;
+            const isLowerBetter = CONFIG.LOWER_IS_BETTER.includes(attr);
+            const isPositive = isLowerBetter ? avgChange < 0 : avgChange > 0;
+            const decimals = (attr === 'pH' || attr === 'Buffer_pH') ? 2 : 1;
+            const name = CONFIG.NUTRIENT_NAMES[attr] || attr;
+
+            let cardClass = 'neutral', color = '#64748b';
+            if (yearData.length > 1) {
+              cardClass = isPositive ? 'positive' : 'negative';
+              color = isPositive ? '#22c55e' : '#ef4444';
+            }
+
+            const graph = createOperationTrendGraph(yearData, color);
+
+            html += `
+              <div class="trend-card ${cardClass}">
+                <div class="trend-header">
+                  <h4 class="trend-title">${name}</h4>
+                  ${yearData.length > 1 ? `<div class="trend-pct" style="color:${color};">${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(1)}%<div class="trend-sub">${first.year} → ${last.year}</div></div>` : ''}
+                </div>
+                <div class="trend-content">
+                  <div class="trend-values">
+                    <div style="font-size:0.65rem;color:#64748b;margin-bottom:0.25rem;display:flex;justify-content:space-between;padding:0 0.5rem;">
+                      <span></span>
+                      <span style="width:50px;text-align:center;">Avg</span>
+                      <span style="width:50px;text-align:center;">Med</span>
+                      <span style="width:70px;text-align:center;font-size:0.6rem;">Range</span>
+                    </div>
+                    ${yearData.map((d, i) => `
+                      <div class="trend-row ${i % 2 === 0 ? 'alt' : ''}" style="font-size:0.8rem;">
+                        <span class="trend-year">${d.year}:</span>
+                        <span style="width:50px;text-align:center;">${d.avg.toFixed(decimals)}</span>
+                        <span style="width:50px;text-align:center;color:#8b5cf6;">${d.median.toFixed(decimals)}</span>
+                        <span style="width:70px;text-align:center;font-size:0.65rem;color:#94a3b8;">${d.minFieldAvg.toFixed(decimals)}-${d.maxFieldAvg.toFixed(decimals)}</span>
+                      </div>
+                    `).join('')}
+                    ${yearData.length > 1 ? `
+                      <div class="trend-row" style="margin-top:0.5rem;border-top:2px solid ${color};padding-top:0.5rem;">
+                        <span>Change:</span>
+                        <span style="width:50px;text-align:center;color:${color};font-weight:700;">${avgChange >= 0 ? '+' : ''}${avgChange.toFixed(decimals)}</span>
+                        <span style="width:50px;text-align:center;color:#8b5cf6;font-weight:700;">${medianChange >= 0 ? '+' : ''}${medianChange.toFixed(decimals)}</span>
+                        <span style="width:70px;"></span>
+                      </div>
+                    ` : ''}
+                  </div>
+                  <div class="trend-graph">
+                    <div style="display:flex;gap:0.75rem;font-size:0.65rem;margin-bottom:0.25rem;justify-content:center;">
+                      <span><span style="color:${color};">●</span> Avg</span>
+                      <span><span style="color:#8b5cf6;">●</span> Median</span>
+                      <span style="color:#cbd5e1;">█ Field Range</span>
+                    </div>
+                    ${graph}
+                  </div>
+                </div>
+              </div>
+            `;
+          } catch (attrError) {
+            console.error('Error processing attribute', attr, ':', attrError);
+          }
+        });
+
+        container.innerHTML = html || '<div class="no-data">No nutrient data available</div>';
+      } catch (error) {
+        console.error('Error in renderOperationTrends:', error);
+        container.innerHTML = `<div class="no-data" style="color: red;">Error loading data: ${error.message}</div>`;
+      }
+    }
+
+    // Graph with range band for operation trends
+    function createOperationTrendGraph(yearData, avgColor) {
+      if (yearData.length < 1) return '';
+      const medianColor = '#8b5cf6';
+
+      // Get all values including range to determine scale
+      const allValues = [
+        ...yearData.map(d => d.avg),
+        ...yearData.map(d => d.median),
+        ...yearData.map(d => d.minFieldAvg),
+        ...yearData.map(d => d.maxFieldAvg)
+      ];
+      const minVal = Math.min(...allValues) * 0.9, maxVal = Math.max(...allValues) * 1.1;
+      const range = maxVal - minVal || 1;
+
+      const width = 280, height = 130;
+      const padLeft = 25, padRight = 25, padTop = 20, padBottom = 22;
+      const gw = width - padLeft - padRight;
+      const gh = height - padTop - padBottom;
+
+      // Calculate points
+      const avgPts = yearData.map((d, i) => {
+        const x = padLeft + (yearData.length > 1 ? (i / (yearData.length - 1)) * gw : gw / 2);
+        const y = padTop + gh - ((d.avg - minVal) / range) * gh;
+        return { x, y, year: d.year, val: d.avg };
+      });
+
+      const medianPts = yearData.map((d, i) => {
+        const x = padLeft + (yearData.length > 1 ? (i / (yearData.length - 1)) * gw : gw / 2);
+        const y = padTop + gh - ((d.median - minVal) / range) * gh;
+        return { x, y, year: d.year, val: d.median };
+      });
+
+      // Range band (min/max field averages)
+      const rangePts = yearData.map((d, i) => {
+        const x = padLeft + (yearData.length > 1 ? (i / (yearData.length - 1)) * gw : gw / 2);
+        const yMin = padTop + gh - ((d.minFieldAvg - minVal) / range) * gh;
+        const yMax = padTop + gh - ((d.maxFieldAvg - minVal) / range) * gh;
+        return { x, yMin, yMax };
+      });
+
+      // Create range band path (polygon)
+      let rangePath = '';
+      if (yearData.length > 1) {
+        const topPoints = rangePts.map(p => `${p.x},${p.yMax}`).join(' L');
+        const bottomPoints = [...rangePts].reverse().map(p => `${p.x},${p.yMin}`).join(' L');
+        rangePath = `<path d="M${topPoints} L${bottomPoints} Z" fill="#e2e8f0" opacity="0.5"/>`;
+      } else {
+        // Single point - draw a vertical line
+        const p = rangePts[0];
+        rangePath = `<line x1="${p.x}" y1="${p.yMin}" x2="${p.x}" y2="${p.yMax}" stroke="#cbd5e1" stroke-width="8" opacity="0.5"/>`;
+      }
+
+      // Create lines
+      const avgLine = avgPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+      const medianLine = medianPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+
+      // Create dots
+      const avgDots = avgPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${avgColor}" stroke="white" stroke-width="1.5"/>`).join('');
+      const medianDots = medianPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${medianColor}" stroke="white" stroke-width="1.5"/>`).join('');
+
+      // Year labels
+      const yearLabels = avgPts.map(p => `<text x="${p.x}" y="${height - 5}" text-anchor="middle" font-size="9" font-weight="600" fill="#475569">${p.year}</text>`).join('');
+
+      return `<svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">
+        ${rangePath}
+        <path d="${avgLine}" fill="none" stroke="${avgColor}" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="${medianLine}" fill="none" stroke="${medianColor}" stroke-width="2" stroke-linecap="round" stroke-dasharray="4,2"/>
+        ${avgDots}
+        ${medianDots}
+        ${yearLabels}
+      </svg>`;
     }
 
     function createLineGraph(yearData, color) {
