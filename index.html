@@ -71,7 +71,7 @@
       .mobile-toolbar { display: flex !important; }
       .stats-box { bottom: 60px !important; right: 0.5rem !important; font-size: 0.75rem !important; padding: 0.5rem !important; min-width: 100px !important; }
       .stats-box h4 { font-size: 0.7rem !important; }
-      #compareYearGroup { display: none !important; } /* Hide compare year on mobile */
+      #compareYearStack { display: none !important; } /* Hide compare stack on mobile - use bottom bar */
     }
     .mobile-toolbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #e2e8f0; padding: 0.5rem; z-index: 1000; justify-content: space-around; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
     .mobile-toolbar button { flex: 1; margin: 0 0.25rem; padding: 0.6rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; background: white; font-size: 0.7rem; cursor: pointer; font-weight: 500; }
@@ -109,21 +109,34 @@
           <label>ATTRIBUTE</label>
           <select id="attributeSelect"></select>
         </div>
-        <div class="control-group">
-          <label>SHOW YEAR</label>
+        <div class="control-group" id="viewYearGroup">
+          <label>YEAR</label>
           <select id="yearSelect"><option value="all">All Years</option></select>
         </div>
-        <div class="control-group compare-mode">
+        <div class="control-group">
           <label>MODE</label>
           <div class="toggle-group">
             <button class="toggle-btn active" id="singleYearBtn">View</button>
             <button class="toggle-btn" id="compareYearsBtn">Compare</button>
           </div>
         </div>
-        <div class="control-group" id="compareYearGroup" style="display:none;">
-          <label>BASELINE</label>
-          <select id="compareYearSelect"><option value="">Select baseline year...</option></select>
+      </div>
+      <!-- Compare Mode Year Stack -->
+      <div id="compareYearStack" style="display: none; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 2px solid #3b82f6; border-radius: 0.5rem; padding: 0.75rem 1rem; text-align: center;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <div style="text-align: center;">
+            <label style="font-size: 0.6rem; font-weight: 600; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 0.25rem;">BASELINE YEAR</label>
+            <select id="compareYearSelect" style="padding: 0.4rem 0.6rem; border: 2px solid #93c5fd; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 600; min-width: 90px;"><option value="">Select...</option></select>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: center; color: #3b82f6;">
+            <span style="font-size: 1.25rem; font-weight: bold;">→</span>
+          </div>
+          <div style="text-align: center;">
+            <label style="font-size: 0.6rem; font-weight: 600; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 0.25rem;">COMPARE TO</label>
+            <select id="compareToYearSelect" style="padding: 0.4rem 0.6rem; border: 2px solid #93c5fd; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 600; min-width: 90px;"><option value="">Select...</option></select>
+          </div>
         </div>
+        <div id="compareSummaryText" style="margin-top: 0.5rem; font-size: 0.75rem; color: #1e40af; font-weight: 500;">Select years to compare</div>
       </div>
       <div class="controls-right">
         <button class="button" id="fieldModeBtn">📱 Field Mode</button>
@@ -862,12 +875,14 @@
       });
       document.getElementById('attributeSelect').addEventListener('change', (e) => { selectedAttribute = e.target.value; updateYearSelector(); updateCompareYearOptions(); updateMap(); updateLegend(); });
       document.getElementById('yearSelect').addEventListener('change', (e) => { selectedYear = e.target.value; updateCompareYearOptions(); updateMap(); });
-      document.getElementById('compareYearSelect').addEventListener('change', (e) => { compareYear = e.target.value; updateMap(); });
+      document.getElementById('compareYearSelect').addEventListener('change', (e) => { compareYear = e.target.value; updateCompareSummary(); updateMap(); });
+      document.getElementById('compareToYearSelect').addEventListener('change', (e) => { selectedYear = e.target.value; updateCompareSummary(); updateMap(); });
       document.getElementById('singleYearBtn').addEventListener('click', () => {
         compareMode = false;
         document.getElementById('singleYearBtn').classList.add('active');
         document.getElementById('compareYearsBtn').classList.remove('active');
-        document.getElementById('compareYearGroup').style.display = 'none';
+        document.getElementById('compareYearStack').style.display = 'none';
+        document.getElementById('viewYearGroup').style.display = 'block';
         document.getElementById('compareInfoBar').style.display = 'none';
         updateLegend();
         updateMap();
@@ -876,15 +891,11 @@
         compareMode = true;
         document.getElementById('compareYearsBtn').classList.add('active');
         document.getElementById('singleYearBtn').classList.remove('active');
-        document.getElementById('compareYearGroup').style.display = 'block';
+        document.getElementById('compareYearStack').style.display = 'block';
+        document.getElementById('viewYearGroup').style.display = 'none';
         document.getElementById('compareInfoBar').style.display = 'block';
         updateCompareYearOptions();
-        // Auto-select the most recent year before selected year
-        const sel = document.getElementById('compareYearSelect');
-        if (sel.options.length > 1) {
-          sel.selectedIndex = 1; // First year after "Select baseline year"
-          compareYear = sel.value;
-        }
+        updateCompareSummary();
         updateLegend();
         updateMap();
       });
@@ -917,19 +928,18 @@
         btn.classList.add('active');
         document.getElementById('compareYearsBtn').classList.add('active');
         document.getElementById('singleYearBtn').classList.remove('active');
+        document.getElementById('compareYearStack').style.display = 'block';
+        document.getElementById('viewYearGroup').style.display = 'none';
         document.getElementById('compareInfoBar').style.display = 'block';
         updateCompareYearOptions();
-        // Auto-select first available compare year
-        const sel = document.getElementById('compareYearSelect');
-        if (sel.options.length > 1) {
-          sel.selectedIndex = 1;
-          compareYear = sel.value;
-        }
+        updateCompareSummary();
       } else {
         btn.textContent = '📊 Compare';
         btn.classList.remove('active');
         document.getElementById('singleYearBtn').classList.add('active');
         document.getElementById('compareYearsBtn').classList.remove('active');
+        document.getElementById('compareYearStack').style.display = 'none';
+        document.getElementById('viewYearGroup').style.display = 'block';
         document.getElementById('compareInfoBar').style.display = 'none';
         compareYear = '';
       }
@@ -937,9 +947,26 @@
       updateMap();
     }
 
+    function updateCompareSummary() {
+      const baselineYear = document.getElementById('compareYearSelect').value;
+      const compareToYear = document.getElementById('compareToYearSelect').value;
+      const summaryEl = document.getElementById('compareSummaryText');
+
+      if (baselineYear && compareToYear) {
+        summaryEl.innerHTML = `Showing change from <strong>${baselineYear}</strong> → <strong>${compareToYear}</strong>`;
+        summaryEl.style.color = '#166534';
+      } else if (baselineYear || compareToYear) {
+        summaryEl.textContent = 'Select both years to compare';
+        summaryEl.style.color = '#d97706';
+      } else {
+        summaryEl.textContent = 'Select years to compare';
+        summaryEl.style.color = '#1e40af';
+      }
+    }
+
     function updateCompareYearOptions() {
-      const sel = document.getElementById('compareYearSelect');
-      sel.innerHTML = '<option value="">Select baseline year...</option>';
+      const baselineSel = document.getElementById('compareYearSelect');
+      const compareToSel = document.getElementById('compareToYearSelect');
 
       // Filter samples by field and attribute
       let filteredSamples = selectedField === 'all'
@@ -952,8 +979,34 @@
         return v !== undefined && v !== null && (selectedAttribute === 'sampleId' || !isNaN(v));
       });
 
-      const years = Utils.getUniqueYears(filteredSamples).filter(y => String(y) !== String(selectedYear));
-      years.forEach(y => { const o = document.createElement('option'); o.value = y; o.textContent = y; sel.appendChild(o); });
+      const years = Utils.getUniqueYears(filteredSamples);
+
+      // Populate baseline dropdown (older years first)
+      baselineSel.innerHTML = '<option value="">Select...</option>';
+      years.forEach(y => {
+        const o = document.createElement('option');
+        o.value = y; o.textContent = y;
+        baselineSel.appendChild(o);
+      });
+
+      // Populate compare-to dropdown (newer years first, reversed)
+      compareToSel.innerHTML = '<option value="">Select...</option>';
+      [...years].reverse().forEach(y => {
+        const o = document.createElement('option');
+        o.value = y; o.textContent = y;
+        compareToSel.appendChild(o);
+      });
+
+      // Auto-select: baseline = oldest year, compare-to = newest year
+      if (years.length >= 2) {
+        baselineSel.value = years[0]; // Oldest
+        compareYear = years[0];
+        compareToSel.value = years[years.length - 1]; // Newest
+        selectedYear = years[years.length - 1];
+      } else if (years.length === 1) {
+        baselineSel.value = years[0];
+        compareYear = years[0];
+      }
     }
     
     function updateLegend() {
