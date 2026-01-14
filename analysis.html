@@ -245,7 +245,12 @@
       <!-- Scatter Plot Section -->
       <div id="scatterSection" style="display: none; margin-top: 1.5rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
-          <h3 style="margin: 0; color: #1e293b;">Scatter Plot: Nutrient vs Yield</h3>
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <h3 id="scatterTitle" style="margin: 0; color: #1e293b;">Scatter Plot: Nutrient vs Yield</h3>
+            <button onclick="toggleScatterAxes()" id="swapAxesBtn" style="padding: 0.375rem 0.75rem; border-radius: 0.375rem; border: 1px solid #3b82f6; background: #eff6ff; color: #1d4ed8; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+              <span style="font-size: 1rem;">⇄</span> Swap Axes
+            </button>
+          </div>
           <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
             <div>
               <label style="margin-right: 0.5rem;">Nutrient:</label>
@@ -1741,6 +1746,28 @@
       return dataPoints;
     }
 
+    // Scatter plot axis state
+    let scatterAxesFlipped = false;
+
+    function toggleScatterAxes() {
+      scatterAxesFlipped = !scatterAxesFlipped;
+      const btn = document.getElementById('swapAxesBtn');
+      const title = document.getElementById('scatterTitle');
+      const nutrient = document.getElementById('scatterNutrientSelect').value;
+      const nutrientName = CONFIG.NUTRIENT_NAMES[nutrient] || nutrient;
+
+      if (scatterAxesFlipped) {
+        btn.style.background = '#3b82f6';
+        btn.style.color = 'white';
+        title.textContent = `Scatter Plot: Yield vs ${nutrientName}`;
+      } else {
+        btn.style.background = '#eff6ff';
+        btn.style.color = '#1d4ed8';
+        title.textContent = `Scatter Plot: ${nutrientName} vs Yield`;
+      }
+      drawScatterPlot();
+    }
+
     // Threshold slider sync functions
     function updateThresholdDisplay() {
       const slider = document.getElementById('yieldThresholdSlider');
@@ -1781,13 +1808,22 @@
         return;
       }
 
-      // Get data ranges
-      const xValues = validPoints.map(p => parseFloat(p[nutrient]));
-      const yValues = validPoints.map(p => p.avgYield);
+      // Get data ranges - swap if axes are flipped
+      const nutrientValues = validPoints.map(p => parseFloat(p[nutrient]));
+      const yieldValues = validPoints.map(p => p.avgYield);
+
+      // When flipped: X = Yield, Y = Nutrient
+      const xValues = scatterAxesFlipped ? yieldValues : nutrientValues;
+      const yValues = scatterAxesFlipped ? nutrientValues : yieldValues;
       const xMin = Math.min(...xValues);
       const xMax = Math.max(...xValues);
       const yMin = Math.min(...yValues);
       const yMax = Math.max(...yValues);
+
+      // Labels for axes
+      const nutrientName = CONFIG.NUTRIENT_NAMES[nutrient] || nutrient;
+      const xLabel = scatterAxesFlipped ? 'Yield (bu/ac)' : nutrientName;
+      const yLabel = scatterAxesFlipped ? nutrientName : 'Yield (bu/ac)';
 
       // Padding for axes
       const padding = { left: 70, right: 40, top: 40, bottom: 60 };
@@ -1874,35 +1910,61 @@
         ctx.fill();
       }
 
-      // Draw yield threshold line
-      if (yieldThreshold >= yMin && yieldThreshold <= yMax) {
-        const thresholdY = yScale(yieldThreshold);
-        ctx.strokeStyle = '#f59e0b';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([8, 4]);
-        ctx.beginPath();
-        ctx.moveTo(padding.left, thresholdY);
-        ctx.lineTo(canvas.width - padding.right, thresholdY);
-        ctx.stroke();
-        ctx.setLineDash([]);
+      // Draw yield threshold line (vertical when flipped, horizontal when normal)
+      if (scatterAxesFlipped) {
+        // Flipped: X = Yield, so threshold is a vertical line
+        if (yieldThreshold >= xMin && yieldThreshold <= xMax) {
+          const thresholdX = xScale(yieldThreshold);
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([8, 4]);
+          ctx.beginPath();
+          ctx.moveTo(thresholdX, padding.top);
+          ctx.lineTo(thresholdX, canvas.height - padding.bottom);
+          ctx.stroke();
+          ctx.setLineDash([]);
 
-        // Label the threshold line
-        ctx.fillStyle = '#92400e';
-        ctx.font = 'bold 12px system-ui';
-        ctx.textAlign = 'left';
-        ctx.fillText(`${yieldThreshold} bu/ac threshold`, padding.left + 5, thresholdY - 5);
+          // Label the threshold line
+          ctx.fillStyle = '#92400e';
+          ctx.font = 'bold 12px system-ui';
+          ctx.save();
+          ctx.translate(thresholdX + 5, padding.top + 60);
+          ctx.rotate(Math.PI / 2);
+          ctx.textAlign = 'left';
+          ctx.fillText(`${yieldThreshold} bu/ac threshold`, 0, 0);
+          ctx.restore();
+        }
+      } else {
+        // Normal: Y = Yield, so threshold is a horizontal line
+        if (yieldThreshold >= yMin && yieldThreshold <= yMax) {
+          const thresholdY = yScale(yieldThreshold);
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([8, 4]);
+          ctx.beginPath();
+          ctx.moveTo(padding.left, thresholdY);
+          ctx.lineTo(canvas.width - padding.right, thresholdY);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Label the threshold line
+          ctx.fillStyle = '#92400e';
+          ctx.font = 'bold 12px system-ui';
+          ctx.textAlign = 'left';
+          ctx.fillText(`${yieldThreshold} bu/ac threshold`, padding.left + 5, thresholdY - 5);
+        }
       }
 
-      // Separate points above/below threshold
+      // Separate points above/below threshold (always based on yield, not axis position)
       const aboveThreshold = validPoints.filter(p => p.avgYield >= yieldThreshold);
       const belowThreshold = validPoints.filter(p => p.avgYield < yieldThreshold);
 
       // Draw points below threshold (gray/muted)
       belowThreshold.forEach(p => {
-        const x = xScale(parseFloat(p[nutrient]));
-        const y = yScale(p.avgYield);
+        const px = scatterAxesFlipped ? xScale(p.avgYield) : xScale(parseFloat(p[nutrient]));
+        const py = scatterAxesFlipped ? yScale(parseFloat(p[nutrient])) : yScale(p.avgYield);
         ctx.beginPath();
-        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.arc(px, py, 4, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(148, 163, 184, 0.4)';
         ctx.fill();
         ctx.strokeStyle = '#94a3b8';
@@ -1912,10 +1974,10 @@
 
       // Draw points above threshold (highlighted)
       aboveThreshold.forEach(p => {
-        const x = xScale(parseFloat(p[nutrient]));
-        const y = yScale(p.avgYield);
+        const px = scatterAxesFlipped ? xScale(p.avgYield) : xScale(parseFloat(p[nutrient]));
+        const py = scatterAxesFlipped ? yScale(parseFloat(p[nutrient])) : yScale(p.avgYield);
         ctx.beginPath();
-        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.arc(px, py, 6, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(34, 197, 94, 0.7)';
         ctx.fill();
         ctx.strokeStyle = '#16a34a';
@@ -1942,29 +2004,29 @@
       ctx.font = '12px system-ui';
       ctx.textAlign = 'center';
 
-      // X-axis labels
+      // X-axis labels (format based on what's on X axis)
       for (let i = 0; i <= 5; i++) {
         const val = xMin + (i * (xMax - xMin) / 5);
         const x = xScale(val);
-        ctx.fillText(val.toFixed(1), x, canvas.height - padding.bottom + 20);
+        ctx.fillText(scatterAxesFlipped ? val.toFixed(0) : val.toFixed(1), x, canvas.height - padding.bottom + 20);
       }
       ctx.font = 'bold 13px system-ui';
-      ctx.fillText(`${CONFIG.NUTRIENT_NAMES[nutrient] || nutrient}`, canvas.width / 2, canvas.height - 12);
+      ctx.fillText(xLabel, canvas.width / 2, canvas.height - 12);
 
-      // Y-axis labels
+      // Y-axis labels (format based on what's on Y axis)
       ctx.font = '12px system-ui';
       ctx.textAlign = 'right';
       for (let i = 0; i <= 5; i++) {
         const val = yMin + (i * (yMax - yMin) / 5);
         const y = yScale(val);
-        ctx.fillText(val.toFixed(0), padding.left - 10, y + 4);
+        ctx.fillText(scatterAxesFlipped ? val.toFixed(1) : val.toFixed(0), padding.left - 10, y + 4);
       }
       ctx.save();
       ctx.translate(18, canvas.height / 2);
       ctx.rotate(-Math.PI / 2);
       ctx.textAlign = 'center';
       ctx.font = 'bold 13px system-ui';
-      ctx.fillText('Yield (bu/ac)', 0, 0);
+      ctx.fillText(yLabel, 0, 0);
       ctx.restore();
 
       // Draw equation and R² on chart
@@ -2028,24 +2090,32 @@
       ctx.fillText('95% prediction interval', legendX + 28, legendY + 72);
 
       // Update threshold analysis panel
-      updateThresholdAnalysis(nutrient, validPoints, yieldThreshold, aboveThreshold, belowThreshold);
+      updateThresholdAnalysis(nutrient, validPoints, yieldThreshold, aboveThreshold, belowThreshold, scatterAxesFlipped);
 
       // Update stats bar
       const statsDiv = document.getElementById('scatterStats');
       const corrDirection = r >= 0 ? '↗ Positive' : '↘ Negative';
       const corrColor = r >= 0 ? '#16a34a' : '#dc2626';
+      const nutrientMin = Math.min(...nutrientValues);
+      const nutrientMax = Math.max(...nutrientValues);
+      const yieldMin = Math.min(...yieldValues);
+      const yieldMax = Math.max(...yieldValues);
+      const axisNote = scatterAxesFlipped
+        ? '<span style="color: #3b82f6; font-weight: 600;">[Axes Flipped: X=Yield, Y=Nutrient]</span>'
+        : '';
       statsDiv.innerHTML = `
-        <strong>${CONFIG.NUTRIENT_NAMES[nutrient] || nutrient}:</strong>
+        <strong>${nutrientName}:</strong>
         n=${validPoints.length} |
         r=${r.toFixed(3)} |
         R²=${(r2 * 100).toFixed(1)}% |
-        ${nutrient} Range: ${xMin.toFixed(1)} - ${xMax.toFixed(1)} |
-        Yield Range: ${yMin.toFixed(0)} - ${yMax.toFixed(0)} bu/ac |
+        ${nutrient} Range: ${nutrientMin.toFixed(1)} - ${nutrientMax.toFixed(1)} |
+        Yield Range: ${yieldMin.toFixed(0)} - ${yieldMax.toFixed(0)} bu/ac |
         <span style="color: ${corrColor};">${corrDirection} correlation</span>
+        ${axisNote}
       `;
     }
 
-    function updateThresholdAnalysis(nutrient, validPoints, threshold, aboveThreshold, belowThreshold) {
+    function updateThresholdAnalysis(nutrient, validPoints, threshold, aboveThreshold, belowThreshold, isFlipped = false) {
       const content = document.getElementById('thresholdContent');
       const nutrientName = CONFIG.NUTRIENT_NAMES[nutrient] || nutrient;
 
@@ -2062,7 +2132,8 @@
       const minAbove = Math.min(...aboveNutrientValues);
       const maxAbove = Math.max(...aboveNutrientValues);
       const avgAbove = aboveNutrientValues.reduce((a, b) => a + b, 0) / aboveNutrientValues.length;
-      const p10Above = aboveNutrientValues.sort((a, b) => a - b)[Math.floor(aboveNutrientValues.length * 0.1)] || minAbove;
+      const sortedAbove = [...aboveNutrientValues].sort((a, b) => a - b);
+      const p10Above = sortedAbove[Math.floor(sortedAbove.length * 0.1)] || minAbove;
 
       // Calculate stats for points below threshold
       let belowStats = '';
@@ -2082,7 +2153,13 @@
         `;
       }
 
+      // Different interpretation based on axis orientation
+      const interpretationText = isFlipped
+        ? `<strong>Key insight:</strong> At yields ≥${threshold} bu/ac, ${nutrient} levels ranged from <strong>${minAbove.toFixed(1)}</strong> to <strong>${maxAbove.toFixed(1)}</strong>. The minimum ${nutrient} observed at this yield level was <strong>${minAbove.toFixed(1)}</strong> - you never see ${nutrient} below this at high yields.`
+        : `<strong>Interpretation:</strong> For high yields (≥${threshold} bu/ac), the minimum ${nutrientName} observed was <strong>${minAbove.toFixed(1)}</strong>. This suggests ${nutrient} levels below this may limit yield potential.`;
+
       content.innerHTML = `
+        ${isFlipped ? '<div style="background: #eff6ff; border: 1px solid #3b82f6; border-radius: 0.375rem; padding: 0.5rem; margin-bottom: 0.75rem; font-size: 0.75rem; color: #1d4ed8;"><strong>Flipped View:</strong> X=Yield, Y=${nutrientName}. Look left of the threshold line to see nutrient levels at high yields.</div>' : ''}
         <div style="background: #f0fdf4; border: 1px solid #22c55e; border-radius: 0.375rem; padding: 0.75rem; margin-bottom: 0.75rem;">
           <div style="font-weight: 700; color: #166534; margin-bottom: 0.5rem;">
             🎯 For yields ≥ ${threshold} bu/ac:
@@ -2103,8 +2180,7 @@
         ${belowStats}
 
         <div style="margin-top: 0.75rem; padding: 0.5rem; background: #fef3c7; border-radius: 0.25rem; font-size: 0.75rem; color: #92400e;">
-          <strong>Interpretation:</strong> For high yields (≥${threshold} bu/ac), the minimum ${nutrientName} observed was <strong>${minAbove.toFixed(1)}</strong>.
-          This suggests ${nutrient} levels below this may limit yield potential.
+          ${interpretationText}
         </div>
       `;
     }
