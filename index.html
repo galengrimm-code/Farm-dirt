@@ -233,6 +233,25 @@
       // For these, we filter out 0 values from display and calculations
       ZERO_MEANS_NO_DATA: ['P', 'P2', 'K', 'OM', 'CEC', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Ca', 'Mg', 'Na', 'NO3', 'NH4'],
 
+      // Field-level shading thresholds (absolute values for 3-zone coloring)
+      // { yellow: X, green: Y } means: red < X, yellow X-Y, green >= Y
+      // For "lower is better" attributes, thresholds are inverted
+      FIELD_SHADING_THRESHOLDS: {
+        P: { yellow: 35, green: 70 },
+        P2: { yellow: 35, green: 70 },
+        K: { yellow: 125, green: 175 },
+        OM: { yellow: 2.5, green: 4.0 },
+        pH: { yellow: 6.0, green: 6.5, max: 7.2 },
+        CEC: { yellow: 10, green: 20 },
+        Ca_sat: { yellow: 60, green: 70 },
+        Mg_sat: { green: 10, yellow: 15 }, // Lower is better - inverted
+        K_Sat: { yellow: 2.5, green: 4.0 },
+        Zn: { yellow: 1.0, green: 2.0 },
+        S: { yellow: 8, green: 15 },
+        Ca: { yellow: 1000, green: 2000 },
+        Mg: { yellow: 150, green: 300 }
+      },
+
       // All nutrients in display order with default visibility
       ALL_NUTRIENTS: [
         { key: 'sampleId', name: 'Sample ID', defaultVisible: true },
@@ -1421,7 +1440,8 @@
             poly.bindTooltip(tooltipContent, { permanent: false, direction: 'center', className: 'field-tooltip' });
 
             // Add permanent field name label in center (only on first polygon of multi-polygon)
-            if (idx === 0) {
+            // Hide labels when zoomed out past level 14 to avoid cluttering the map
+            if (idx === 0 && map.getZoom() >= 14) {
               const center = poly.getBounds().getCenter();
               const label = L.marker(center, {
                 icon: L.divIcon({
@@ -1524,18 +1544,53 @@
         return filtered.length > 0 ? filtered : values; // Fallback to original if all filtered
       };
 
-      if (allFieldAvgs.length > 1) {
-        // Remove outliers for color range calculation
+      // Use absolute thresholds if defined for this attribute
+      const thresholds = CONFIG.FIELD_SHADING_THRESHOLDS[selectedAttribute];
+
+      // Debug: track color distribution
+      const colorCounts = { green: 0, yellow: 0, red: 0 };
+
+      if (thresholds && allFieldAvgs.length > 0) {
+        // Use absolute threshold-based coloring
+        console.log('Using absolute thresholds for', selectedAttribute, thresholds);
+
+        Object.entries(fieldAverages).forEach(([fieldName, stats]) => {
+          let color;
+          const val = stats.avg;
+
+          if (isLowerBetter) {
+            // For "lower is better" (like Mg_sat): green if below green threshold, yellow in between, red above yellow
+            // thresholds: { green: 10, yellow: 15 } means: val <= 10 = green, 10-15 = yellow, > 15 = red
+            if (val <= thresholds.green) color = '#22c55e';      // Green (low/good)
+            else if (val <= thresholds.yellow) color = '#eab308'; // Yellow (medium)
+            else color = '#ef4444';                                // Red (high/bad)
+          } else {
+            // For "higher is better" (like P, K, OM): green if above green threshold, yellow in between, red below yellow
+            // thresholds: { yellow: 35, green: 70 } means: val >= 70 = green, 35-70 = yellow, < 35 = red
+            if (val >= thresholds.green) color = '#22c55e';      // Green (high/good)
+            else if (val >= thresholds.yellow) color = '#eab308'; // Yellow (medium)
+            else color = '#ef4444';                                // Red (low/bad)
+          }
+
+          fieldColors[fieldName] = color;
+          fieldColors[fieldName + '_stats'] = stats;
+
+          // Track color distribution
+          if (color === '#22c55e') colorCounts.green++;
+          else if (color === '#eab308') colorCounts.yellow++;
+          else if (color === '#ef4444') colorCounts.red++;
+        });
+
+        console.log('Field color distribution:', colorCounts, 'Total fields colored:', Object.keys(fieldAverages).length);
+      } else if (allFieldAvgs.length > 1) {
+        // Fallback: relative coloring for attributes without defined thresholds
         const filteredAvgs = removeOutliers(allFieldAvgs);
         const sortedAvgs = [...filteredAvgs].sort((a, b) => a - b);
         const minAvg = sortedAvgs[0];
         const maxAvg = sortedAvgs[sortedAvgs.length - 1];
         const range = maxAvg - minAvg;
 
-        console.log('Color gradient range:', { minAvg, maxAvg, range, isLowerBetter, originalCount: allFieldAvgs.length, filteredCount: filteredAvgs.length });
-
-        // Debug: track color distribution
-        const colorCounts = { green: 0, yellow: 0, red: 0 };
+        console.log('Using relative color gradient:', { minAvg, maxAvg, range, isLowerBetter, originalCount: allFieldAvgs.length, filteredCount: filteredAvgs.length });
 
         Object.entries(fieldAverages).forEach(([fieldName, stats]) => {
           let color;
