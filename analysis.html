@@ -236,9 +236,29 @@
           </select>
         </div>
         <button onclick="exportYieldCorrelation()" class="export-btn">📄 Export Report</button>
+        <button onclick="toggleYieldDebug()" class="export-btn" style="background: #f59e0b;">🔍 Debug Data</button>
       </div>
       <div id="yieldContent">
         <div class="no-data">No yield data available. Import yield maps on the Import page to see correlations.</div>
+      </div>
+
+      <!-- Scatter Plot Section -->
+      <div id="scatterSection" style="display: none; margin-top: 1.5rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h3 style="margin: 0; color: #1e293b;">Scatter Plot: Nutrient vs Yield</h3>
+          <div>
+            <label style="margin-right: 0.5rem;">Nutrient:</label>
+            <select id="scatterNutrientSelect" onchange="drawScatterPlot()" style="padding: 0.375rem 0.75rem; border-radius: 0.375rem; border: 1px solid #cbd5e1;"></select>
+          </div>
+        </div>
+        <canvas id="scatterCanvas" width="800" height="400" style="background: white; border: 1px solid #e2e8f0; border-radius: 0.375rem; max-width: 100%;"></canvas>
+        <div id="scatterStats" style="margin-top: 0.75rem; font-size: 0.875rem; color: #64748b;"></div>
+      </div>
+
+      <!-- Debug Panel -->
+      <div id="yieldDebugPanel" style="display: none; margin-top: 1.5rem; background: #fffbeb; border: 2px solid #f59e0b; border-radius: 0.5rem; padding: 1rem;">
+        <h3 style="margin: 0 0 1rem 0; color: #92400e;">🔍 Data Verification Panel</h3>
+        <div id="debugContent" style="font-family: monospace; font-size: 0.8rem; white-space: pre-wrap; overflow-x: auto;"></div>
       </div>
     </div>
   </div>
@@ -1521,6 +1541,411 @@
       // Re-run the full update to rebuild with new sort
       updateYieldAnalysis();
     };
+
+    // ========== SCATTER PLOT & DEBUG ==========
+    let currentYieldDataPoints = []; // Store for scatter plot
+
+    function toggleYieldDebug() {
+      const debugPanel = document.getElementById('yieldDebugPanel');
+      const scatterSection = document.getElementById('scatterSection');
+      const isHidden = debugPanel.style.display === 'none';
+
+      debugPanel.style.display = isHidden ? 'block' : 'none';
+      scatterSection.style.display = isHidden ? 'block' : 'none';
+
+      if (isHidden) {
+        generateDebugReport();
+        populateScatterSelect();
+        drawScatterPlot();
+      }
+    }
+
+    function populateScatterSelect() {
+      const select = document.getElementById('scatterNutrientSelect');
+      const visibleNutrients = getVisibleNutrients();
+      select.innerHTML = visibleNutrients.map(n =>
+        `<option value="${n}"${n === 'P' ? ' selected' : ''}>${CONFIG.NUTRIENT_NAMES[n] || n}</option>`
+      ).join('');
+    }
+
+    function getYieldDataPoints() {
+      const cropFilter = document.getElementById('yieldCropSelect').value;
+      const yearFilter = document.getElementById('yieldYearSelect').value;
+      const fieldFilter = document.getElementById('yieldFieldSelect').value;
+
+      let samplesWithYield = sampleData.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0);
+      if (fieldFilter !== 'all') samplesWithYield = samplesWithYield.filter(s => s.field === fieldFilter);
+
+      const locationMap = new Map();
+      samplesWithYield.forEach(sample => {
+        const locKey = `${sample.lat.toFixed(5)},${sample.lon.toFixed(5)}`;
+        const existing = locationMap.get(locKey);
+        if (!existing || (sample.year && sample.year > existing.year)) {
+          locationMap.set(locKey, sample);
+        }
+      });
+      samplesWithYield = Array.from(locationMap.values());
+
+      const dataPoints = [];
+      samplesWithYield.forEach(sample => {
+        Object.entries(sample.yieldCorrelations).forEach(([year, yieldInfo]) => {
+          if (yearFilter !== 'all' && String(year) !== String(yearFilter)) return;
+          if (cropFilter !== 'all' && yieldInfo.crop !== cropFilter) return;
+          dataPoints.push({
+            ...sample,
+            yieldYear: parseInt(year),
+            avgYield: yieldInfo.avgYield,
+            crop: yieldInfo.crop,
+            yieldPointCount: yieldInfo.pointCount
+          });
+        });
+      });
+      return dataPoints;
+    }
+
+    function drawScatterPlot() {
+      const canvas = document.getElementById('scatterCanvas');
+      const ctx = canvas.getContext('2d');
+      const nutrient = document.getElementById('scatterNutrientSelect').value;
+      const dataPoints = getYieldDataPoints();
+
+      // Filter for valid data
+      const validPoints = dataPoints.filter(d => {
+        const val = d[nutrient];
+        if (val === undefined || val === null || val === '') return false;
+        return isFinite(parseFloat(val));
+      });
+
+      // Clear canvas
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (validPoints.length < 3) {
+        ctx.fillStyle = '#64748b';
+        ctx.font = '14px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('Not enough data points', canvas.width / 2, canvas.height / 2);
+        return;
+      }
+
+      // Get data ranges
+      const xValues = validPoints.map(p => parseFloat(p[nutrient]));
+      const yValues = validPoints.map(p => p.avgYield);
+      const xMin = Math.min(...xValues);
+      const xMax = Math.max(...xValues);
+      const yMin = Math.min(...yValues);
+      const yMax = Math.max(...yValues);
+
+      // Padding for axes
+      const padding = { left: 60, right: 30, top: 30, bottom: 50 };
+      const plotWidth = canvas.width - padding.left - padding.right;
+      const plotHeight = canvas.height - padding.top - padding.bottom;
+
+      // Scale functions
+      const xScale = (val) => padding.left + ((val - xMin) / (xMax - xMin || 1)) * plotWidth;
+      const yScale = (val) => canvas.height - padding.bottom - ((val - yMin) / (yMax - yMin || 1)) * plotHeight;
+
+      // Draw axes
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padding.left, padding.top);
+      ctx.lineTo(padding.left, canvas.height - padding.bottom);
+      ctx.lineTo(canvas.width - padding.right, canvas.height - padding.bottom);
+      ctx.stroke();
+
+      // Draw grid lines
+      ctx.strokeStyle = '#f1f5f9';
+      for (let i = 0; i <= 5; i++) {
+        const y = padding.top + (i * plotHeight / 5);
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(canvas.width - padding.right, y);
+        ctx.stroke();
+      }
+
+      // Draw axis labels
+      ctx.fillStyle = '#64748b';
+      ctx.font = '11px system-ui';
+      ctx.textAlign = 'center';
+
+      // X-axis labels
+      for (let i = 0; i <= 5; i++) {
+        const val = xMin + (i * (xMax - xMin) / 5);
+        const x = xScale(val);
+        ctx.fillText(val.toFixed(1), x, canvas.height - padding.bottom + 20);
+      }
+      ctx.fillText(`${CONFIG.NUTRIENT_NAMES[nutrient] || nutrient}`, canvas.width / 2, canvas.height - 10);
+
+      // Y-axis labels
+      ctx.textAlign = 'right';
+      for (let i = 0; i <= 5; i++) {
+        const val = yMin + (i * (yMax - yMin) / 5);
+        const y = yScale(val);
+        ctx.fillText(val.toFixed(0), padding.left - 10, y + 4);
+      }
+      ctx.save();
+      ctx.translate(15, canvas.height / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = 'center';
+      ctx.fillText('Yield (bu/ac)', 0, 0);
+      ctx.restore();
+
+      // Calculate correlation for color
+      const correlation = calculateCorrelation(xValues, yValues);
+      const r = correlation ? correlation.r : 0;
+
+      // Draw points
+      validPoints.forEach(p => {
+        const x = xScale(parseFloat(p[nutrient]));
+        const y = yScale(p.avgYield);
+
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = r >= 0 ? 'rgba(34, 197, 94, 0.6)' : 'rgba(239, 68, 68, 0.6)';
+        ctx.fill();
+        ctx.strokeStyle = r >= 0 ? '#16a34a' : '#dc2626';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
+
+      // Draw trend line if significant correlation
+      if (correlation && Math.abs(r) > 0.1) {
+        const meanX = xValues.reduce((a, b) => a + b, 0) / xValues.length;
+        const meanY = yValues.reduce((a, b) => a + b, 0) / yValues.length;
+        const slope = xValues.reduce((sum, xi, i) => sum + (xi - meanX) * (yValues[i] - meanY), 0) /
+                      xValues.reduce((sum, xi) => sum + (xi - meanX) ** 2, 0);
+        const intercept = meanY - slope * meanX;
+
+        const x1 = xMin;
+        const x2 = xMax;
+        const y1 = slope * x1 + intercept;
+        const y2 = slope * x2 + intercept;
+
+        ctx.strokeStyle = r >= 0 ? '#22c55e' : '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(xScale(x1), yScale(y1));
+        ctx.lineTo(xScale(x2), yScale(y2));
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Update stats
+      const statsDiv = document.getElementById('scatterStats');
+      statsDiv.innerHTML = `
+        <strong>${CONFIG.NUTRIENT_NAMES[nutrient] || nutrient}:</strong>
+        n=${validPoints.length} |
+        r=${r.toFixed(3)} |
+        R²=${(r * r * 100).toFixed(1)}% |
+        Range: ${xMin.toFixed(1)} - ${xMax.toFixed(1)} |
+        Yield Range: ${yMin.toFixed(0)} - ${yMax.toFixed(0)} bu/ac
+        ${r >= 0 ? '<span style="color: #16a34a;">↗ Positive correlation</span>' : '<span style="color: #dc2626;">↘ Negative correlation</span>'}
+      `;
+    }
+
+    function generateDebugReport() {
+      const debugDiv = document.getElementById('debugContent');
+      const dataPoints = getYieldDataPoints();
+      let report = '';
+
+      // 1. HIGH vs LOW P SAMPLES
+      report += '═══════════════════════════════════════════════════════════════\n';
+      report += '1. RAW DATA: HIGH P vs LOW P SAMPLES\n';
+      report += '═══════════════════════════════════════════════════════════════\n\n';
+
+      const samplesWithP = dataPoints.filter(d => d.P !== undefined && d.P !== null && d.P !== '' && isFinite(parseFloat(d.P)));
+      if (samplesWithP.length > 0) {
+        const sortedByP = [...samplesWithP].sort((a, b) => parseFloat(b.P) - parseFloat(a.P));
+
+        report += '📈 TOP 5 HIGH PHOSPHORUS SAMPLES:\n';
+        report += '─────────────────────────────────────────────────────────────\n';
+        sortedByP.slice(0, 5).forEach((s, i) => {
+          report += `  ${i + 1}. P = ${parseFloat(s.P).toFixed(1)} ppm → Yield = ${s.avgYield.toFixed(1)} bu/ac\n`;
+          report += `     Field: ${s.field || 'Unknown'} | GPS: (${s.lat.toFixed(5)}, ${s.lon.toFixed(5)})\n`;
+          report += `     Crop: ${s.crop} | Year: ${s.yieldYear} | Yield Points: ${s.yieldPointCount}\n\n`;
+        });
+
+        report += '\n📉 BOTTOM 5 LOW PHOSPHORUS SAMPLES:\n';
+        report += '─────────────────────────────────────────────────────────────\n';
+        sortedByP.slice(-5).reverse().forEach((s, i) => {
+          report += `  ${i + 1}. P = ${parseFloat(s.P).toFixed(1)} ppm → Yield = ${s.avgYield.toFixed(1)} bu/ac\n`;
+          report += `     Field: ${s.field || 'Unknown'} | GPS: (${s.lat.toFixed(5)}, ${s.lon.toFixed(5)})\n`;
+          report += `     Crop: ${s.crop} | Year: ${s.yieldYear} | Yield Points: ${s.yieldPointCount}\n\n`;
+        });
+
+        // Calculate average yield for high vs low P
+        const highPAvg = sortedByP.slice(0, Math.ceil(sortedByP.length / 4))
+          .reduce((sum, s) => sum + s.avgYield, 0) / Math.ceil(sortedByP.length / 4);
+        const lowPAvg = sortedByP.slice(-Math.ceil(sortedByP.length / 4))
+          .reduce((sum, s) => sum + s.avgYield, 0) / Math.ceil(sortedByP.length / 4);
+
+        report += '\n📊 QUARTILE COMPARISON:\n';
+        report += '─────────────────────────────────────────────────────────────\n';
+        report += `  Top 25% P samples (n=${Math.ceil(sortedByP.length / 4)}): Avg Yield = ${highPAvg.toFixed(1)} bu/ac\n`;
+        report += `  Bottom 25% P samples (n=${Math.ceil(sortedByP.length / 4)}): Avg Yield = ${lowPAvg.toFixed(1)} bu/ac\n`;
+        report += `  Difference: ${(highPAvg - lowPAvg).toFixed(1)} bu/ac\n`;
+        report += `  ${highPAvg > lowPAvg ? '✓ HIGH P → HIGHER YIELD (expected)' : '⚠ HIGH P → LOWER YIELD (unusual!)'}\n`;
+      } else {
+        report += '  ⚠ No samples with phosphorus data found\n';
+      }
+
+      // 2. CORRELATION FORMULA VERIFICATION
+      report += '\n\n═══════════════════════════════════════════════════════════════\n';
+      report += '2. CORRELATION FORMULA VERIFICATION (Pearson r)\n';
+      report += '═══════════════════════════════════════════════════════════════\n\n';
+
+      if (samplesWithP.length >= 5) {
+        const x = samplesWithP.map(s => parseFloat(s.P));
+        const y = samplesWithP.map(s => s.avgYield);
+        const n = x.length;
+
+        const sumX = x.reduce((a, b) => a + b, 0);
+        const sumY = y.reduce((a, b) => a + b, 0);
+        const sumXY = x.reduce((total, xi, i) => total + xi * y[i], 0);
+        const sumX2 = x.reduce((total, xi) => total + xi * xi, 0);
+        const sumY2 = y.reduce((total, yi) => total + yi * yi, 0);
+
+        const numerator = n * sumXY - sumX * sumY;
+        const denomX = n * sumX2 - sumX * sumX;
+        const denomY = n * sumY2 - sumY * sumY;
+        const denominator = Math.sqrt(denomX * denomY);
+        const r = numerator / denominator;
+
+        report += 'Formula: r = Σ((x - x̄)(y - ȳ)) / √(Σ(x - x̄)² × Σ(y - ȳ)²)\n';
+        report += 'Equivalent: r = (n×Σxy - Σx×Σy) / √((n×Σx² - (Σx)²) × (n×Σy² - (Σy)²))\n\n';
+        report += 'Step-by-step for PHOSPHORUS:\n';
+        report += '─────────────────────────────────────────────────────────────\n';
+        report += `  n (sample count) = ${n}\n`;
+        report += `  Σx (sum of P values) = ${sumX.toFixed(2)}\n`;
+        report += `  Σy (sum of yields) = ${sumY.toFixed(2)}\n`;
+        report += `  Σxy (sum of P×yield) = ${sumXY.toFixed(2)}\n`;
+        report += `  Σx² (sum of P²) = ${sumX2.toFixed(2)}\n`;
+        report += `  Σy² (sum of yield²) = ${sumY2.toFixed(2)}\n\n`;
+        report += `  Mean P (x̄) = ${(sumX / n).toFixed(2)}\n`;
+        report += `  Mean Yield (ȳ) = ${(sumY / n).toFixed(2)}\n\n`;
+        report += `  Numerator = n×Σxy - Σx×Σy = ${n}×${sumXY.toFixed(2)} - ${sumX.toFixed(2)}×${sumY.toFixed(2)} = ${numerator.toFixed(2)}\n`;
+        report += `  Denom Part 1 = n×Σx² - (Σx)² = ${n}×${sumX2.toFixed(2)} - ${sumX.toFixed(2)}² = ${denomX.toFixed(2)}\n`;
+        report += `  Denom Part 2 = n×Σy² - (Σy)² = ${n}×${sumY2.toFixed(2)} - ${sumY.toFixed(2)}² = ${denomY.toFixed(2)}\n`;
+        report += `  Denominator = √(${denomX.toFixed(2)} × ${denomY.toFixed(2)}) = ${denominator.toFixed(2)}\n\n`;
+        report += `  r = ${numerator.toFixed(2)} / ${denominator.toFixed(2)} = ${r.toFixed(4)}\n`;
+        report += `  R² = ${(r * r * 100).toFixed(2)}%\n\n`;
+        report += `  ✓ FORMULA CHECK: ${Math.abs(r - calculateCorrelation(x, y).r) < 0.0001 ? 'PASSED - matches internal calculation' : 'MISMATCH - possible bug!'}\n`;
+      }
+
+      // 3. DATA ALIGNMENT VERIFICATION
+      report += '\n\n═══════════════════════════════════════════════════════════════\n';
+      report += '3. DATA ALIGNMENT: SAMPLE-YIELD GPS MATCHING\n';
+      report += '═══════════════════════════════════════════════════════════════\n\n';
+
+      report += 'Sample 5 random sample-yield pairs with GPS coordinates:\n';
+      report += '─────────────────────────────────────────────────────────────\n';
+      const randomSamples = [...dataPoints].sort(() => Math.random() - 0.5).slice(0, 5);
+      randomSamples.forEach((s, i) => {
+        report += `\n${i + 1}. SOIL SAMPLE:\n`;
+        report += `   GPS: (${s.lat.toFixed(6)}, ${s.lon.toFixed(6)})\n`;
+        report += `   Field: ${s.field} | Sample Year: ${s.year || 'N/A'}\n`;
+        report += `   P: ${s.P || 'N/A'} | K: ${s.K || 'N/A'} | pH: ${s.pH || 'N/A'} | OM: ${s.OM || 'N/A'}\n`;
+        report += `   → MATCHED YIELD: ${s.avgYield.toFixed(1)} bu/ac (${s.crop}, ${s.yieldYear})\n`;
+        report += `   → Based on ${s.yieldPointCount} yield points within search radius\n`;
+      });
+
+      // 4. DATA QUALITY CHECKS
+      report += '\n\n═══════════════════════════════════════════════════════════════\n';
+      report += '4. DATA QUALITY CHECKS\n';
+      report += '═══════════════════════════════════════════════════════════════\n\n';
+
+      // Check each nutrient for issues
+      const visibleNutrients = getVisibleNutrients();
+      report += 'NUTRIENT DATA RANGES AND ISSUES:\n';
+      report += '─────────────────────────────────────────────────────────────\n';
+
+      visibleNutrients.forEach(nutrient => {
+        const validData = dataPoints.filter(d => {
+          const val = d[nutrient];
+          return val !== undefined && val !== null && val !== '' && isFinite(parseFloat(val));
+        });
+
+        if (validData.length === 0) {
+          report += `  ${nutrient}: No valid data\n`;
+          return;
+        }
+
+        const values = validData.map(d => parseFloat(d[nutrient]));
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const mean = values.reduce((a, b) => a + b, 0) / values.length;
+        const sorted = [...values].sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length / 2)];
+
+        // Check for zeros
+        const zeroCount = values.filter(v => v === 0).length;
+        const zeroPct = (zeroCount / values.length * 100).toFixed(1);
+
+        // Check for outliers (> 3 std dev)
+        const stdDev = Math.sqrt(values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length);
+        const outliers = values.filter(v => Math.abs(v - mean) > 3 * stdDev).length;
+
+        report += `\n  ${CONFIG.NUTRIENT_NAMES[nutrient] || nutrient}:\n`;
+        report += `    Range: ${min.toFixed(2)} - ${max.toFixed(2)} (spread: ${(max - min).toFixed(2)})\n`;
+        report += `    Mean: ${mean.toFixed(2)} | Median: ${median.toFixed(2)}\n`;
+        report += `    Valid samples: ${validData.length} / ${dataPoints.length}\n`;
+        if (zeroCount > 0) {
+          report += `    ⚠ ZEROS: ${zeroCount} samples (${zeroPct}%) have value = 0\n`;
+        }
+        if (outliers > 0) {
+          report += `    ⚠ OUTLIERS: ${outliers} samples > 3 std devs from mean\n`;
+        }
+      });
+
+      // Yield distribution
+      report += '\n\nYIELD DISTRIBUTION:\n';
+      report += '─────────────────────────────────────────────────────────────\n';
+      const yields = dataPoints.map(d => d.avgYield);
+      const yMin = Math.min(...yields);
+      const yMax = Math.max(...yields);
+      const yMean = yields.reduce((a, b) => a + b, 0) / yields.length;
+      const ySorted = [...yields].sort((a, b) => a - b);
+      const yMedian = ySorted[Math.floor(ySorted.length / 2)];
+      const yStdDev = Math.sqrt(yields.reduce((sum, v) => sum + (v - yMean) ** 2, 0) / yields.length);
+
+      report += `  Range: ${yMin.toFixed(1)} - ${yMax.toFixed(1)} bu/ac\n`;
+      report += `  Mean: ${yMean.toFixed(1)} bu/ac | Median: ${yMedian.toFixed(1)} bu/ac\n`;
+      report += `  Std Dev: ${yStdDev.toFixed(1)} bu/ac\n`;
+      report += `  Total samples: ${dataPoints.length}\n`;
+
+      // Check for suspiciously uniform yield
+      const yieldVariation = yStdDev / yMean * 100;
+      if (yieldVariation < 5) {
+        report += `  ⚠ LOW VARIATION: Yield varies only ${yieldVariation.toFixed(1)}% - might indicate data issue\n`;
+      }
+
+      // 5. INTERPRETATION
+      report += '\n\n═══════════════════════════════════════════════════════════════\n';
+      report += '5. INTERPRETATION NOTES\n';
+      report += '═══════════════════════════════════════════════════════════════\n\n';
+
+      report += 'Reasons correlations might appear negative when they "shouldn\'t be":\n';
+      report += '─────────────────────────────────────────────────────────────\n';
+      report += '  1. Luxury consumption: Crop yields plateau but soil nutrient keeps increasing\n';
+      report += '  2. Confounding factors: High P fields may have other limiting factors\n';
+      report += '  3. Soil type variation: Lighter soils may show high P but lower yields\n';
+      report += '  4. Management zones: High-input areas may have drainage/compaction issues\n';
+      report += '  5. Timing: Soil samples from different year than yield data\n';
+      report += '  6. Spatial mismatch: Check that yield points are actually within sample zones\n';
+      report += '  7. Data errors: Zero values, outliers, or import issues\n\n';
+
+      report += 'What to verify:\n';
+      report += '─────────────────────────────────────────────────────────────\n';
+      report += '  ✓ Look at scatter plot - does the trend visually match the correlation sign?\n';
+      report += '  ✓ Check high vs low quartile yields above - do they make sense?\n';
+      report += '  ✓ Verify GPS coordinates are in the right locations\n';
+      report += '  ✓ Check for zeros or outliers pulling the correlation\n';
+      report += '  ✓ Filter by single field to reduce confounding factors\n';
+
+      debugDiv.textContent = report;
+    }
 
     // ========== EXPORT FUNCTIONS ==========
     function getReportStyles() {
