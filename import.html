@@ -77,6 +77,7 @@
     .save-alias-row input[type="checkbox"] { width: 1rem; height: 1rem; }
     .save-alias-row label { font-size: 0.875rem; color: #475569; }
     .modal .button { padding: 0.5rem 1rem; width: auto; }
+    .backup-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 0.25rem 1rem; font-size: 0.7rem; color: #64748b; text-align: center; z-index: 900; }
   </style>
 </head>
 <body>
@@ -157,6 +158,7 @@
           <select id="yieldCrop" style="width: 140px;">
             <option value="corn">🌽 Corn</option>
             <option value="soybeans">🫘 Soybeans</option>
+            <option value="amylose">🍚 Amylose</option>
           </select>
         </div>
         <div class="form-group">
@@ -356,9 +358,10 @@
     };
 
     let sampleData = [], fieldBoundaries = {}, yieldData = [];
+    let backupDownloadedThisSession = false;
 
     document.addEventListener('DOMContentLoaded', async () => {
-      loadLocalData(); updateSummary(); updateBackupStatus();
+      loadLocalData(); updateSummary(); updateBackupStatus(); updateBackupFooter();
       try { await SheetsAPI.init(); SheetsAPI.onSignInChange = handleSignInChange; handleSignInChange(SheetsAPI.isSignedIn); } catch (e) { console.warn(e); }
       document.getElementById('uploadBoundaryBtn').addEventListener('click', uploadBoundaries);
       document.getElementById('uploadSampleBtn').addEventListener('click', uploadSamples);
@@ -520,10 +523,12 @@
       saveBackup();
       updateSummary();
       updateBackupStatus();
+      updateBackupFooter();
 
-      // Auto-download if setting is 'after-import'
+      // Auto-download only once per session if setting is 'after-import'
       const autoBackup = localStorage.getItem('autoBackupFrequency');
-      if (autoBackup === 'after-import') {
+      if (autoBackup === 'after-import' && !backupDownloadedThisSession) {
+        backupDownloadedThisSession = true;
         setTimeout(() => exportToJSON(), 500);
       }
     }
@@ -2089,6 +2094,18 @@
     }
 
     function showStatus(msg, isSuccess) { const el = document.getElementById('statusMessage'); el.textContent = msg; el.style.display = 'block'; el.style.background = isSuccess ? '#dcfce7' : '#fee2e2'; el.style.color = isSuccess ? '#166534' : '#991b1b'; setTimeout(() => el.style.display = 'none', 4000); }
+
+    function updateBackupFooter() {
+      const backupTime = localStorage.getItem('soilDataBackupTime');
+      const footer = document.getElementById('backupFooter');
+      if (backupTime) {
+        const date = new Date(parseInt(backupTime));
+        footer.textContent = 'Last backup: ' + date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } else {
+        footer.textContent = 'No backup yet';
+      }
+    }
   </script>
+  <div class="backup-footer" id="backupFooter">No backup yet</div>
 </body>
 </html>

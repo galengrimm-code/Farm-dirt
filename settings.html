@@ -40,6 +40,7 @@
     .btn-row { display: flex; gap: 1rem; flex-wrap: wrap; }
     .btn-row .button { flex: 1; }
     #statusMessage { display: none; position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 9999; padding: 0.75rem 1rem; border-radius: 0.375rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .backup-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 0.25rem 1rem; font-size: 0.7rem; color: #64748b; text-align: center; z-index: 900; }
   </style>
 </head>
 <body>
@@ -296,6 +297,7 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
       loadSettings();
+      updateBackupFooter();
       try { await SheetsAPI.init(); SheetsAPI.onSignInChange = handleSignInChange; handleSignInChange(SheetsAPI.isSignedIn); } catch (e) {}
       document.getElementById('saveBtn').addEventListener('click', saveSettings);
       document.getElementById('resetBtn').addEventListener('click', resetSettings);
@@ -587,6 +589,18 @@
     function saveSettings() { const settings = {}; Object.keys(defaults).forEach(k => { const i = document.getElementById(k); if (i) settings[k] = parseFloat(i.value) || defaults[k]; }); localStorage.setItem('soilSettings', JSON.stringify(settings)); showStatus('✓ Settings saved', true); }
     function resetSettings() { if (!confirm('Reset all settings to defaults?')) return; Object.entries(defaults).forEach(([k, v]) => { const i = document.getElementById(k); if (i) i.value = v; }); localStorage.setItem('soilSettings', JSON.stringify(defaults)); showStatus('✓ Settings reset', true); }
     function showStatus(msg, ok) { const el = document.getElementById('statusMessage'); el.textContent = msg; el.style.display = 'block'; el.style.background = ok ? '#dcfce7' : '#fee2e2'; el.style.color = ok ? '#166534' : '#991b1b'; setTimeout(() => el.style.display = 'none', 4000); }
+
+    function updateBackupFooter() {
+      const backupTime = localStorage.getItem('soilDataBackupTime');
+      const footer = document.getElementById('backupFooter');
+      if (backupTime) {
+        const date = new Date(parseInt(backupTime));
+        footer.textContent = 'Last backup: ' + date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } else {
+        footer.textContent = 'No backup yet';
+      }
+    }
   </script>
+  <div class="backup-footer" id="backupFooter">No backup yet</div>
 </body>
 </html>

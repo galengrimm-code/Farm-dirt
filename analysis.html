@@ -109,6 +109,7 @@
       .tabs { flex-direction: column; }
       .tab { text-align: center; }
     }
+    .backup-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 0.25rem 1rem; font-size: 0.7rem; color: #64748b; text-align: center; z-index: 900; }
   </style>
 </head>
 <body>
@@ -341,6 +342,7 @@
       loadLocalData();
       setupTabs();
       setupEventListeners();
+      updateBackupFooter();
     });
 
     async function handleAuth() { if (SheetsAPI.isSignedIn) await SheetsAPI.signOut(); else await SheetsAPI.signIn(); }
@@ -1314,6 +1316,18 @@
       el.style.color = ok ? '#166534' : '#991b1b';
       setTimeout(() => el.style.display = 'none', 4000);
     }
+
+    function updateBackupFooter() {
+      const backupTime = localStorage.getItem('soilDataBackupTime');
+      const footer = document.getElementById('backupFooter');
+      if (backupTime) {
+        const date = new Date(parseInt(backupTime));
+        footer.textContent = 'Last backup: ' + date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } else {
+        footer.textContent = 'No backup yet';
+      }
+    }
   </script>
+  <div class="backup-footer" id="backupFooter">No backup yet</div>
 </body>
 </html>

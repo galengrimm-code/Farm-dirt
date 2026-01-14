@@ -76,6 +76,8 @@
     .mobile-toolbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #e2e8f0; padding: 0.5rem; z-index: 1000; justify-content: space-around; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
     .mobile-toolbar button { flex: 1; margin: 0 0.25rem; padding: 0.6rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; background: white; font-size: 0.7rem; cursor: pointer; font-weight: 500; }
     .mobile-toolbar button.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+    .backup-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 0.25rem 1rem; font-size: 0.7rem; color: #64748b; text-align: center; z-index: 900; }
+    @media (max-width: 639px) { .backup-footer { bottom: 50px; } }
   </style>
 </head>
 <body>
@@ -174,6 +176,13 @@
         <div style="display: flex; justify-content: space-between; margin-bottom: 3px;"><span style="color: #64748b;">Avg:</span> <span id="statsAvg" style="font-weight: 600;">-</span></div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 3px;"><span style="color: #64748b;">High:</span> <span id="statsHigh" style="font-weight: 600; color: #22c55e;">-</span></div>
         <div style="display: flex; justify-content: space-between;"><span style="color: #64748b;">Low:</span> <span id="statsLow" style="font-weight: 600; color: #ef4444;">-</span></div>
+      </div>
+      <div id="zoomIndicator" style="position: absolute; bottom: 30px; left: 10px; background: white; padding: 6px 10px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); z-index: 1000; font-size: 11px; font-weight: 500;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: #64748b;">Zoom: <span id="zoomLevel">13</span></span>
+          <span style="color: #94a3b8;">|</span>
+          <span id="viewMode" style="color: #3b82f6;">Sample View</span>
+        </div>
       </div>
     </div>
     
@@ -720,6 +729,7 @@
       populateAttributeDropdown(); // Populate nutrients based on visibility settings
       initMap();
       setupEventListeners();
+      updateZoomIndicator(); // Initialize zoom indicator
 
       // Load operation name
       const opName = localStorage.getItem('operationName');
@@ -730,6 +740,7 @@
       // Load cached data first for instant display
       loadLocalData();
       updateLastUpdated();
+      updateBackupFooter();
 
       // Check if cache is fresh (less than 5 minutes old)
       const cacheTime = localStorage.getItem('soilDataCacheTime');
@@ -781,7 +792,13 @@
       
       // Listen for zoom changes to switch between field view and sample view
       map.on('zoomend', function() {
+        updateZoomIndicator();
         updateMap();
+      });
+
+      // Also update on zoom start for smoother feel
+      map.on('zoom', function() {
+        updateZoomIndicator();
       });
       
       // Add "Center on Me" button for mobile
@@ -1240,50 +1257,85 @@
       }
     }
 
+    const ZOOM_THRESHOLD = 14; // Zoom level threshold for switching views
+
+    function updateZoomIndicator() {
+      const zoomLevel = map.getZoom();
+      const isZoomedOut = zoomLevel < ZOOM_THRESHOLD && selectedField === 'all';
+
+      document.getElementById('zoomLevel').textContent = Math.round(zoomLevel);
+      const viewModeEl = document.getElementById('viewMode');
+
+      if (isZoomedOut && Object.keys(fieldBoundaries).length > 0 && selectedAttribute !== 'sampleId') {
+        viewModeEl.textContent = 'Field View';
+        viewModeEl.style.color = '#22c55e';
+      } else {
+        viewModeEl.textContent = 'Sample View';
+        viewModeEl.style.color = '#3b82f6';
+      }
+    }
+
     function updateMap() {
       currentLayers.forEach(l => map.removeLayer(l));
       currentLayers = [];
-      
+
       const zoomLevel = map.getZoom();
-      const isZoomedOut = zoomLevel < 13; // Threshold for switching to field view
-      
+      const isZoomedOut = zoomLevel < ZOOM_THRESHOLD && selectedField === 'all'; // Only use field view when "All Fields" selected
+
       // Compare mode - show year-over-year change (always show samples)
       if (compareMode && selectedYear !== 'all' && compareYear) {
         drawBoundaries(false);
         renderCompareMode();
         return;
       }
-      
-      // Zoomed out: show field-level shading
+
+      // Zoomed out with All Fields: show field-level shading
       if (isZoomedOut && Object.keys(fieldBoundaries).length > 0 && selectedAttribute !== 'sampleId') {
         drawFieldShading();
+        updateZoomIndicator();
         return;
       }
-      
-      // Zoomed in: show individual samples
+
+      // Zoomed in or specific field: show individual samples
       drawBoundaries(false);
       drawSampleMarkers();
+      updateZoomIndicator();
     }
     
     function drawBoundaries(withShading, fieldColors = {}) {
       Object.entries(fieldBoundaries).forEach(([name, polys]) => {
         if (selectedField !== 'all' && selectedField !== name) return;
         const arr = Array.isArray(polys[0]?.[0]) ? polys : [polys];
-        arr.forEach(coords => {
+        arr.forEach((coords, idx) => {
           const color = fieldColors[name] || '#22c55e';
           const fillOpacity = withShading ? 0.6 : 0.1;
-          const poly = L.polygon(coords, { 
-            color: withShading ? color : '#22c55e', 
-            weight: withShading ? 2 : 3, 
-            fillOpacity: fillOpacity, 
-            fillColor: color 
+          const poly = L.polygon(coords, {
+            color: withShading ? color : '#22c55e',
+            weight: withShading ? 2 : 3,
+            fillOpacity: fillOpacity,
+            fillColor: color
           }).addTo(map);
-          
+
           if (withShading && fieldColors[name]) {
             const fieldStats = fieldColors[name + '_stats'];
             if (fieldStats) {
-              poly.bindTooltip(`<strong>${name}</strong><br>Avg ${CONFIG.NUTRIENT_NAMES[selectedAttribute] || selectedAttribute}: ${fieldStats.avg.toFixed(1)} ${CONFIG.NUTRIENT_UNITS[selectedAttribute] || ''}`, 
+              poly.bindTooltip(`<strong>${name}</strong><br>Avg ${CONFIG.NUTRIENT_NAMES[selectedAttribute] || selectedAttribute}: ${fieldStats.avg.toFixed(1)} ${CONFIG.NUTRIENT_UNITS[selectedAttribute] || ''}`,
                 { permanent: false, direction: 'center', className: 'field-tooltip' });
+            }
+
+            // Add permanent field name label in center (only on first polygon of multi-polygon)
+            if (idx === 0) {
+              const center = poly.getBounds().getCenter();
+              const label = L.marker(center, {
+                icon: L.divIcon({
+                  className: 'field-label',
+                  html: `<div style="background: rgba(255,255,255,0.9); padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; color: #1e293b; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.2); border: 1px solid ${color};">${name}</div>`,
+                  iconSize: null,
+                  iconAnchor: [0, 0]
+                }),
+                interactive: false
+              }).addTo(map);
+              currentLayers.push(label);
             }
           } else {
             poly.bindTooltip(name, { permanent: false, direction: 'center' });
@@ -1605,6 +1657,18 @@
       if (gpsWatchId) { navigator.geolocation.clearWatch(gpsWatchId); gpsWatchId = null; }
       if (gpsMarker) { map.removeLayer(gpsMarker); map.removeLayer(gpsCircle); gpsMarker = null; gpsCircle = null; }
     }
+
+    function updateBackupFooter() {
+      const backupTime = localStorage.getItem('soilDataBackupTime');
+      const footer = document.getElementById('backupFooter');
+      if (backupTime) {
+        const date = new Date(parseInt(backupTime));
+        footer.textContent = 'Last backup: ' + date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } else {
+        footer.textContent = 'No backup yet';
+      }
+    }
   </script>
+  <div class="backup-footer" id="backupFooter">No backup yet</div>
 </body>
 </html>
