@@ -210,6 +210,105 @@
       </div>
       <small style="display:block; margin-top:0.75rem; color:#64748b;">Data is saved locally and synced to Google Sheets when signed in.</small>
     </div>
+
+    <!-- Data Quality / Outlier Removal Section -->
+    <div class="import-section" style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border-color: #ef4444;">
+      <h3 style="color: #dc2626;">🧹 Data Quality</h3>
+      <p style="color: #991b1b; font-size: 0.875rem; margin-bottom: 1rem;">Scan for and remove outliers or bad data points from your dataset.</p>
+
+      <!-- Outlier Thresholds (collapsible) -->
+      <div style="margin-bottom: 1rem;">
+        <button onclick="toggleOutlierThresholds()" style="background: none; border: 1px solid #fca5a5; padding: 0.5rem 0.75rem; border-radius: 0.375rem; cursor: pointer; font-size: 0.8rem; color: #991b1b; display: flex; align-items: center; gap: 0.5rem;">
+          <span id="thresholdToggleIcon">▶</span> Configure Outlier Thresholds
+        </button>
+        <div id="outlierThresholds" style="display: none; margin-top: 0.75rem; padding: 1rem; background: white; border-radius: 0.5rem; border: 1px solid #fca5a5;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div>
+              <label style="font-size: 0.75rem; font-weight: 600; color: #475569;">Yield Range (bu/ac)</label>
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="number" id="outlierYieldMin" value="50" style="width: 70px; padding: 0.375rem; border: 1px solid #cbd5e1; border-radius: 0.25rem;">
+                <span style="color: #64748b;">to</span>
+                <input type="number" id="outlierYieldMax" value="350" style="width: 70px; padding: 0.375rem; border: 1px solid #cbd5e1; border-radius: 0.25rem;">
+              </div>
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; font-weight: 600; color: #475569;">Yield % of Field Avg</label>
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="number" id="outlierYieldPctMin" value="50" style="width: 70px; padding: 0.375rem; border: 1px solid #cbd5e1; border-radius: 0.25rem;">
+                <span style="color: #64748b;">% to</span>
+                <input type="number" id="outlierYieldPctMax" value="175" style="width: 70px; padding: 0.375rem; border: 1px solid #cbd5e1; border-radius: 0.25rem;">
+                <span style="color: #64748b;">%</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; font-weight: 600; color: #475569;">pH Range</label>
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="number" id="outlierPHMin" value="4.5" step="0.1" style="width: 70px; padding: 0.375rem; border: 1px solid #cbd5e1; border-radius: 0.25rem;">
+                <span style="color: #64748b;">to</span>
+                <input type="number" id="outlierPHMax" value="8.5" step="0.1" style="width: 70px; padding: 0.375rem; border: 1px solid #cbd5e1; border-radius: 0.25rem;">
+              </div>
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; font-weight: 600; color: #475569;">Phosphorus Max (ppm)</label>
+              <input type="number" id="outlierPMax" value="300" style="width: 100px; padding: 0.375rem; border: 1px solid #cbd5e1; border-radius: 0.25rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; font-weight: 600; color: #475569;">Potassium Max (ppm)</label>
+              <input type="number" id="outlierKMax" value="800" style="width: 100px; padding: 0.375rem; border: 1px solid #cbd5e1; border-radius: 0.25rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; font-weight: 600; color: #475569;">CEC Max</label>
+              <input type="number" id="outlierCECMax" value="50" style="width: 100px; padding: 0.375rem; border: 1px solid #cbd5e1; border-radius: 0.25rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; font-weight: 600; color: #475569;">OM Max (%)</label>
+              <input type="number" id="outlierOMMax" value="15" step="0.1" style="width: 100px; padding: 0.375rem; border: 1px solid #cbd5e1; border-radius: 0.25rem;">
+            </div>
+          </div>
+          <button onclick="saveOutlierThresholds()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #dc2626; color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.8rem;">Save Thresholds</button>
+        </div>
+      </div>
+
+      <!-- Scan Button -->
+      <button class="button" id="scanOutliersBtn" onclick="scanForOutliers()" style="background: #dc2626; color: white; margin-bottom: 1rem;">🔍 Scan for Outliers</button>
+
+      <!-- Scan Results (hidden by default) -->
+      <div id="outlierResults" style="display: none;">
+        <div id="outlierSummary" style="padding: 0.75rem; background: white; border-radius: 0.5rem; margin-bottom: 1rem; border: 1px solid #fca5a5;"></div>
+
+        <!-- Outlier Table -->
+        <div id="outlierTableContainer" style="max-height: 400px; overflow-y: auto; background: white; border-radius: 0.5rem; border: 1px solid #fca5a5;">
+          <table id="outlierTable" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+            <thead style="position: sticky; top: 0; background: #fef2f2;">
+              <tr>
+                <th style="padding: 0.5rem; text-align: left; border-bottom: 2px solid #fca5a5; width: 40px;">
+                  <input type="checkbox" id="selectAllOutliers" onchange="toggleAllOutliers(this.checked)">
+                </th>
+                <th style="padding: 0.5rem; text-align: left; border-bottom: 2px solid #fca5a5;">Field</th>
+                <th style="padding: 0.5rem; text-align: left; border-bottom: 2px solid #fca5a5;">Year</th>
+                <th style="padding: 0.5rem; text-align: left; border-bottom: 2px solid #fca5a5;">Type</th>
+                <th style="padding: 0.5rem; text-align: left; border-bottom: 2px solid #fca5a5;">Issue</th>
+                <th style="padding: 0.5rem; text-align: left; border-bottom: 2px solid #fca5a5;">Value</th>
+              </tr>
+            </thead>
+            <tbody id="outlierTableBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="margin-top: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <button onclick="selectAllOutliersBtn()" style="padding: 0.5rem 0.75rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 0.375rem; cursor: pointer; font-size: 0.8rem;">Select All</button>
+          <button onclick="selectNoneOutliersBtn()" style="padding: 0.5rem 0.75rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 0.375rem; cursor: pointer; font-size: 0.8rem;">Select None</button>
+          <button onclick="deleteSelectedOutliers()" class="button danger" style="padding: 0.5rem 1rem; font-size: 0.875rem;">🗑️ Delete Selected</button>
+        </div>
+      </div>
+
+      <!-- Audit Log -->
+      <div id="outlierAuditLog" style="margin-top: 1rem; padding: 0.75rem; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 0.5rem; display: none;">
+        <h4 style="margin: 0 0 0.5rem 0; font-size: 0.875rem; color: #92400e;">📋 Deletion History</h4>
+        <div id="auditLogContent" style="font-size: 0.75rem; color: #78350f; max-height: 150px; overflow-y: auto;"></div>
+      </div>
+    </div>
   </div>
 
   <div id="statusMessage"></div>
@@ -278,8 +377,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.16";
-    const BUILD_DATE = "2026-01-14T17:41:54";
+    const APP_VERSION = "v1.0.17";
+    const BUILD_DATE = "2026-01-14T17:46:16";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -2560,6 +2659,454 @@
         footer.innerHTML = `${versionInfo} <span style="margin: 0 0.5rem; color: #cbd5e1;">|</span> No backup yet`;
       }
     }
+
+    // ========== DATA QUALITY / OUTLIER DETECTION ==========
+    let detectedOutliers = [];
+
+    function toggleOutlierThresholds() {
+      const panel = document.getElementById('outlierThresholds');
+      const icon = document.getElementById('thresholdToggleIcon');
+      if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        icon.textContent = '▼';
+        loadOutlierThresholds();
+      } else {
+        panel.style.display = 'none';
+        icon.textContent = '▶';
+      }
+    }
+
+    function loadOutlierThresholds() {
+      const saved = localStorage.getItem('outlierThresholds');
+      if (saved) {
+        const thresholds = JSON.parse(saved);
+        if (thresholds.yieldMin) document.getElementById('outlierYieldMin').value = thresholds.yieldMin;
+        if (thresholds.yieldMax) document.getElementById('outlierYieldMax').value = thresholds.yieldMax;
+        if (thresholds.yieldPctMin) document.getElementById('outlierYieldPctMin').value = thresholds.yieldPctMin;
+        if (thresholds.yieldPctMax) document.getElementById('outlierYieldPctMax').value = thresholds.yieldPctMax;
+        if (thresholds.pHMin) document.getElementById('outlierPHMin').value = thresholds.pHMin;
+        if (thresholds.pHMax) document.getElementById('outlierPHMax').value = thresholds.pHMax;
+        if (thresholds.pMax) document.getElementById('outlierPMax').value = thresholds.pMax;
+        if (thresholds.kMax) document.getElementById('outlierKMax').value = thresholds.kMax;
+        if (thresholds.cecMax) document.getElementById('outlierCECMax').value = thresholds.cecMax;
+        if (thresholds.omMax) document.getElementById('outlierOMMax').value = thresholds.omMax;
+      }
+    }
+
+    function saveOutlierThresholds() {
+      const thresholds = {
+        yieldMin: parseFloat(document.getElementById('outlierYieldMin').value),
+        yieldMax: parseFloat(document.getElementById('outlierYieldMax').value),
+        yieldPctMin: parseFloat(document.getElementById('outlierYieldPctMin').value),
+        yieldPctMax: parseFloat(document.getElementById('outlierYieldPctMax').value),
+        pHMin: parseFloat(document.getElementById('outlierPHMin').value),
+        pHMax: parseFloat(document.getElementById('outlierPHMax').value),
+        pMax: parseFloat(document.getElementById('outlierPMax').value),
+        kMax: parseFloat(document.getElementById('outlierKMax').value),
+        cecMax: parseFloat(document.getElementById('outlierCECMax').value),
+        omMax: parseFloat(document.getElementById('outlierOMMax').value)
+      };
+      localStorage.setItem('outlierThresholds', JSON.stringify(thresholds));
+      showStatus('✓ Outlier thresholds saved', true);
+    }
+
+    function getOutlierThresholds() {
+      const saved = localStorage.getItem('outlierThresholds');
+      if (saved) return JSON.parse(saved);
+      return {
+        yieldMin: 50, yieldMax: 350,
+        yieldPctMin: 50, yieldPctMax: 175,
+        pHMin: 4.5, pHMax: 8.5,
+        pMax: 300, kMax: 800, cecMax: 50, omMax: 15
+      };
+    }
+
+    async function scanForOutliers() {
+      showStatus('Scanning for outliers...', true);
+      detectedOutliers = [];
+      const thresholds = getOutlierThresholds();
+
+      // Make sure we have data loaded
+      await loadLocalData();
+
+      // Calculate field averages for yield % calculation
+      const fieldYieldAvgs = {};
+      sampleData.forEach(s => {
+        if (s.yieldInfo && Array.isArray(s.yieldInfo)) {
+          s.yieldInfo.forEach(yi => {
+            const field = s.field || 'Unknown';
+            const key = `${field}_${yi.crop}`;
+            if (!fieldYieldAvgs[key]) fieldYieldAvgs[key] = [];
+            if (yi.avgYield && yi.avgYield > 0) {
+              fieldYieldAvgs[key].push(yi.avgYield);
+            }
+          });
+        }
+      });
+      // Calculate averages
+      Object.keys(fieldYieldAvgs).forEach(key => {
+        const vals = fieldYieldAvgs[key];
+        fieldYieldAvgs[key] = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+      });
+
+      // Scan soil samples for nutrient outliers
+      sampleData.forEach((sample, index) => {
+        const field = sample.field || 'Unknown';
+        const year = sample.year || 'N/A';
+        const sampleId = sample.sampleId || sample.SAMPLE_ID || sample.sample_id || `#${index + 1}`;
+
+        // pH check
+        const pH = parseFloat(sample.pH);
+        if (!isNaN(pH) && pH > 0) {
+          if (pH < thresholds.pHMin) {
+            detectedOutliers.push({
+              type: 'sample',
+              index,
+              field,
+              year,
+              sampleId,
+              dataType: 'Nutrient',
+              issue: 'pH too low',
+              value: pH.toFixed(2),
+              attribute: 'pH'
+            });
+          } else if (pH > thresholds.pHMax) {
+            detectedOutliers.push({
+              type: 'sample',
+              index,
+              field,
+              year,
+              sampleId,
+              dataType: 'Nutrient',
+              issue: 'pH too high',
+              value: pH.toFixed(2),
+              attribute: 'pH'
+            });
+          }
+        }
+
+        // Phosphorus check
+        const P = parseFloat(sample.P);
+        if (!isNaN(P) && P > thresholds.pMax) {
+          detectedOutliers.push({
+            type: 'sample',
+            index,
+            field,
+            year,
+            sampleId,
+            dataType: 'Nutrient',
+            issue: 'P too high',
+            value: P.toFixed(0) + ' ppm',
+            attribute: 'P'
+          });
+        }
+
+        // Potassium check
+        const K = parseFloat(sample.K);
+        if (!isNaN(K) && K > thresholds.kMax) {
+          detectedOutliers.push({
+            type: 'sample',
+            index,
+            field,
+            year,
+            sampleId,
+            dataType: 'Nutrient',
+            issue: 'K too high',
+            value: K.toFixed(0) + ' ppm',
+            attribute: 'K'
+          });
+        }
+
+        // CEC check
+        const CEC = parseFloat(sample.CEC);
+        if (!isNaN(CEC) && CEC > thresholds.cecMax) {
+          detectedOutliers.push({
+            type: 'sample',
+            index,
+            field,
+            year,
+            sampleId,
+            dataType: 'Nutrient',
+            issue: 'CEC too high',
+            value: CEC.toFixed(1),
+            attribute: 'CEC'
+          });
+        }
+
+        // OM check
+        const OM = parseFloat(sample.OM);
+        if (!isNaN(OM) && OM > thresholds.omMax) {
+          detectedOutliers.push({
+            type: 'sample',
+            index,
+            field,
+            year,
+            sampleId,
+            dataType: 'Nutrient',
+            issue: 'OM too high',
+            value: OM.toFixed(2) + '%',
+            attribute: 'OM'
+          });
+        }
+
+        // Yield outlier checks (embedded in sample)
+        if (sample.yieldInfo && Array.isArray(sample.yieldInfo)) {
+          sample.yieldInfo.forEach((yi, yiIndex) => {
+            const avgYield = yi.avgYield;
+            if (!avgYield || avgYield <= 0) return;
+
+            // Raw yield range check
+            if (avgYield < thresholds.yieldMin) {
+              detectedOutliers.push({
+                type: 'yield',
+                sampleIndex: index,
+                yieldIndex: yiIndex,
+                field,
+                year: yi.year || 'N/A',
+                sampleId,
+                dataType: `Yield (${yi.crop || 'unknown'})`,
+                issue: 'Yield too low',
+                value: avgYield.toFixed(1) + ' bu/ac',
+                crop: yi.crop
+              });
+            } else if (avgYield > thresholds.yieldMax) {
+              detectedOutliers.push({
+                type: 'yield',
+                sampleIndex: index,
+                yieldIndex: yiIndex,
+                field,
+                year: yi.year || 'N/A',
+                sampleId,
+                dataType: `Yield (${yi.crop || 'unknown'})`,
+                issue: 'Yield too high',
+                value: avgYield.toFixed(1) + ' bu/ac',
+                crop: yi.crop
+              });
+            }
+
+            // Percentage of field average check
+            const key = `${field}_${yi.crop}`;
+            const fieldAvg = fieldYieldAvgs[key];
+            if (fieldAvg && fieldAvg > 0) {
+              const pct = (avgYield / fieldAvg) * 100;
+              if (pct < thresholds.yieldPctMin) {
+                detectedOutliers.push({
+                  type: 'yield',
+                  sampleIndex: index,
+                  yieldIndex: yiIndex,
+                  field,
+                  year: yi.year || 'N/A',
+                  sampleId,
+                  dataType: `Yield (${yi.crop || 'unknown'})`,
+                  issue: 'Yield % too low',
+                  value: pct.toFixed(0) + '% of field avg',
+                  crop: yi.crop
+                });
+              } else if (pct > thresholds.yieldPctMax) {
+                detectedOutliers.push({
+                  type: 'yield',
+                  sampleIndex: index,
+                  yieldIndex: yiIndex,
+                  field,
+                  year: yi.year || 'N/A',
+                  sampleId,
+                  dataType: `Yield (${yi.crop || 'unknown'})`,
+                  issue: 'Yield % too high',
+                  value: pct.toFixed(0) + '% of field avg',
+                  crop: yi.crop
+                });
+              }
+            }
+          });
+        }
+      });
+
+      // Display results
+      displayOutlierResults();
+      loadAuditLog();
+    }
+
+    function displayOutlierResults() {
+      const resultsDiv = document.getElementById('outlierResults');
+      const summaryDiv = document.getElementById('outlierSummary');
+      const tableBody = document.getElementById('outlierTableBody');
+
+      if (detectedOutliers.length === 0) {
+        resultsDiv.style.display = 'block';
+        summaryDiv.innerHTML = '<div style="color: #166534; font-weight: 600;">✓ No outliers detected! Your data looks clean.</div>';
+        tableBody.innerHTML = '';
+        return;
+      }
+
+      // Count by type
+      const nutrientCount = detectedOutliers.filter(o => o.dataType === 'Nutrient').length;
+      const yieldCount = detectedOutliers.filter(o => o.dataType.startsWith('Yield')).length;
+
+      summaryDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <span style="font-weight: 700; color: #dc2626; font-size: 1.25rem;">⚠️ Found ${detectedOutliers.length} potential outliers</span>
+            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.25rem;">
+              ${nutrientCount} nutrient issues • ${yieldCount} yield issues
+            </div>
+          </div>
+          <div style="font-size: 0.75rem; color: #64748b;">
+            Review and select items to delete
+          </div>
+        </div>
+      `;
+
+      // Build table rows
+      tableBody.innerHTML = detectedOutliers.map((outlier, idx) => `
+        <tr style="border-bottom: 1px solid #fecaca;">
+          <td style="padding: 0.5rem;">
+            <input type="checkbox" class="outlier-checkbox" data-index="${idx}" checked>
+          </td>
+          <td style="padding: 0.5rem;">${outlier.field}</td>
+          <td style="padding: 0.5rem;">${outlier.year}</td>
+          <td style="padding: 0.5rem;">
+            <span style="padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.7rem; background: ${outlier.dataType === 'Nutrient' ? '#dbeafe' : '#fef3c7'}; color: ${outlier.dataType === 'Nutrient' ? '#1e40af' : '#92400e'};">
+              ${outlier.dataType}
+            </span>
+          </td>
+          <td style="padding: 0.5rem; color: #dc2626; font-weight: 500;">${outlier.issue}</td>
+          <td style="padding: 0.5rem; font-family: monospace;">${outlier.value}</td>
+        </tr>
+      `).join('');
+
+      resultsDiv.style.display = 'block';
+      document.getElementById('selectAllOutliers').checked = true;
+
+      showStatus(`Found ${detectedOutliers.length} potential outliers`, true);
+    }
+
+    function toggleAllOutliers(checked) {
+      document.querySelectorAll('.outlier-checkbox').forEach(cb => cb.checked = checked);
+    }
+
+    function selectAllOutliersBtn() {
+      toggleAllOutliers(true);
+      document.getElementById('selectAllOutliers').checked = true;
+    }
+
+    function selectNoneOutliersBtn() {
+      toggleAllOutliers(false);
+      document.getElementById('selectAllOutliers').checked = false;
+    }
+
+    async function deleteSelectedOutliers() {
+      const checkboxes = document.querySelectorAll('.outlier-checkbox:checked');
+      const selectedIndices = Array.from(checkboxes).map(cb => parseInt(cb.dataset.index));
+
+      if (selectedIndices.length === 0) {
+        showStatus('No outliers selected for deletion', false);
+        return;
+      }
+
+      // Confirmation dialog
+      const confirmMsg = `Permanently delete ${selectedIndices.length} data point(s)?\n\nThis cannot be undone!`;
+      if (!confirm(confirmMsg)) {
+        return;
+      }
+
+      // Group by type and gather info for audit log
+      const toDelete = selectedIndices.map(i => detectedOutliers[i]);
+      const nutrientDeletes = toDelete.filter(o => o.type === 'sample');
+      const yieldDeletes = toDelete.filter(o => o.type === 'yield');
+
+      // Track what we're deleting for the audit log
+      const deletionSummary = {
+        date: new Date().toISOString(),
+        total: toDelete.length,
+        nutrients: nutrientDeletes.length,
+        yields: yieldDeletes.length,
+        details: toDelete.map(o => ({
+          field: o.field,
+          year: o.year,
+          issue: o.issue,
+          value: o.value
+        }))
+      };
+
+      // Delete yield data from samples (remove specific yieldInfo entries)
+      // We need to process in reverse order to maintain correct indices
+      const yieldDeletesByExample = {};
+      yieldDeletes.forEach(yd => {
+        const key = yd.sampleIndex;
+        if (!yieldDeletesByExample[key]) yieldDeletesByExample[key] = [];
+        yieldDeletesByExample[key].push(yd.yieldIndex);
+      });
+
+      Object.keys(yieldDeletesByExample).forEach(sampleIndex => {
+        const indices = yieldDeletesByExample[sampleIndex].sort((a, b) => b - a); // reverse order
+        const sample = sampleData[parseInt(sampleIndex)];
+        if (sample && sample.yieldInfo) {
+          indices.forEach(yi => {
+            sample.yieldInfo.splice(yi, 1);
+          });
+          // If no yield data left, remove the yieldInfo array
+          if (sample.yieldInfo.length === 0) {
+            delete sample.yieldInfo;
+          }
+        }
+      });
+
+      // Delete entire sample records for nutrient outliers
+      // Get unique sample indices to delete (sorted in reverse to maintain indices)
+      const sampleIndicesToDelete = [...new Set(nutrientDeletes.map(o => o.index))].sort((a, b) => b - a);
+      sampleIndicesToDelete.forEach(idx => {
+        sampleData.splice(idx, 1);
+      });
+
+      // Save updated data
+      await saveLocalData();
+      await saveToIndexedDB();
+
+      // Add to audit log
+      addAuditLogEntry(deletionSummary);
+
+      // Update UI
+      updateSummary();
+      detectedOutliers = [];
+      document.getElementById('outlierResults').style.display = 'none';
+
+      showStatus(`✓ Deleted ${selectedIndices.length} outlier(s)`, true);
+
+      // Reload audit log display
+      loadAuditLog();
+    }
+
+    function addAuditLogEntry(entry) {
+      const log = JSON.parse(localStorage.getItem('outlierAuditLog') || '[]');
+      log.unshift(entry); // Add to beginning
+      // Keep only last 50 entries
+      if (log.length > 50) log.length = 50;
+      localStorage.setItem('outlierAuditLog', JSON.stringify(log));
+    }
+
+    function loadAuditLog() {
+      const logDiv = document.getElementById('outlierAuditLog');
+      const contentDiv = document.getElementById('auditLogContent');
+      const log = JSON.parse(localStorage.getItem('outlierAuditLog') || '[]');
+
+      if (log.length === 0) {
+        logDiv.style.display = 'none';
+        return;
+      }
+
+      logDiv.style.display = 'block';
+      contentDiv.innerHTML = log.map(entry => {
+        const date = new Date(entry.date);
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const timeStr = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        return `<div style="padding: 0.375rem 0; border-bottom: 1px dashed #fcd34d;">
+          <strong>${dateStr} ${timeStr}:</strong> Removed ${entry.total} outliers (${entry.nutrients} nutrient, ${entry.yields} yield)
+        </div>`;
+      }).join('');
+    }
+
+    // Load audit log on page load
+    setTimeout(loadAuditLog, 500);
   </script>
   <div class="backup-footer" id="backupFooter">No backup yet</div>
 </body>

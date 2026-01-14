@@ -4,6 +4,20 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 
 ---
 
+## [v1.0.17] - January 14, 2026
+
+### Data Quality / Outlier Removal
+- **New Data Quality section** on Import page for cleaning bad data
+- **Outlier Detection Scan**: Scans all samples and flags suspicious values
+  - Yield: < 50 or > 350 bu/ac (raw), or < 50% or > 175% of field average
+  - Nutrients: pH outside 4.5-8.5, P > 300, K > 800, CEC > 50, OM > 15%
+- **Review Before Delete**: Table of flagged items with checkboxes for selection
+- **Configurable Thresholds**: Adjust what counts as an outlier
+- **Delete with Confirmation**: Permanently removes selected outliers
+- **Audit Log**: Records all deletions with timestamps
+
+---
+
 ## [v1.0.15] - January 14, 2026
 
 ### Yield Correlation
