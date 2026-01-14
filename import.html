@@ -1440,14 +1440,23 @@
       const samplesWithYield = new Set();
 
       // Count yield points per field
+      // Note: fieldBoundaries[fieldName] is an array of polygon coordinate arrays (for multi-polygon support)
       const yieldPointsPerField = {};
+      let orphanedYieldPoints = 0;
       yearYield.forEach(y => {
-        for (const [fieldName, boundary] of Object.entries(fieldBoundaries)) {
-          if (pointInPolygon([y.lat, y.lon], boundary)) {
-            yieldPointsPerField[fieldName] = (yieldPointsPerField[fieldName] || 0) + 1;
-            break;
+        let foundField = false;
+        for (const [fieldName, polygons] of Object.entries(fieldBoundaries)) {
+          // Check each polygon in the field (most fields have just one)
+          for (const polygon of polygons) {
+            if (pointInPolygon([y.lat, y.lon], polygon)) {
+              yieldPointsPerField[fieldName] = (yieldPointsPerField[fieldName] || 0) + 1;
+              foundField = true;
+              break;
+            }
           }
+          if (foundField) break;
         }
+        if (!foundField) orphanedYieldPoints++;
       });
 
       // Initialize field stats from fields that have yield points
@@ -1480,11 +1489,14 @@
 
         // Determine which field this yield point is in
         let yieldField = null;
-        for (const [fieldName, boundary] of Object.entries(fieldBoundaries)) {
-          if (pointInPolygon([yieldPoint.lat, yieldPoint.lon], boundary)) {
-            yieldField = fieldName;
-            break;
+        for (const [fieldName, polygons] of Object.entries(fieldBoundaries)) {
+          for (const polygon of polygons) {
+            if (pointInPolygon([yieldPoint.lat, yieldPoint.lon], polygon)) {
+              yieldField = fieldName;
+              break;
+            }
           }
+          if (yieldField) break;
         }
 
         if (validSamples.length > 0) {
@@ -1576,7 +1588,9 @@
         yieldPointCount: yearYield.length,
         sampleAgeStats,
         avgSampleAge: matchedCount > 0 ? Math.round((totalSampleAge / matchedCount) * 10) / 10 : null,
-        samplesWithYield: samplesWithYield.size
+        samplesWithYield: samplesWithYield.size,
+        orphanedYieldPoints,
+        totalBoundaries: Object.keys(fieldBoundaries).length
       };
     }
 
@@ -1610,6 +1624,14 @@
       const noMatch = ages.noMatch || 0;
 
       // Summary stats - now focused on yield points and sample age
+      const orphaned = results.orphanedYieldPoints || 0;
+      const inBoundary = results.total - orphaned;
+      const hasOrphans = orphaned > 0;
+
+      // Clear any existing debug section from previous opens
+      const existingDebug = document.getElementById('gpsDebugSection');
+      if (existingDebug) existingDebug.remove();
+
       document.getElementById('yieldSummaryStats').innerHTML = `
         <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
           <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">${results.total.toLocaleString()}</div>
@@ -1628,6 +1650,27 @@
           <div style="font-size: 0.75rem; color: #64748b;">Samples w/ Yield</div>
         </div>
       `;
+
+      // GPS Debug section - shows how many yield points fall inside field boundaries
+      const gpsDebugHtml = `
+        <div style="margin-top: 0.75rem; padding: 0.75rem; background: ${hasOrphans ? '#fef3c7' : '#f0fdf4'}; border-radius: 0.375rem; border: 1px solid ${hasOrphans ? '#fcd34d' : '#86efac'};">
+          <div style="font-weight: 600; font-size: 0.875rem; color: #374151; margin-bottom: 0.5rem;">
+            GPS Boundary Check (${results.totalBoundaries || 0} field boundaries)
+          </div>
+          <div style="display: flex; gap: 1rem; font-size: 0.8125rem;">
+            <div>
+              <span style="color: #16a34a; font-weight: 600;">${inBoundary.toLocaleString()}</span>
+              <span style="color: #64748b;"> inside boundaries</span>
+            </div>
+            <div>
+              <span style="color: ${hasOrphans ? '#dc2626' : '#64748b'}; font-weight: 600;">${orphaned.toLocaleString()}</span>
+              <span style="color: ${hasOrphans ? '#dc2626' : '#64748b'};"> outside all boundaries</span>
+            </div>
+          </div>
+          ${hasOrphans ? '<div style="font-size: 0.75rem; color: #92400e; margin-top: 0.5rem;">⚠️ Yield GPS coordinates don\'t fall within any field boundary - check for GPS offset or missing boundaries</div>' : ''}
+        </div>
+      `;
+      document.getElementById('yieldSummaryStats').insertAdjacentHTML('afterend', '<div id="gpsDebugSection">' + gpsDebugHtml + '</div>');
 
       // Sample age breakdown bar
       const ageBreakdownHtml = `
@@ -1901,11 +1944,11 @@
       showStatus('Syncing to Google Sheets...', true);
       try {
         await SheetsAPI.initializeSheets();
-        
+
         // Clear existing data first, then write fresh (prevents duplicates)
         await clearSheetsData('Fields');
         await clearSheetsData('Samples');
-        
+
         // Write fields
         if (Object.keys(fieldBoundaries).length > 0) {
           const fieldRows = Object.entries(fieldBoundaries).map(([name, boundary]) => [
@@ -1922,20 +1965,42 @@
             resource: { values: fieldRows }
           });
         }
-        
+
         // Write samples
         if (sampleData.length > 0) {
-          const headerRes = await gapi.client.sheets.spreadsheets.values.get({ 
-            spreadsheetId: CONFIG.SHEET_ID, 
-            range: 'Samples!A1:ZZ1' 
+          const headerRes = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: CONFIG.SHEET_ID,
+            range: 'Samples!A1:ZZ1'
           });
-          const headers = headerRes.result.values?.[0] || [];
-          const rows = sampleData.map(s => headers.map(h => { 
-            const v = s[h]; 
-            if (v === undefined || v === null) return ''; 
-            if (typeof v === 'object') return JSON.stringify(v); 
-            return v; 
+          let headers = headerRes.result.values?.[0] || [];
+
+          // Ensure yieldCorrelations column exists in headers
+          if (!headers.includes('yieldCorrelations')) {
+            headers.push('yieldCorrelations');
+            // Update header row to include new column
+            await gapi.client.sheets.spreadsheets.values.update({
+              spreadsheetId: CONFIG.SHEET_ID,
+              range: 'Samples!A1:' + String.fromCharCode(65 + headers.length - 1) + '1',
+              valueInputOption: 'RAW',
+              resource: { values: [headers] }
+            });
+            console.log('Added yieldCorrelations column to Sheet headers');
+          }
+
+          // Debug: check how many samples have yield data
+          const samplesWithYield = sampleData.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0);
+          console.log(`Syncing ${sampleData.length} samples, ${samplesWithYield.length} with yield data`);
+          if (samplesWithYield.length > 0) {
+            console.log('Sample yield data example:', JSON.stringify(samplesWithYield[0].yieldCorrelations));
+          }
+
+          const rows = sampleData.map(s => headers.map(h => {
+            const v = s[h];
+            if (v === undefined || v === null) return '';
+            if (typeof v === 'object') return JSON.stringify(v);
+            return v;
           }));
+
           await gapi.client.sheets.spreadsheets.values.append({
             spreadsheetId: CONFIG.SHEET_ID,
             range: 'Samples!A:ZZ',
@@ -1943,8 +2008,9 @@
             resource: { values: rows }
           });
         }
-        
-        showStatus(`✓ Synced ${Object.keys(fieldBoundaries).length} fields, ${sampleData.length} samples`, true);
+
+        const samplesWithYield = sampleData.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0).length;
+        showStatus(`✓ Synced ${Object.keys(fieldBoundaries).length} fields, ${sampleData.length} samples (${samplesWithYield} with yield)`, true);
       } catch (e) { showStatus('Sync error: ' + e.message, false); console.error(e); }
     }
 

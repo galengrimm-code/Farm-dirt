@@ -673,78 +673,101 @@
     // ========== TAB 2: Historical Field Trends ==========
     function updateHistory(fieldName) {
       const container = document.getElementById('historyContent');
-      
+
       if (!fieldName) {
         container.innerHTML = '<div class="no-data">Select a field to view nutrient trends over time</div>';
         return;
       }
-      
+
+      console.log('=== Field Trends Debug ===');
+      console.log('Selected field:', JSON.stringify(fieldName), 'length:', fieldName.length);
+
       const fieldSamples = sampleData.filter(s => s.field === fieldName);
+      console.log('Samples found:', fieldSamples.length);
+
       const years = [...new Set(fieldSamples.map(s => s.year).filter(y => y))].sort();
-      
+      console.log('Years found:', years);
+
+      if (fieldSamples.length > 0) {
+        console.log('First sample:', JSON.stringify(fieldSamples[0]));
+        console.log('Sample years breakdown:', years.map(y => ({ year: y, count: fieldSamples.filter(s => String(s.year) === String(y)).length })));
+      }
+
       if (years.length < 1) {
         container.innerHTML = '<div class="no-data">No data available for this field</div>';
         return;
       }
       
-      let html = `<div style="background:#f8fafc;border:2px solid #cbd5e1;border-radius:0.5rem;padding:1rem;margin-bottom:1rem;"><h3 style="margin:0 0 0.25rem 0;">${fieldName}</h3><p style="margin:0;color:#64748b;">Years: ${years.join(', ')}</p></div>`;
-      
-      const visibleNutrients = getVisibleNutrients();
-      visibleNutrients.forEach(attr => {
-        const yearData = [];
-        let hasData = false;
+      let html = `<div style="background:#f8fafc;border:2px solid #cbd5e1;border-radius:0.5rem;padding:1rem;margin-bottom:1rem;"><h3 style="margin:0 0 0.25rem 0;">${fieldName}</h3><p style="margin:0;color:#64748b;">Years: ${years.join(', ')} (${fieldSamples.length} samples)</p></div>`;
 
-        years.forEach(year => {
-          const yearSamples = fieldSamples.filter(s => String(s.year) === String(year));
-          const stats = getStats(yearSamples, attr);
-          if (stats) { yearData.push({ year, avg: stats.avg, median: stats.median, count: stats.count }); hasData = true; }
+      try {
+        const visibleNutrients = getVisibleNutrients();
+        console.log('Visible nutrients:', visibleNutrients.length);
+
+        visibleNutrients.forEach(attr => {
+          try {
+            const yearData = [];
+            let hasData = false;
+
+            years.forEach(year => {
+              const yearSamples = fieldSamples.filter(s => String(s.year) === String(year));
+              const stats = getStats(yearSamples, attr);
+              if (stats) { yearData.push({ year, avg: stats.avg, median: stats.median, count: stats.count }); hasData = true; }
+            });
+
+            if (!hasData || yearData.length < 1) return;
+
+            const first = yearData[0], last = yearData[yearData.length - 1];
+            const avgChange = last.avg - first.avg;
+            const medianChange = last.median - first.median;
+            const pctChange = first.avg !== 0 ? (avgChange / first.avg) * 100 : 0;
+            const isLowerBetter = CONFIG.LOWER_IS_BETTER.includes(attr);
+            const isPositive = isLowerBetter ? avgChange < 0 : avgChange > 0;
+            const decimals = (attr === 'pH' || attr === 'Buffer_pH') ? 2 : 1;
+            const unit = CONFIG.NUTRIENT_UNITS[attr] || '';
+            const name = CONFIG.NUTRIENT_NAMES[attr] || attr;
+
+            let cardClass = 'neutral', color = '#64748b';
+            if (yearData.length > 1) {
+              cardClass = isPositive ? 'positive' : 'negative';
+              color = isPositive ? '#22c55e' : '#ef4444';
+            }
+
+            const graph = createDualLineGraph(yearData, color);
+
+            html += `
+              <div class="trend-card ${cardClass}">
+                <div class="trend-header">
+                  <h4 class="trend-title">${name}</h4>
+                  ${yearData.length > 1 ? `<div class="trend-pct" style="color:${color};">${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(1)}%<div class="trend-sub">${first.year} → ${last.year}</div></div>` : ''}
+                </div>
+                <div class="trend-content">
+                  <div class="trend-values">
+                    <div style="font-size:0.7rem;color:#64748b;margin-bottom:0.25rem;display:flex;justify-content:space-between;padding:0 0.75rem;"><span></span><span style="width:70px;text-align:center;">Avg</span><span style="width:70px;text-align:center;">Median</span></div>
+                    ${yearData.map((d, i) => `<div class="trend-row ${i % 2 === 0 ? 'alt' : ''}"><span class="trend-year">${d.year}:</span><span class="trend-value" style="width:70px;text-align:center;">${d.avg.toFixed(decimals)}</span><span class="trend-value" style="width:70px;text-align:center;color:#8b5cf6;">${d.median.toFixed(decimals)}</span></div>`).join('')}
+                    ${yearData.length > 1 ? `<div class="trend-row" style="margin-top:0.5rem;border-top:2px solid ${color};padding-top:0.5rem;"><span>Change:</span><span style="width:70px;text-align:center;color:${color};font-weight:700;">${avgChange >= 0 ? '+' : ''}${avgChange.toFixed(decimals)}</span><span style="width:70px;text-align:center;color:#8b5cf6;font-weight:700;">${medianChange >= 0 ? '+' : ''}${medianChange.toFixed(decimals)}</span></div>` : ''}
+                  </div>
+                  <div class="trend-graph">
+                    <div style="display:flex;gap:1rem;font-size:0.7rem;margin-bottom:0.25rem;justify-content:center;">
+                      <span><span style="color:${color};">●</span> Average</span>
+                      <span><span style="color:#8b5cf6;">●</span> Median</span>
+                    </div>
+                    ${graph}
+                  </div>
+                </div>
+              </div>
+            `;
+          } catch (attrError) {
+            console.error('Error processing attribute', attr, ':', attrError);
+          }
         });
 
-        if (!hasData || yearData.length < 1) return;
-
-        const first = yearData[0], last = yearData[yearData.length - 1];
-        const avgChange = last.avg - first.avg;
-        const medianChange = last.median - first.median;
-        const pctChange = first.avg !== 0 ? (avgChange / first.avg) * 100 : 0;
-        const isLowerBetter = CONFIG.LOWER_IS_BETTER.includes(attr);
-        const isPositive = isLowerBetter ? avgChange < 0 : avgChange > 0;
-        const decimals = (attr === 'pH' || attr === 'Buffer_pH') ? 2 : 1;
-        const unit = CONFIG.NUTRIENT_UNITS[attr] || '';
-        const name = CONFIG.NUTRIENT_NAMES[attr] || attr;
-
-        let cardClass = 'neutral', color = '#64748b';
-        if (yearData.length > 1) {
-          cardClass = isPositive ? 'positive' : 'negative';
-          color = isPositive ? '#22c55e' : '#ef4444';
-        }
-
-        const graph = createDualLineGraph(yearData, color);
-
-        html += `
-          <div class="trend-card ${cardClass}">
-            <div class="trend-header">
-              <h4 class="trend-title">${name}</h4>
-              ${yearData.length > 1 ? `<div class="trend-pct" style="color:${color};">${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(1)}%<div class="trend-sub">${first.year} → ${last.year}</div></div>` : ''}
-            </div>
-            <div class="trend-content">
-              <div class="trend-values">
-                <div style="font-size:0.7rem;color:#64748b;margin-bottom:0.25rem;display:flex;justify-content:space-between;padding:0 0.75rem;"><span></span><span style="width:70px;text-align:center;">Avg</span><span style="width:70px;text-align:center;">Median</span></div>
-                ${yearData.map((d, i) => `<div class="trend-row ${i % 2 === 0 ? 'alt' : ''}"><span class="trend-year">${d.year}:</span><span class="trend-value" style="width:70px;text-align:center;">${d.avg.toFixed(decimals)}</span><span class="trend-value" style="width:70px;text-align:center;color:#8b5cf6;">${d.median.toFixed(decimals)}</span></div>`).join('')}
-                ${yearData.length > 1 ? `<div class="trend-row" style="margin-top:0.5rem;border-top:2px solid ${color};padding-top:0.5rem;"><span>Change:</span><span style="width:70px;text-align:center;color:${color};font-weight:700;">${avgChange >= 0 ? '+' : ''}${avgChange.toFixed(decimals)}</span><span style="width:70px;text-align:center;color:#8b5cf6;font-weight:700;">${medianChange >= 0 ? '+' : ''}${medianChange.toFixed(decimals)}</span></div>` : ''}
-              </div>
-              <div class="trend-graph">
-                <div style="display:flex;gap:1rem;font-size:0.7rem;margin-bottom:0.25rem;justify-content:center;">
-                  <span><span style="color:${color};">●</span> Average</span>
-                  <span><span style="color:#8b5cf6;">●</span> Median</span>
-                </div>
-                ${graph}
-              </div>
-            </div>
-          </div>
-        `;
-      });
-      
-      container.innerHTML = html || '<div class="no-data">No nutrient data available</div>';
+        console.log('Generated HTML length:', html.length);
+        container.innerHTML = html || '<div class="no-data">No nutrient data available</div>';
+      } catch (error) {
+        console.error('Error in updateHistory:', error);
+        container.innerHTML = `<div class="no-data" style="color: red;">Error loading data: ${error.message}</div>`;
+      }
     }
 
     function createLineGraph(yearData, color) {
