@@ -1321,7 +1321,9 @@
 
         const yearInfo = detectedYear ? `📅 Auto-detected year: ${detectedYear}<br>` : '';
         const batchInfo = filesProcessed > 1 ? `📁 Processed ${filesProcessed} yield files<br>` : '';
-        const matchRate = Math.round((correlationResults.matched / correlationResults.total) * 100);
+        const matchRate = correlationResults.totalSamples > 0
+          ? Math.round((correlationResults.samplesWithYield / correlationResults.totalSamples) * 100)
+          : 0;
         const matchColor = matchRate === 100 ? '#22c55e' : (matchRate >= 80 ? '#f59e0b' : '#ef4444');
 
         let errorInfo = '';
@@ -1331,7 +1333,8 @@
 
         statusEl.innerHTML = `
           <span style="color: #22c55e;">${yearInfo}${batchInfo}✓ Processed ${newPoints.length.toLocaleString()} yield points</span>${errorInfo}<br>
-          <span style="color: ${matchColor};">✓ Matched ${correlationResults.matched} of ${correlationResults.total} soil samples (${matchRate}%)</span><br>
+          <span style="color: ${matchColor};">✓ ${correlationResults.samplesWithYield} of ${correlationResults.totalSamples} soil samples have yield data (${matchRate}%)</span><br>
+          <span style="color: #64748b; font-size: 0.85rem;">Avg ${correlationResults.avgYieldPointsPerSample} yield points per sample</span><br>
           <button onclick="showYieldSummary(lastYieldResults)" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: #f59e0b; color: white; border: none; border-radius: 0.25rem; cursor: pointer; font-weight: 600;">
             📊 View Import Summary
           </button>
@@ -1339,11 +1342,6 @@
 
         // Store results for later viewing
         lastYieldResults = correlationResults;
-
-        // Auto-show summary if there are unmatched samples
-        if (correlationResults.skippedLocation > 0) {
-          setTimeout(() => showYieldSummary(correlationResults), 500);
-        }
 
         fileInput.value = '';
 
@@ -1525,8 +1523,10 @@
     }
     
     async function correlateYieldToSamples(yieldYear, radiusFeet) {
-      // NEW LOGIC: For each yield point, find the most recent soil sample at that location
-      // The sample must be from the same year or earlier (soil conditions at planting time)
+      // SOIL-SAMPLE-CENTRIC LOGIC:
+      // For each soil sample location, find all yield points within the radius
+      // Calculate average yield from those points and assign to the sample
+      // This answers: "For this soil sample location, what was the average yield?"
 
       // Convert feet to approximate degrees (at ~40° latitude)
       const radiusLatDeg = radiusFeet / 364000;
@@ -1538,103 +1538,35 @@
       const yearYield = yieldData.filter(y => y.year === yieldYear_int);
 
       if (yearYield.length === 0) {
-        return { matched: 0, total: 0, noYieldData: true, fieldStats: {}, unmatchedYieldPoints: [], sampleAgeStats: {} };
+        return {
+          totalSamples: sampleData.length,
+          samplesWithYield: 0,
+          samplesWithoutYield: sampleData.length,
+          totalYieldPoints: 0,
+          avgYieldPointsPerSample: 0,
+          noYieldData: true,
+          fieldStats: {},
+          yieldYear: yieldYear_int,
+          radiusFeet
+        };
       }
-
-      // Get yield data bounding box - use loop instead of spread to avoid stack overflow
-      let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
-      for (const y of yearYield) {
-        if (y.lat < minLat) minLat = y.lat;
-        if (y.lat > maxLat) maxLat = y.lat;
-        if (y.lon < minLon) minLon = y.lon;
-        if (y.lon > maxLon) maxLon = y.lon;
-      }
-      const yieldBounds = { minLat, maxLat, minLon, maxLon };
 
       // Helper for async breathing
       const breathe = () => new Promise(resolve => setTimeout(resolve, 0));
 
-      // Sample age tracking
-      const sampleAgeStats = {
-        sameYear: 0,      // Best: sample from same year as yield
-        oneYearOld: 0,    // Good: 1 year prior
-        twoThreeYears: 0, // Acceptable: 2-3 years prior
-        stale: 0,         // Warning: 4+ years prior
-        noMatch: 0        // No sample found
-      };
-      let totalSampleAge = 0;
-      let matchedCount = 0;
+      // Track results
+      let samplesWithYieldCount = 0;
+      let samplesWithoutYieldCount = 0;
+      let totalYieldPointsMatched = 0;
 
       // Per-field tracking
       const fieldStats = {};
-      const unmatchedYieldPoints = [];
 
-      // Track which samples received yield data (to avoid double-counting)
-      const samplesWithYield = new Set();
+      // Get unique fields that have samples
+      const fieldsWithSamples = [...new Set(sampleData.map(s => s.field).filter(f => f))];
 
-      // Count yield points per field
-      // Note: fieldBoundaries[fieldName] is an array of polygon coordinate arrays (for multi-polygon support)
-      const yieldPointsPerField = {};
-      let orphanedYieldPoints = 0;
-
-      // Debug: Log boundary info
-      console.log('=== YIELD MATCHING DEBUG ===');
-      console.log('Total field boundaries:', Object.keys(fieldBoundaries).length);
-      console.log('Field names:', Object.keys(fieldBoundaries).sort().join(', '));
-      console.log('Total yield points to process:', yearYield.length);
-
-      // Debug: Check first few yield points
-      if (yearYield.length > 0) {
-        console.log('First 3 yield points GPS:', yearYield.slice(0, 3).map(y => `(${y.lat.toFixed(6)}, ${y.lon.toFixed(6)})`));
-      }
-
-      // Debug: Check boundary coordinates for a few fields
-      const fieldNames = Object.keys(fieldBoundaries).slice(0, 3);
-      fieldNames.forEach(fn => {
-        const polys = fieldBoundaries[fn];
-        if (polys && polys[0] && polys[0][0]) {
-          console.log(`Field "${fn}" first polygon corner: (${polys[0][0][0]?.toFixed(6)}, ${polys[0][0][1]?.toFixed(6)})`);
-        }
-      });
-
-      // Cache field lookups for reuse in correlation loop
-      const yieldPointFields = new Array(yearYield.length);
-
-      for (let idx = 0; idx < yearYield.length; idx++) {
-        const y = yearYield[idx];
-        let foundField = null;
-        for (const [fieldName, polygons] of Object.entries(fieldBoundaries)) {
-          for (const polygon of polygons) {
-            if (pointInPolygon([y.lat, y.lon], polygon)) {
-              yieldPointsPerField[fieldName] = (yieldPointsPerField[fieldName] || 0) + 1;
-              foundField = fieldName;
-              if (idx < 5) {
-                console.log(`Yield point ${idx} (${y.lat.toFixed(6)}, ${y.lon.toFixed(6)}) -> ${fieldName}`);
-              }
-              break;
-            }
-          }
-          if (foundField) break;
-        }
-        yieldPointFields[idx] = foundField;
-        if (!foundField) orphanedYieldPoints++;
-        // Breathe every 5000 points
-        if (idx % 5000 === 4999) await breathe();
-      }
-
-      // Debug: Show yield distribution per field
-      console.log('=== YIELD POINTS PER FIELD ===');
-      const sortedFields = Object.entries(yieldPointsPerField).sort((a, b) => b[1] - a[1]);
-      sortedFields.forEach(([field, count]) => {
-        console.log(`  ${field}: ${count} points`);
-      });
-      console.log(`  (orphaned - outside all boundaries): ${orphanedYieldPoints} points`);
-      console.log(`  Total accounted: ${sortedFields.reduce((sum, [_, c]) => sum + c, 0) + orphanedYieldPoints} / ${yearYield.length}`);
-
-      // Initialize field stats from fields that have yield points
-      // Also gather soil sample inventory for each field
-      Object.keys(yieldPointsPerField).forEach(field => {
-        // Get soil sample inventory for this field
+      // Initialize field stats
+      fieldsWithSamples.forEach(field => {
         const fieldSamples = sampleData.filter(s => s.field === field);
         const samplesByYear = {};
         fieldSamples.forEach(s => {
@@ -1643,185 +1575,108 @@
             samplesByYear[yr] = (samplesByYear[yr] || 0) + 1;
           }
         });
-        const mostRecentYear = Object.keys(samplesByYear).map(Number).filter(y => y <= yieldYear_int).sort((a, b) => b - a)[0] || null;
 
         fieldStats[field] = {
-          yieldPoints: yieldPointsPerField[field],
-          matchedPoints: 0,
-          sampleAges: { sameYear: 0, oneYearOld: 0, twoThreeYears: 0, stale: 0 },
-          // NEW: Detailed diagnostics
-          sampleInventory: samplesByYear,  // { 2019: 45, 2021: 52, ... }
-          totalSoilSamples: fieldSamples.length,
-          mostRecentSampleYear: mostRecentYear,
-          sampleAgeFromYield: mostRecentYear ? yieldYear_int - mostRecentYear : null,
-          // Track WHY yield points didn't match
-          unmatchReasons: {
-            noSampleWithinRadius: 0,      // No soil sample within search radius at all
-            onlyFutureSamples: 0          // Had samples nearby but all from years after yield
-          },
-          // Coverage: yield points that have ANY nearby sample (regardless of year)
-          yieldPointsWithNearbySample: 0
+          totalSamples: fieldSamples.length,
+          samplesWithYield: 0,
+          samplesWithoutYield: 0,
+          totalYieldPointsMatched: 0,
+          sampleInventory: samplesByYear
         };
       });
 
-      // Debug: Show sample years for fields with yield data
-      console.log('=== SAMPLE YEARS PER FIELD (fields with yield) ===');
-      console.log(`Yield year: ${yieldYear_int}, looking for samples from ${yieldYear_int} or earlier`);
-      Object.keys(yieldPointsPerField).forEach(field => {
-        const fieldSamples = sampleData.filter(s => s.field === field);
-        const years = [...new Set(fieldSamples.map(s => s.year))].sort();
-        const validYears = years.filter(y => parseInt(y) <= yieldYear_int);
-        console.log(`  ${field}: ${fieldSamples.length} samples, years: [${years.join(', ')}], valid for matching: [${validYears.join(', ')}]`);
-      });
+      console.log('=== YIELD MATCHING (SOIL-SAMPLE-CENTRIC) ===');
+      console.log(`Total soil samples: ${sampleData.length}`);
+      console.log(`Total yield points for ${yieldYear_int}: ${yearYield.length}`);
+      console.log(`Search radius: ${radiusFeet}ft`);
 
-      // Debug: Special check for Wyatt
-      if (yieldPointsPerField['Wyatt']) {
-        const wyattSamples = sampleData.filter(s => s.field === 'Wyatt');
-        const wyattYears = [...new Set(wyattSamples.map(s => s.year))].sort();
-        console.log(`=== WYATT SPECIAL CHECK ===`);
-        console.log(`Wyatt has ${wyattSamples.length} total samples`);
-        console.log(`Wyatt sample years: ${wyattYears.join(', ')}`);
-        console.log(`Most recent Wyatt year: ${wyattYears[wyattYears.length - 1]}`);
-        console.log(`Sample age if matching to most recent: ${yieldYear_int} - ${wyattYears[wyattYears.length - 1]} = ${yieldYear_int - parseInt(wyattYears[wyattYears.length - 1])} years`);
-      }
+      // Process each soil sample - find nearby yield points
+      for (let sIdx = 0; sIdx < sampleData.length; sIdx++) {
+        const sample = sampleData[sIdx];
 
-      // Process each yield point - find matching soil sample
-      for (let yIdx = 0; yIdx < yearYield.length; yIdx++) {
-        const yieldPoint = yearYield[yIdx];
-        // Use cached field lookup instead of re-doing point-in-polygon
-        const yieldField = yieldPointFields[yIdx];
+        if (!sample.lat || !sample.lon) continue;
 
-        // Find all soil samples within radius
-        const nearbySamples = [];
-        for (let sIdx = 0; sIdx < sampleData.length; sIdx++) {
-          const sample = sampleData[sIdx];
-          const latDiff = Math.abs(yieldPoint.lat - sample.lat);
-          const lonDiff = Math.abs(yieldPoint.lon - sample.lon);
+        // Find all yield points within radius of this sample
+        const nearbyYieldPoints = [];
+        for (let yIdx = 0; yIdx < yearYield.length; yIdx++) {
+          const yp = yearYield[yIdx];
+          const latDiff = Math.abs(sample.lat - yp.lat);
+          const lonDiff = Math.abs(sample.lon - yp.lon);
           if (latDiff <= radiusLatDeg && lonDiff <= radiusLonDeg) {
-            nearbySamples.push({ sample, idx: sIdx });
+            nearbyYieldPoints.push(yp);
           }
         }
 
-        // Filter to samples from yield year or earlier, then find most recent
-        const validSamples = nearbySamples
-          .filter(({ sample }) => {
-            const sampleYear = parseInt(sample.year);
-            return !isNaN(sampleYear) && sampleYear <= yieldYear_int;
-          })
-          .sort((a, b) => parseInt(b.sample.year) - parseInt(a.sample.year)); // Most recent first
+        const field = sample.field || 'Unknown';
 
-        // Track coverage: did this yield point have ANY nearby sample?
-        const hasAnySampleNearby = nearbySamples.length > 0;
-        if (hasAnySampleNearby && yieldField && fieldStats[yieldField]) {
-          fieldStats[yieldField].yieldPointsWithNearbySample++;
-        }
-
-        if (validSamples.length > 0) {
-          // Use the most recent sample
-          const { sample: bestSample, idx: sampleIdx } = validSamples[0];
-          const sampleYear = parseInt(bestSample.year);
-          const sampleAge = yieldYear_int - sampleYear;
-
-          // Categorize sample age
-          if (sampleAge === 0) {
-            sampleAgeStats.sameYear++;
-            if (yieldField && fieldStats[yieldField]) fieldStats[yieldField].sampleAges.sameYear++;
-          } else if (sampleAge === 1) {
-            sampleAgeStats.oneYearOld++;
-            if (yieldField && fieldStats[yieldField]) fieldStats[yieldField].sampleAges.oneYearOld++;
-          } else if (sampleAge <= 3) {
-            sampleAgeStats.twoThreeYears++;
-            if (yieldField && fieldStats[yieldField]) fieldStats[yieldField].sampleAges.twoThreeYears++;
-          } else {
-            sampleAgeStats.stale++;
-            if (yieldField && fieldStats[yieldField]) fieldStats[yieldField].sampleAges.stale++;
+        if (nearbyYieldPoints.length > 0) {
+          // Calculate average yield from nearby points
+          let totalYield = 0;
+          for (const yp of nearbyYieldPoints) {
+            totalYield += yp.yield;
           }
+          const avgYield = totalYield / nearbyYieldPoints.length;
 
-          totalSampleAge += sampleAge;
-          matchedCount++;
-          if (yieldField && fieldStats[yieldField]) fieldStats[yieldField].matchedPoints++;
+          // Store yield correlation on the sample
+          if (!sample.yieldCorrelations) sample.yieldCorrelations = {};
+          sample.yieldCorrelations[yieldYear_int] = {
+            avgYield: Math.round(avgYield * 10) / 10,
+            pointCount: nearbyYieldPoints.length,
+            crop: nearbyYieldPoints[0].crop,
+            radiusFt: radiusFeet
+          };
 
-          // Store yield on the matched sample
-          if (!bestSample.yieldCorrelations) bestSample.yieldCorrelations = {};
+          samplesWithYieldCount++;
+          totalYieldPointsMatched += nearbyYieldPoints.length;
 
-          // If this sample already has yield data for this year, average it
-          if (bestSample.yieldCorrelations[yieldYear_int]) {
-            const existing = bestSample.yieldCorrelations[yieldYear_int];
-            const newTotal = existing.avgYield * existing.pointCount + yieldPoint.yield;
-            existing.pointCount++;
-            existing.avgYield = Math.round((newTotal / existing.pointCount) * 10) / 10;
-          } else {
-            bestSample.yieldCorrelations[yieldYear_int] = {
-              avgYield: Math.round(yieldPoint.yield * 10) / 10,
-              pointCount: 1,
-              crop: yieldPoint.crop,
-              radiusFt: radiusFeet,
-              sampleAge: sampleAge,
-              sampleYear: sampleYear
-            };
+          if (fieldStats[field]) {
+            fieldStats[field].samplesWithYield++;
+            fieldStats[field].totalYieldPointsMatched += nearbyYieldPoints.length;
           }
-
-          samplesWithYield.add(sampleIdx);
         } else {
-          // No matching sample found
-          sampleAgeStats.noMatch++;
-
-          // Determine reason and track per-field
-          let reason;
-          if (nearbySamples.length > 0) {
-            // Had samples but all were from after yield year
-            const futureYears = [...new Set(nearbySamples.map(s => s.sample.year))].sort();
-            reason = `Only future samples found (${futureYears.join(', ')})`;
-            if (yieldField && fieldStats[yieldField]) {
-              fieldStats[yieldField].unmatchReasons.onlyFutureSamples++;
-            }
-          } else {
-            // No samples within search radius at all
-            reason = 'No soil samples within radius';
-            if (yieldField && fieldStats[yieldField]) {
-              fieldStats[yieldField].unmatchReasons.noSampleWithinRadius++;
-            }
+          samplesWithoutYieldCount++;
+          if (fieldStats[field]) {
+            fieldStats[field].samplesWithoutYield++;
           }
-
-          unmatchedYieldPoints.push({
-            yieldIdx: yIdx,
-            field: yieldField || 'Unknown',
-            lat: yieldPoint.lat,
-            lon: yieldPoint.lon,
-            yield: yieldPoint.yield,
-            reason: reason
-          });
         }
 
-        // Breathe every 2000 points to keep UI responsive
-        if (yIdx % 2000 === 1999) await breathe();
+        // Breathe every 100 samples to keep UI responsive
+        if (sIdx % 100 === 99) await breathe();
       }
 
-      // Calculate match rates and coverage per field
+      // Calculate per-field match rates
       for (const field of Object.keys(fieldStats)) {
         const stats = fieldStats[field];
-        stats.matchRate = stats.yieldPoints > 0 ? Math.round((stats.matchedPoints / stats.yieldPoints) * 100) : 0;
-        // Coverage: what % of yield points had ANY soil sample nearby (max theoretical match rate)
-        stats.coverageRate = stats.yieldPoints > 0 ? Math.round((stats.yieldPointsWithNearbySample / stats.yieldPoints) * 100) : 0;
+        stats.matchRate = stats.totalSamples > 0
+          ? Math.round((stats.samplesWithYield / stats.totalSamples) * 100)
+          : 0;
+        stats.avgYieldPointsPerSample = stats.samplesWithYield > 0
+          ? Math.round(stats.totalYieldPointsMatched / stats.samplesWithYield)
+          : 0;
       }
 
       // Save updated samples
       saveLocalData();
 
+      const avgYieldPointsPerSample = samplesWithYieldCount > 0
+        ? Math.round(totalYieldPointsMatched / samplesWithYieldCount)
+        : 0;
+
+      console.log('=== YIELD MATCHING RESULTS ===');
+      console.log(`Samples with yield data: ${samplesWithYieldCount}`);
+      console.log(`Samples without yield data: ${samplesWithoutYieldCount}`);
+      console.log(`Avg yield points per matched sample: ${avgYieldPointsPerSample}`);
+
       return {
-        matched: matchedCount,
-        total: yearYield.length,
-        yieldBounds,
+        totalSamples: sampleData.length,
+        samplesWithYield: samplesWithYieldCount,
+        samplesWithoutYield: samplesWithoutYieldCount,
+        totalYieldPoints: yearYield.length,
+        totalYieldPointsMatched,
+        avgYieldPointsPerSample,
         yieldYear: yieldYear_int,
         radiusFeet,
-        fieldStats,
-        unmatchedYieldPoints,
-        yieldPointCount: yearYield.length,
-        sampleAgeStats,
-        avgSampleAge: matchedCount > 0 ? Math.round((totalSampleAge / matchedCount) * 10) / 10 : null,
-        samplesWithYield: samplesWithYield.size,
-        orphanedYieldPoints,
-        totalBoundaries: Object.keys(fieldBoundaries).length
+        fieldStats
       };
     }
 
@@ -1848,94 +1703,45 @@
       lastYieldResults = results;
       const modal = document.getElementById('yieldSummaryModal');
 
-      // Sample age stats
-      const ages = results.sampleAgeStats || {};
-      const totalFields = Object.keys(results.fieldStats).length;
-      const hasStale = (ages.stale || 0) > 0;
-      const noMatch = ages.noMatch || 0;
-
-      // Summary stats - now focused on yield points and sample age
-      const orphaned = results.orphanedYieldPoints || 0;
-      const inBoundary = results.total - orphaned;
-      const hasOrphans = orphaned > 0;
+      // Calculate match rate
+      const matchRate = results.totalSamples > 0
+        ? Math.round((results.samplesWithYield / results.totalSamples) * 100)
+        : 0;
+      const matchColor = matchRate === 100 ? '#16a34a' : (matchRate >= 80 ? '#d97706' : '#dc2626');
 
       // Clear any existing debug section from previous opens
       const existingDebug = document.getElementById('gpsDebugSection');
       if (existingDebug) existingDebug.remove();
 
+      // Summary stats - soil-sample-centric
       document.getElementById('yieldSummaryStats').innerHTML = `
         <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
-          <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">${results.total.toLocaleString()}</div>
-          <div style="font-size: 0.75rem; color: #64748b;">Yield Points</div>
+          <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">${results.totalSamples.toLocaleString()}</div>
+          <div style="font-size: 0.75rem; color: #64748b;">Total Samples</div>
         </div>
         <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #22c55e;">
-          <div style="font-size: 1.5rem; font-weight: 700; color: #16a34a;">${results.matched.toLocaleString()}</div>
-          <div style="font-size: 0.75rem; color: #64748b;">Matched to Samples</div>
+          <div style="font-size: 1.5rem; font-weight: 700; color: #16a34a;">${results.samplesWithYield.toLocaleString()}</div>
+          <div style="font-size: 0.75rem; color: #64748b;">With Yield Data</div>
         </div>
-        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid ${hasStale ? '#f59e0b' : '#e2e8f0'};">
-          <div style="font-size: 1.5rem; font-weight: 700; color: ${hasStale ? '#d97706' : '#1e293b'};">${results.avgSampleAge !== null ? results.avgSampleAge + ' yr' : '-'}</div>
-          <div style="font-size: 0.75rem; color: #64748b;">Avg Sample Age</div>
+        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid ${results.samplesWithoutYield > 0 ? '#f59e0b' : '#e2e8f0'};">
+          <div style="font-size: 1.5rem; font-weight: 700; color: ${results.samplesWithoutYield > 0 ? '#d97706' : '#64748b'};">${results.samplesWithoutYield.toLocaleString()}</div>
+          <div style="font-size: 0.75rem; color: #64748b;">No Yield Nearby</div>
         </div>
         <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
-          <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">${results.samplesWithYield || 0}</div>
-          <div style="font-size: 0.75rem; color: #64748b;">Samples w/ Yield</div>
+          <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">${results.avgYieldPointsPerSample}</div>
+          <div style="font-size: 0.75rem; color: #64748b;">Avg Pts/Sample</div>
         </div>
       `;
 
-      // GPS Debug section - shows how many yield points fall inside field boundaries
-      const gpsDebugHtml = `
-        <div style="margin-top: 0.75rem; padding: 0.75rem; background: ${hasOrphans ? '#fef3c7' : '#f0fdf4'}; border-radius: 0.375rem; border: 1px solid ${hasOrphans ? '#fcd34d' : '#86efac'};">
-          <div style="font-weight: 600; font-size: 0.875rem; color: #374151; margin-bottom: 0.5rem;">
-            GPS Boundary Check (${results.totalBoundaries || 0} field boundaries)
-          </div>
-          <div style="display: flex; gap: 1rem; font-size: 0.8125rem;">
-            <div>
-              <span style="color: #16a34a; font-weight: 600;">${inBoundary.toLocaleString()}</span>
-              <span style="color: #64748b;"> inside boundaries</span>
-            </div>
-            <div>
-              <span style="color: ${hasOrphans ? '#dc2626' : '#64748b'}; font-weight: 600;">${orphaned.toLocaleString()}</span>
-              <span style="color: ${hasOrphans ? '#dc2626' : '#64748b'};"> outside all boundaries</span>
-            </div>
-          </div>
-          ${hasOrphans ? '<div style="font-size: 0.75rem; color: #92400e; margin-top: 0.5rem;">⚠️ Yield GPS coordinates don\'t fall within any field boundary - check for GPS offset or missing boundaries</div>' : ''}
-        </div>
-      `;
-      document.getElementById('yieldSummaryStats').insertAdjacentHTML('afterend', '<div id="gpsDebugSection">' + gpsDebugHtml + '</div>');
-
-      // Sample age breakdown bar
-      const ageBreakdownHtml = `
-        <div style="margin-bottom: 1rem; padding: 1rem; background: #f8fafc; border-radius: 0.5rem; border: 1px solid #e2e8f0;">
-          <div style="font-weight: 600; margin-bottom: 0.75rem; color: #374151;">Sample Age at Harvest</div>
-          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
-            <div style="flex: 1; min-width: 120px; text-align: center; padding: 0.5rem; background: #dcfce7; border-radius: 0.375rem; border: 1px solid #86efac;">
-              <div style="font-size: 1.25rem; font-weight: 700; color: #166534;">${ages.sameYear || 0}</div>
-              <div style="font-size: 0.7rem; color: #166534;">Same Year</div>
-            </div>
-            <div style="flex: 1; min-width: 120px; text-align: center; padding: 0.5rem; background: #dbeafe; border-radius: 0.375rem; border: 1px solid #93c5fd;">
-              <div style="font-size: 1.25rem; font-weight: 700; color: #1e40af;">${ages.oneYearOld || 0}</div>
-              <div style="font-size: 0.7rem; color: #1e40af;">1 Year Prior</div>
-            </div>
-            <div style="flex: 1; min-width: 120px; text-align: center; padding: 0.5rem; background: #fef3c7; border-radius: 0.375rem; border: 1px solid #fcd34d;">
-              <div style="font-size: 1.25rem; font-weight: 700; color: #92400e;">${ages.twoThreeYears || 0}</div>
-              <div style="font-size: 0.7rem; color: #92400e;">2-3 Years</div>
-            </div>
-            <div style="flex: 1; min-width: 120px; text-align: center; padding: 0.5rem; background: ${(ages.stale || 0) > 0 ? '#fef2f2' : '#f8fafc'}; border-radius: 0.375rem; border: 1px solid ${(ages.stale || 0) > 0 ? '#fca5a5' : '#e2e8f0'};">
-              <div style="font-size: 1.25rem; font-weight: 700; color: ${(ages.stale || 0) > 0 ? '#dc2626' : '#64748b'};">${ages.stale || 0}</div>
-              <div style="font-size: 0.7rem; color: ${(ages.stale || 0) > 0 ? '#dc2626' : '#64748b'};">4+ Years (Stale)</div>
-            </div>
-          </div>
-          ${hasStale ? '<div style="font-size: 0.75rem; color: #dc2626; margin-top: 0.5rem;">⚠️ Stale samples may not reflect soil conditions at planting time</div>' : ''}
-        </div>
-      `;
-
-      // Per-field breakdown with detailed diagnostics
+      // Per-field breakdown
       const fieldRows = Object.entries(results.fieldStats)
+        .filter(([field, stats]) => stats.totalSamples > 0)
         .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
         .map(([field, stats]) => {
-          const isLowMatch = stats.matchRate < 80;
-          const rateColor = stats.matchRate === 100 ? '#16a34a' : (isLowMatch ? '#dc2626' : '#d97706');
-          const rateBg = stats.matchRate === 100 ? '#f0fdf4' : (isLowMatch ? '#fef2f2' : '#fffbeb');
+          const fieldMatchRate = stats.matchRate || 0;
+          const isLowMatch = fieldMatchRate < 80;
+          const rateColor = fieldMatchRate === 100 ? '#16a34a' : (isLowMatch ? '#dc2626' : '#d97706');
+          const rateBg = fieldMatchRate === 100 ? '#f0fdf4' : (isLowMatch ? '#fef2f2' : '#fffbeb');
 
           // Sample inventory display
           const inventory = stats.sampleInventory || {};
@@ -1944,119 +1750,90 @@
             ? invYears.map(y => `${y}: ${inventory[y]}`).join(', ')
             : '<span style="color:#dc2626;">None</span>';
 
-          // Coverage vs match explanation
-          const coverageRate = stats.coverageRate || 0;
-          const unmatchReasons = stats.unmatchReasons || {};
-          const noNearby = unmatchReasons.noSampleWithinRadius || 0;
-          const futureOnly = unmatchReasons.onlyFutureSamples || 0;
-
-          // Diagnostic insight
-          let diagnostic = '';
-          if (stats.matchRate < coverageRate) {
-            diagnostic = `<span style="color:#d97706;">↳ ${futureOnly.toLocaleString()} pts have samples but from future years</span>`;
-          } else if (coverageRate < 100) {
-            diagnostic = `<span style="color:#dc2626;">↳ ${noNearby.toLocaleString()} pts have no sample within ${results.radiusFeet}ft</span>`;
-          }
-
           return `
             <tr style="border-bottom: 1px solid #e2e8f0; vertical-align: top;">
               <td style="padding: 0.75rem 0.5rem;">
                 <div style="font-weight: 600;">${field}</div>
                 <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.25rem;">
-                  Samples: ${invDisplay}
+                  Samples by year: ${invDisplay}
                 </div>
               </td>
               <td style="padding: 0.75rem 0.5rem; text-align: center;">
-                <div style="color: #1e293b; font-weight: 500;">${stats.yieldPoints.toLocaleString()}</div>
-                <div style="font-size: 0.7rem; color: #64748b;">yield pts</div>
+                <div style="color: #1e293b; font-weight: 500;">${stats.totalSamples}</div>
+                <div style="font-size: 0.7rem; color: #64748b;">samples</div>
               </td>
               <td style="padding: 0.75rem 0.5rem; text-align: center;">
-                <div style="font-size: 0.8rem;">
-                  <span style="color: #3b82f6;" title="Coverage: yield points with ANY nearby sample">${coverageRate}%</span>
-                  <span style="color: #94a3b8;">→</span>
-                  <span style="background: ${rateBg}; color: ${rateColor}; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-weight: 600;">
-                    ${stats.matchRate}%
-                  </span>
-                </div>
-                <div style="font-size: 0.65rem; color: #64748b;">coverage → match</div>
+                <div style="color: #16a34a; font-weight: 500;">${stats.samplesWithYield}</div>
+                <div style="font-size: 0.7rem; color: #64748b;">with yield</div>
               </td>
-              <td style="padding: 0.75rem 0.5rem; text-align: left; font-size: 0.75rem; max-width: 180px;">
-                ${diagnostic || '<span style="color:#16a34a;">✓ Good coverage</span>'}
+              <td style="padding: 0.75rem 0.5rem; text-align: center;">
+                <span style="background: ${rateBg}; color: ${rateColor}; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">
+                  ${fieldMatchRate}%
+                </span>
+              </td>
+              <td style="padding: 0.75rem 0.5rem; text-align: center;">
+                <div style="color: #64748b;">${stats.avgYieldPointsPerSample || 0}</div>
+                <div style="font-size: 0.7rem; color: #64748b;">pts/sample</div>
               </td>
             </tr>
           `;
         }).join('');
 
       document.getElementById('yieldTabFields').innerHTML = `
-        ${ageBreakdownHtml}
         <div style="margin-bottom: 1rem; padding: 0.75rem; background: #eff6ff; border-radius: 0.375rem; border: 1px solid #bfdbfe;">
-          <div style="font-weight: 600; color: #1e40af; margin-bottom: 0.5rem;">Understanding Match Rates</div>
+          <div style="font-weight: 600; color: #1e40af; margin-bottom: 0.5rem;">How Yield Matching Works</div>
           <div style="font-size: 0.8rem; color: #1e40af;">
-            <strong>Coverage %</strong> = yield points with ANY soil sample within ${results.radiusFeet}ft (max possible match)<br>
-            <strong>Match %</strong> = yield points matched to samples from ${results.yieldYear} or earlier<br>
-            <em>If coverage >> match: your samples are newer than yield data (e.g., 2024 samples can't match 2023 yield)</em>
+            For each <strong>soil sample location</strong>, we find all yield points within <strong>${results.radiusFeet}ft</strong> and calculate the average yield.<br>
+            Samples with no yield points nearby will show "No Yield Nearby" - this means no harvester passed within ${results.radiusFeet}ft of that sample location.
           </div>
         </div>
         <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
           <thead>
             <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
-              <th style="padding: 0.5rem; text-align: left;">Field & Sample Inventory</th>
-              <th style="padding: 0.5rem; text-align: center;">Yield Data</th>
-              <th style="padding: 0.5rem; text-align: center;">Coverage → Match</th>
-              <th style="padding: 0.5rem; text-align: left;">Diagnostic</th>
+              <th style="padding: 0.5rem; text-align: left;">Field</th>
+              <th style="padding: 0.5rem; text-align: center;">Samples</th>
+              <th style="padding: 0.5rem; text-align: center;">With Yield</th>
+              <th style="padding: 0.5rem; text-align: center;">Match %</th>
+              <th style="padding: 0.5rem; text-align: center;">Avg Pts</th>
             </tr>
           </thead>
           <tbody>${fieldRows}</tbody>
         </table>
         <div style="margin-top: 1rem; padding: 0.75rem; background: #f8fafc; border-radius: 0.375rem; font-size: 0.8125rem; color: #64748b;">
-          <strong>Import Settings:</strong> Year ${results.yieldYear}, Radius ${results.radiusFeet}ft, ${results.yieldPointCount.toLocaleString()} yield points processed
+          <strong>Import Settings:</strong> Yield Year ${results.yieldYear}, Search Radius ${results.radiusFeet}ft, ${results.totalYieldPoints.toLocaleString()} yield points available
         </div>
       `;
 
-      // Unmatched yield points (not samples)
-      const unmatchedPoints = results.unmatchedYieldPoints || [];
-      if (unmatchedPoints.length > 0) {
-        const groupedByReason = {};
-        unmatchedPoints.forEach(p => {
-          const key = p.reason.split(' (')[0];
-          if (!groupedByReason[key]) groupedByReason[key] = [];
-          groupedByReason[key].push(p);
-        });
+      // Samples without yield - show which fields have gaps
+      const fieldsWithGaps = Object.entries(results.fieldStats)
+        .filter(([_, stats]) => stats.samplesWithoutYield > 0)
+        .sort((a, b) => b[1].samplesWithoutYield - a[1].samplesWithoutYield);
 
-        let unmatchedHtml = `
-          <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fef2f2; border-radius: 0.375rem; border: 1px solid #fca5a5;">
-            <strong style="color: #991b1b;">${unmatchedPoints.length.toLocaleString()} yield points</strong>
-            <span style="color: #64748b;"> could not be matched to soil samples</span>
+      if (fieldsWithGaps.length > 0) {
+        let gapsHtml = `
+          <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fef3c7; border-radius: 0.375rem; border: 1px solid #fcd34d;">
+            <strong style="color: #92400e;">${results.samplesWithoutYield} soil samples</strong>
+            <span style="color: #92400e;"> have no yield data within ${results.radiusFeet}ft</span>
           </div>
+          <div style="font-size: 0.875rem; color: #64748b; margin-bottom: 0.75rem;">
+            This typically means the harvester didn't pass close enough to these sample locations, or yield data wasn't uploaded for that field.
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
         `;
-
-        for (const [reason, points] of Object.entries(groupedByReason)) {
-          const byField = {};
-          points.forEach(p => {
-            byField[p.field] = (byField[p.field] || 0) + 1;
-          });
-          unmatchedHtml += `
-            <div style="margin-bottom: 1rem;">
-              <div style="font-weight: 600; color: #991b1b; margin-bottom: 0.5rem;">
-                ${reason} (${points.length.toLocaleString()} points)
-              </div>
-              <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                ${Object.entries(byField).slice(0, 10).map(([field, count]) => `
-                  <span style="background: #fef2f2; border: 1px solid #fca5a5; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;">
-                    ${field}: ${count.toLocaleString()}
-                  </span>
-                `).join('')}
-                ${Object.keys(byField).length > 10 ? `<span style="color: #64748b; font-size: 0.75rem;">... and ${Object.keys(byField).length - 10} more fields</span>` : ''}
-              </div>
-            </div>
+        fieldsWithGaps.forEach(([field, stats]) => {
+          gapsHtml += `
+            <span style="background: #fef3c7; border: 1px solid #fcd34d; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.8rem;">
+              ${field}: ${stats.samplesWithoutYield} samples
+            </span>
           `;
-        }
-        document.getElementById('yieldTabUnmatched').innerHTML = unmatchedHtml;
+        });
+        gapsHtml += '</div>';
+        document.getElementById('yieldTabUnmatched').innerHTML = gapsHtml;
       } else {
         document.getElementById('yieldTabUnmatched').innerHTML = `
           <div style="text-align: center; padding: 2rem; color: #16a34a;">
             <div style="font-size: 2rem;">✓</div>
-            <div style="font-weight: 600;">All yield points matched to soil samples!</div>
+            <div style="font-weight: 600;">All soil samples have yield data nearby!</div>
           </div>
         `;
       }
