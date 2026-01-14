@@ -156,9 +156,9 @@
         </div>
         <div class="form-group">
           <label>Crop Type</label>
-          <select id="yieldCrop" style="width: 140px;">
+          <select id="yieldCrop" style="width: 140px;" required>
+            <option value="">-- Select Crop --</option>
             <option value="corn">🌽 Corn</option>
-            <option value="soybeans">🫘 Soybeans</option>
             <option value="amylose">🍚 Amylose</option>
           </select>
         </div>
@@ -274,8 +274,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.8";
-    const BUILD_DATE = "2026-01-14T16:26:29";
+    const APP_VERSION = "v1.0.9";
+    const BUILD_DATE = "2026-01-14T16:33:32";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -1362,6 +1362,7 @@
       const statusEl = document.getElementById('yieldStatus');
 
       if (!files.length) { showStatus('Please select yield file(s)', false); return; }
+      if (!yieldCrop) { showStatus('Please select a crop type before importing', false); return; }
 
       statusEl.innerHTML = '<span style="color: #3b82f6;">⏳ Processing yield data...</span>';
 
