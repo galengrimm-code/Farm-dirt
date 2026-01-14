@@ -294,8 +294,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.1";
-    const BUILD_DATE = "2026-01-14T15:03:51";
+    const APP_VERSION = "v1.0.2";
+    const BUILD_DATE = "2026-01-14T15:10:29";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -2372,6 +2372,60 @@
         report.push(`  Only ${pairsP.length} valid ${testNutrient} values (need 5+)`);
       }
 
+      report.push('');
+      report.push('');
+      report.push('╔════════════════════════════════════════════════════════════════════╗');
+      report.push('║                    UNDERSTANDING CORRELATIONS                       ║');
+      report.push('╚════════════════════════════════════════════════════════════════════╝');
+      report.push('');
+      report.push('WHY MIGHT CORRELATIONS BE NEGATIVE?');
+      report.push('───────────────────────────────────');
+      report.push('A negative correlation means higher nutrient levels are associated');
+      report.push('with LOWER yields. This can happen for several legitimate reasons:');
+      report.push('');
+      report.push('1. NUTRIENT TOXICITY OR IMBALANCE');
+      report.push('   • Too much of some nutrients can harm crops (e.g., high Na, Fe)');
+      report.push('   • Nutrient imbalances affect uptake of other nutrients');
+      report.push('   • Example: High Mg can block Ca uptake');
+      report.push('');
+      report.push('2. SOIL QUALITY INDICATORS');
+      report.push('   • Some nutrients accumulate in poor-draining soils');
+      report.push('   • High H_Sat indicates acidic conditions limiting yield');
+      report.push('   • High Na_Sat indicates salinity problems');
+      report.push('');
+      report.push('3. MANAGEMENT PRACTICES');
+      report.push('   • High-yielding areas may have depleted nutrients');
+      report.push('   • Low-yielding areas may have accumulated unused fertilizer');
+      report.push('   • Manure application patterns vs. yield patterns');
+      report.push('');
+      report.push('4. SPATIAL CONFOUNDING');
+      report.push('   • Nutrient levels may correlate with other limiting factors');
+      report.push('   • Example: Low spots have high nutrients but poor drainage');
+      report.push('   • Hilltops may have low nutrients but better conditions');
+      report.push('');
+      report.push('5. SAMPLE SIZE & NOISE');
+      report.push('   • Small sample sizes can show spurious correlations');
+      report.push('   • Look for |r| > 0.3 and n > 20 for meaningful relationships');
+      report.push('   • R² < 10% means the nutrient explains very little yield variation');
+      report.push('');
+      report.push('INTERPRETING THE RESULTS');
+      report.push('────────────────────────');
+      report.push('• r = +1.0: Perfect positive (higher nutrient = higher yield)');
+      report.push('• r = +0.5: Moderate positive correlation');
+      report.push('• r =  0.0: No linear relationship');
+      report.push('• r = -0.5: Moderate negative correlation');
+      report.push('• r = -1.0: Perfect negative (higher nutrient = lower yield)');
+      report.push('');
+      report.push('• R² (R-squared): % of yield variation explained by this nutrient');
+      report.push('  - R² = 25% means 25% of yield differences relate to this nutrient');
+      report.push('  - R² < 5% = very weak, likely not meaningful');
+      report.push('  - R² > 20% = moderate, worth investigating');
+      report.push('');
+      report.push('NUTRIENTS EXPECTED TO BE NEGATIVE (Lower is Better):');
+      report.push('  • H_Sat (Hydrogen Saturation) - indicates acidity');
+      report.push('  • Na_Sat (Sodium Saturation) - indicates salinity');
+      report.push('  • Mg_sat (when excessive) - can block calcium');
+      report.push('  • Soluble_Salts - indicates salt stress');
       report.push('');
       report.push('═'.repeat(70));
       report.push(`Report generated: ${new Date().toLocaleString()}`);
