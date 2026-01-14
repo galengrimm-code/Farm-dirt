@@ -79,19 +79,19 @@
     .trend-pct { font-size: 1.5rem; font-weight: 700; text-align: right; }
     .trend-sub { font-size: 0.75rem; color: #64748b; font-weight: 500; }
     .trend-content { display: flex; flex-wrap: nowrap; gap: 1rem; align-items: stretch; }
-    .trend-values { background: rgba(255,255,255,0.7); border-radius: 0.5rem; padding: 0.5rem; min-width: 180px; flex: 0 0 auto; max-height: 400px; overflow-y: auto; }
+    .trend-values { background: rgba(255,255,255,0.7); border-radius: 0.5rem; padding: 0.5rem; min-width: 200px; flex: 0 0 auto; max-height: 400px; overflow-y: auto; }
     .trend-row { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; font-size: 0.875rem; border-radius: 0.25rem; }
     .trend-row.alt { background: rgba(0,0,0,0.03); }
     .trend-year { font-weight: 600; color: #475569; min-width: 50px; }
     .trend-value { font-weight: 700; color: #1e293b; }
-    .trend-graph { flex: 1 1 auto; background: rgba(255,255,255,0.5); border-radius: 0.5rem; padding: 0.5rem; min-width: 300px; }
-    .trend-graph svg { display: block; width: 100%; height: auto; min-height: 150px; }
-    .trend-graph.large svg { min-height: 250px; }
-    .trend-graph.xlarge svg { min-height: 350px; }
+    .trend-graph { flex: 1 1 auto; background: rgba(255,255,255,0.5); border-radius: 0.5rem; padding: 0.75rem; min-width: 400px; }
+    .trend-graph svg { display: block; width: 100%; height: auto; min-height: 180px; }
+    .trend-graph.large svg { min-height: 220px; }
+    .trend-graph.xlarge svg { min-height: 280px; }
     @media (max-width: 900px) {
       .trend-content { flex-direction: column; }
       .trend-graph { min-width: 100%; width: 100%; }
-      .trend-graph svg { min-height: 250px; }
+      .trend-graph svg { min-height: 200px; }
     }
     
     /* Field Rankings */
@@ -951,16 +951,16 @@
       const minVal = Math.min(...allValues) * 0.9, maxVal = Math.max(...allValues) * 1.1;
       const range = maxVal - minVal || 1;
 
-      // Dynamic dimensions based on year count
-      const baseWidth = 300;
-      const width = numYears <= 5 ? baseWidth : Math.max(baseWidth, numYears * 50);
-      const height = numYears <= 5 ? 170 : (numYears <= 10 ? 210 : 260);
-      const padLeft = 30, padRight = 30, padTop = 25, padBottom = 30;
+      // Dynamic dimensions based on year count - larger for PDF readability
+      const baseWidth = 450;
+      const width = numYears <= 5 ? baseWidth : Math.max(baseWidth, numYears * 60);
+      const height = numYears <= 5 ? 190 : (numYears <= 10 ? 230 : 290);
+      const padLeft = 35, padRight = 35, padTop = 30, padBottom = 40;
       const gw = width - padLeft - padRight;
       const gh = height - padTop - padBottom;
 
-      // Determine label skip interval for many years
-      const labelSkip = numYears > 12 ? 2 : (numYears > 8 ? 1 : 0);
+      // Determine label skip interval - only skip for very many years
+      const labelSkip = numYears > 15 ? 2 : (numYears > 10 ? 1 : 0);
 
       // Calculate points
       const avgPts = yearData.map((d, i) => {
@@ -999,25 +999,25 @@
       const avgLine = avgPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
       const medianLine = medianPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
 
-      // Create dots - smaller for many years
-      const dotRadius = numYears > 10 ? 3 : 4;
-      const avgDots = avgPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="${dotRadius}" fill="${avgColor}" stroke="white" stroke-width="1.5"/>`).join('');
-      const medianDots = medianPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="${dotRadius}" fill="${medianColor}" stroke="white" stroke-width="1.5"/>`).join('');
+      // Create dots
+      const dotRadius = numYears > 10 ? 4 : 5;
+      const avgDots = avgPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="${dotRadius}" fill="${avgColor}" stroke="white" stroke-width="2"/>`).join('');
+      const medianDots = medianPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="${dotRadius}" fill="${medianColor}" stroke="white" stroke-width="2"/>`).join('');
 
-      // Year labels - skip some if too many years
+      // Year labels - always show all for small datasets
       const yearLabels = avgPts.map((p, i) => {
         const showLabel = i === 0 || i === avgPts.length - 1 || (labelSkip === 0) || (labelSkip === 1 && i % 2 === 0) || (labelSkip === 2 && i % 3 === 0);
         if (!showLabel) return '';
-        const fontSize = numYears > 10 ? 8 : 9;
-        return `<text x="${p.x}" y="${height - 8}" text-anchor="middle" font-size="${fontSize}" font-weight="600" fill="#475569">${p.year}</text>`;
+        const fontSize = numYears > 12 ? 10 : 11;
+        return `<text x="${p.x}" y="${height - 12}" text-anchor="middle" font-size="${fontSize}" font-weight="600" fill="#475569">${p.year}</text>`;
       }).join('');
 
       const sizeClass = numYears > 10 ? 'xlarge' : (numYears > 5 ? 'large' : '');
 
-      return `<svg width="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;" data-size="${sizeClass}">
+      return `<svg width="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;min-height:${height}px;" data-size="${sizeClass}">
         ${rangePath}
-        <path d="${avgLine}" fill="none" stroke="${avgColor}" stroke-width="2.5" stroke-linecap="round"/>
-        <path d="${medianLine}" fill="none" stroke="${medianColor}" stroke-width="2" stroke-linecap="round" stroke-dasharray="4,2"/>
+        <path d="${avgLine}" fill="none" stroke="${avgColor}" stroke-width="3" stroke-linecap="round"/>
+        <path d="${medianLine}" fill="none" stroke="${medianColor}" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="4,2"/>
         ${avgDots}
         ${medianDots}
         ${yearLabels}
@@ -1054,16 +1054,16 @@
       const minVal = Math.min(...allValues) * 0.85, maxVal = Math.max(...allValues) * 1.15;
       const range = maxVal - minVal || 1;
 
-      // Dynamic dimensions based on year count
-      const baseWidth = 300;
-      const width = numYears <= 5 ? baseWidth : Math.max(baseWidth, numYears * 50);
-      const height = numYears <= 5 ? 160 : (numYears <= 10 ? 200 : 250);
-      const padLeft = 30, padRight = 30, padTop = 25, padBottom = 30;
+      // Dynamic dimensions based on year count - larger for PDF readability
+      const baseWidth = 450;  // Wider base for better label spacing
+      const width = numYears <= 5 ? baseWidth : Math.max(baseWidth, numYears * 60);
+      const height = numYears <= 5 ? 180 : (numYears <= 10 ? 220 : 280);
+      const padLeft = 35, padRight = 35, padTop = 30, padBottom = 40; // More padding for labels
       const gw = width - padLeft - padRight;
       const gh = height - padTop - padBottom;
 
-      // Determine label skip interval for many years
-      const labelSkip = numYears > 12 ? 2 : (numYears > 8 ? 1 : 0);
+      // Determine label skip interval - only skip for very many years
+      const labelSkip = numYears > 15 ? 2 : (numYears > 10 ? 1 : 0);
 
       // Calculate points for both lines
       const avgPts = yearData.map((d, i) => {
@@ -1083,35 +1083,35 @@
       const medianLine = medianPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
 
       // Create dots - smaller for many years
-      const dotRadius = numYears > 10 ? 3 : 4;
-      const avgDots = avgPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="${dotRadius}" fill="${avgColor}" stroke="white" stroke-width="1.5"/>`).join('');
-      const medianDots = medianPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="${dotRadius}" fill="${medianColor}" stroke="white" stroke-width="1.5"/>`).join('');
+      const dotRadius = numYears > 10 ? 4 : 5;
+      const avgDots = avgPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="${dotRadius}" fill="${avgColor}" stroke="white" stroke-width="2"/>`).join('');
+      const medianDots = medianPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="${dotRadius}" fill="${medianColor}" stroke="white" stroke-width="2"/>`).join('');
 
-      // Year labels at bottom - skip some if too many years
+      // Year labels at bottom - always show all for small datasets
       const yearLabels = avgPts.map((p, i) => {
-        // Always show first and last, skip middle ones based on labelSkip
+        // Always show first and last, skip middle ones only for very many years
         const showLabel = i === 0 || i === avgPts.length - 1 || (labelSkip === 0) || (labelSkip === 1 && i % 2 === 0) || (labelSkip === 2 && i % 3 === 0);
         if (!showLabel) return '';
-        const fontSize = numYears > 10 ? 8 : 9;
-        return `<text x="${p.x}" y="${height - 8}" text-anchor="middle" font-size="${fontSize}" font-weight="600" fill="#475569">${p.year}</text>`;
+        const fontSize = numYears > 12 ? 10 : 11;
+        return `<text x="${p.x}" y="${height - 12}" text-anchor="middle" font-size="${fontSize}" font-weight="600" fill="#475569">${p.year}</text>`;
       }).join('');
 
-      // Value labels - only show for fewer years or on hover
+      // Value labels - show for up to 10 years
       let avgLabels = '', medianLabels = '';
-      if (numYears <= 8) {
+      if (numYears <= 10) {
         avgLabels = avgPts.map((p, i) => {
           const medianY = medianPts[i].y;
           const gap = Math.abs(p.y - medianY);
-          let offset = gap < 16 ? (p.y < medianY ? -10 : 14) : -10;
-          const fontSize = numYears > 6 ? 7 : 8;
+          let offset = gap < 20 ? (p.y < medianY ? -12 : 16) : -12;
+          const fontSize = numYears > 6 ? 9 : 10;
           return `<text x="${p.x}" y="${p.y + offset}" text-anchor="middle" font-size="${fontSize}" font-weight="700" fill="${avgColor}">${p.val.toFixed(1)}</text>`;
         }).join('');
 
         medianLabels = medianPts.map((p, i) => {
           const avgY = avgPts[i].y;
           const gap = Math.abs(p.y - avgY);
-          let offset = gap < 16 ? (p.y <= avgY ? -10 : 14) : 14;
-          const fontSize = numYears > 6 ? 7 : 8;
+          let offset = gap < 20 ? (p.y <= avgY ? -12 : 16) : 16;
+          const fontSize = numYears > 6 ? 9 : 10;
           return `<text x="${p.x}" y="${p.y + offset}" text-anchor="middle" font-size="${fontSize}" font-weight="700" fill="${medianColor}">${p.val.toFixed(1)}</text>`;
         }).join('');
       }
@@ -1119,9 +1119,9 @@
       // Add size class hint via data attribute
       const sizeClass = numYears > 10 ? 'xlarge' : (numYears > 5 ? 'large' : '');
 
-      return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;" data-size="${sizeClass}">
-        <path d="${avgLine}" fill="none" stroke="${avgColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="${medianLine}" fill="none" stroke="${medianColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6,3"/>
+      return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;min-height:${height}px;" data-size="${sizeClass}">
+        <path d="${avgLine}" fill="none" stroke="${avgColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="${medianLine}" fill="none" stroke="${medianColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6,3"/>
         ${avgDots}${medianDots}
         ${yearLabels}
         ${avgLabels}${medianLabels}
@@ -1468,25 +1468,28 @@
         .card.positive { border-left-color: #22c55e; background: #f0fdf4; }
         .card.negative { border-left-color: #ef4444; background: #fef2f2; }
 
-        /* Trend Cards for Field Trends Report */
-        .trend-card { background: #fff; border: 2px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 16px; page-break-inside: avoid; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        /* Trend Cards for Field Trends Report - PDF optimized */
+        .trend-card { background: #fff; border: 2px solid #e2e8f0; border-radius: 10px; padding: 20px; margin-bottom: 20px; page-break-inside: avoid; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
         .trend-card.positive { background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-color: #22c55e; }
         .trend-card.negative { background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border-color: #ef4444; }
         .trend-card.neutral { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-color: #94a3b8; }
-        .trend-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid rgba(0,0,0,0.1); }
-        .trend-title { font-size: 16px; font-weight: 700; color: #1e293b; margin: 0; }
-        .trend-pct { font-size: 20px; font-weight: 700; text-align: right; }
-        .trend-sub { font-size: 10px; color: #64748b; font-weight: 500; }
-        .trend-content { display: flex; flex-wrap: nowrap; gap: 16px; align-items: stretch; }
-        .trend-values { background: rgba(255,255,255,0.8); border-radius: 6px; padding: 8px; min-width: 160px; flex: 0 0 auto; max-height: 300px; overflow-y: auto; }
-        .trend-row { display: flex; justify-content: space-between; gap: 8px; padding: 4px 8px; font-size: 10px; border-radius: 4px; }
+        .trend-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.1); }
+        .trend-title { font-size: 18px; font-weight: 700; color: #1e293b; margin: 0; }
+        .trend-pct { font-size: 22px; font-weight: 700; text-align: right; }
+        .trend-sub { font-size: 11px; color: #64748b; font-weight: 500; }
+
+        /* Stacked layout for PDF - data table on top, full-width graph below */
+        .trend-content { display: flex; flex-direction: column; gap: 16px; }
+        .trend-values { background: rgba(255,255,255,0.8); border-radius: 6px; padding: 10px; width: 100%; }
+        .trend-values-row { display: flex; flex-wrap: wrap; gap: 8px; }
+        .trend-row { display: inline-flex; justify-content: space-between; gap: 8px; padding: 6px 12px; font-size: 11px; border-radius: 4px; min-width: 120px; }
         .trend-row.alt { background: rgba(0,0,0,0.04); }
         .trend-year { font-weight: 600; color: #475569; }
         .trend-value { font-weight: 700; color: #1e293b; }
-        .trend-graph { flex: 1 1 auto; min-width: 350px; }
-        .trend-graph svg { width: 100%; height: auto; min-height: 180px; }
-        .trend-graph.large svg { min-height: 220px; }
-        .trend-graph.xlarge svg { min-height: 280px; }
+        .trend-graph { width: 100%; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 8px; }
+        .trend-graph svg { width: 100%; height: auto; min-height: 200px; display: block; }
+        .trend-graph.large svg { min-height: 240px; }
+        .trend-graph.xlarge svg { min-height: 300px; }
 
         /* Nutrient cards for Year Comparison */
         .nutrient-card { background: #fff; border: 2px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
@@ -1502,11 +1505,11 @@
 
         .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 10px; text-align: center; }
         @media print {
-          body { padding: 0; }
+          body { padding: 10px; }
           .trend-card, .nutrient-card { page-break-inside: avoid; }
           h1 { page-break-after: avoid; }
-          .trend-graph { min-width: 400px; }
-          .trend-graph svg { min-height: 200px; }
+          .trend-graph { width: 100%; }
+          .trend-graph svg { min-height: 220px; width: 100%; }
         }
       `;
     }
