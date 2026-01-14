@@ -1443,7 +1443,28 @@
       // Note: fieldBoundaries[fieldName] is an array of polygon coordinate arrays (for multi-polygon support)
       const yieldPointsPerField = {};
       let orphanedYieldPoints = 0;
-      yearYield.forEach(y => {
+
+      // Debug: Log boundary info
+      console.log('=== YIELD MATCHING DEBUG ===');
+      console.log('Total field boundaries:', Object.keys(fieldBoundaries).length);
+      console.log('Field names:', Object.keys(fieldBoundaries).sort().join(', '));
+      console.log('Total yield points to process:', yearYield.length);
+
+      // Debug: Check first few yield points
+      if (yearYield.length > 0) {
+        console.log('First 3 yield points GPS:', yearYield.slice(0, 3).map(y => `(${y.lat.toFixed(6)}, ${y.lon.toFixed(6)})`));
+      }
+
+      // Debug: Check boundary coordinates for a few fields
+      const fieldNames = Object.keys(fieldBoundaries).slice(0, 3);
+      fieldNames.forEach(fn => {
+        const polys = fieldBoundaries[fn];
+        if (polys && polys[0] && polys[0][0]) {
+          console.log(`Field "${fn}" first polygon corner: (${polys[0][0][0]?.toFixed(6)}, ${polys[0][0][1]?.toFixed(6)})`);
+        }
+      });
+
+      yearYield.forEach((y, idx) => {
         let foundField = false;
         for (const [fieldName, polygons] of Object.entries(fieldBoundaries)) {
           // Check each polygon in the field (most fields have just one)
@@ -1451,6 +1472,10 @@
             if (pointInPolygon([y.lat, y.lon], polygon)) {
               yieldPointsPerField[fieldName] = (yieldPointsPerField[fieldName] || 0) + 1;
               foundField = true;
+              // Debug: Log first match for first few points
+              if (idx < 5) {
+                console.log(`Yield point ${idx} (${y.lat.toFixed(6)}, ${y.lon.toFixed(6)}) -> ${fieldName}`);
+              }
               break;
             }
           }
@@ -1458,6 +1483,15 @@
         }
         if (!foundField) orphanedYieldPoints++;
       });
+
+      // Debug: Show yield distribution per field
+      console.log('=== YIELD POINTS PER FIELD ===');
+      const sortedFields = Object.entries(yieldPointsPerField).sort((a, b) => b[1] - a[1]);
+      sortedFields.forEach(([field, count]) => {
+        console.log(`  ${field}: ${count} points`);
+      });
+      console.log(`  (orphaned - outside all boundaries): ${orphanedYieldPoints} points`);
+      console.log(`  Total accounted: ${sortedFields.reduce((sum, [_, c]) => sum + c, 0) + orphanedYieldPoints} / ${yearYield.length}`);
 
       // Initialize field stats from fields that have yield points
       Object.keys(yieldPointsPerField).forEach(field => {
@@ -1467,6 +1501,27 @@
           sampleAges: { sameYear: 0, oneYearOld: 0, twoThreeYears: 0, stale: 0 }
         };
       });
+
+      // Debug: Show sample years for fields with yield data
+      console.log('=== SAMPLE YEARS PER FIELD (fields with yield) ===');
+      console.log(`Yield year: ${yieldYear_int}, looking for samples from ${yieldYear_int} or earlier`);
+      Object.keys(yieldPointsPerField).forEach(field => {
+        const fieldSamples = sampleData.filter(s => s.field === field);
+        const years = [...new Set(fieldSamples.map(s => s.year))].sort();
+        const validYears = years.filter(y => parseInt(y) <= yieldYear_int);
+        console.log(`  ${field}: ${fieldSamples.length} samples, years: [${years.join(', ')}], valid for matching: [${validYears.join(', ')}]`);
+      });
+
+      // Debug: Special check for Wyatt
+      if (yieldPointsPerField['Wyatt']) {
+        const wyattSamples = sampleData.filter(s => s.field === 'Wyatt');
+        const wyattYears = [...new Set(wyattSamples.map(s => s.year))].sort();
+        console.log(`=== WYATT SPECIAL CHECK ===`);
+        console.log(`Wyatt has ${wyattSamples.length} total samples`);
+        console.log(`Wyatt sample years: ${wyattYears.join(', ')}`);
+        console.log(`Most recent Wyatt year: ${wyattYears[wyattYears.length - 1]}`);
+        console.log(`Sample age if matching to most recent: ${yieldYear_int} - ${wyattYears[wyattYears.length - 1]} = ${yieldYear_int - parseInt(wyattYears[wyattYears.length - 1])} years`);
+      }
 
       // Process each yield point - find matching soil sample
       yearYield.forEach((yieldPoint, yIdx) => {
