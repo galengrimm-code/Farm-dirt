@@ -106,7 +106,7 @@
         <div class="summary-item"><div class="number" id="fieldCount">0</div><div class="label">Fields</div></div>
         <div class="summary-item"><div class="number" id="sampleCount">0</div><div class="label">Samples</div></div>
         <div class="summary-item"><div class="number" id="yearCount">0</div><div class="label">Years</div><div class="year-list" id="yearList" style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;"></div></div>
-        <div class="summary-item"><div class="number" id="yieldCount">0</div><div class="label">Samples w/ Yield</div><div class="field-list" id="yieldFieldList" style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;"></div></div>
+        <div class="summary-item" style="min-width: 200px;"><div class="number" id="yieldCount">0</div><div class="label">Samples w/ Yield</div><div id="yieldFieldList" style="margin-top: 0.5rem;"></div></div>
       </div>
       <div id="backupStatus" style="margin-top: 1rem; padding: 0.75rem; border-radius: 0.375rem; font-size: 0.8125rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;"></div>
     </div>
@@ -274,8 +274,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.7";
-    const BUILD_DATE = "2026-01-14T16:24:35";
+    const APP_VERSION = "v1.0.8";
+    const BUILD_DATE = "2026-01-14T16:26:29";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -722,11 +722,44 @@
       const uniqueYears = [...new Set(sampleData.map(s => s.year).filter(y => y))].sort((a, b) => a - b);
       document.getElementById('yearCount').textContent = uniqueYears.length;
       document.getElementById('yearList').textContent = uniqueYears.join(', ');
-      // Count samples with yield correlations and get unique fields
+      // Count samples with yield correlations and build organized field list
       const samplesWithYield = sampleData.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0);
       document.getElementById('yieldCount').textContent = samplesWithYield.length;
-      const fieldsWithYield = [...new Set(samplesWithYield.map(s => s.field).filter(f => f && f !== 'Unknown'))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-      document.getElementById('yieldFieldList').textContent = fieldsWithYield.length > 0 ? fieldsWithYield.join(', ') : '';
+
+      // Build field summary with crop/year info
+      const fieldYieldInfo = {};
+      samplesWithYield.forEach(s => {
+        if (!s.field || s.field === 'Unknown') return;
+        if (!fieldYieldInfo[s.field]) {
+          fieldYieldInfo[s.field] = { count: 0, crops: new Set(), years: new Set() };
+        }
+        fieldYieldInfo[s.field].count++;
+        Object.values(s.yieldCorrelations).forEach(yieldInfo => {
+          if (yieldInfo.crop) fieldYieldInfo[s.field].crops.add(yieldInfo.crop);
+          if (yieldInfo.year) fieldYieldInfo[s.field].years.add(yieldInfo.year);
+        });
+        Object.keys(s.yieldCorrelations).forEach(year => {
+          fieldYieldInfo[s.field].years.add(parseInt(year));
+        });
+      });
+
+      // Generate organized HTML
+      const sortedFields = Object.keys(fieldYieldInfo).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+      let yieldListHtml = '';
+      if (sortedFields.length > 0) {
+        yieldListHtml = '<div style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.25rem;">';
+        sortedFields.forEach(field => {
+          const info = fieldYieldInfo[field];
+          const crops = [...info.crops].map(c => c === 'corn' ? '🌽' : c === 'amylose' ? '🍚' : c === 'soybeans' ? '🫘' : '').join('');
+          const years = [...info.years].sort();
+          const yearStr = years.length === 1 ? years[0] : `${years[0]}-${years[years.length-1]}`;
+          yieldListHtml += `<span style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 0.25rem; padding: 0.15rem 0.4rem; font-size: 0.7rem; color: #92400e; white-space: nowrap;">
+            <strong>${field}</strong> ${crops} <span style="color: #b45309;">${info.count}</span>
+          </span>`;
+        });
+        yieldListHtml += '</div>';
+      }
+      document.getElementById('yieldFieldList').innerHTML = yieldListHtml;
     }
 
     async function uploadBoundaries() {
