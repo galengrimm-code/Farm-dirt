@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Soil Sample Analysis - Import</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; min-height: 100vh; }
@@ -229,6 +231,37 @@
       <div class="modal-footer">
         <button class="button" style="background: #94a3b8;" onclick="closeMappingModal()">Cancel</button>
         <button class="button primary" onclick="proceedWithImport()">Import with Mappings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Yield Import Summary Modal -->
+  <div id="yieldSummaryModal" class="modal-overlay">
+    <div class="modal" style="max-width: 900px;">
+      <div class="modal-header" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+        <h3>🌾 Yield Import Summary</h3>
+        <button class="modal-close" onclick="closeYieldSummary()">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 0;">
+        <!-- Summary Stats -->
+        <div id="yieldSummaryStats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; padding: 1rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0;"></div>
+
+        <!-- Tabs -->
+        <div style="display: flex; border-bottom: 1px solid #e2e8f0;">
+          <button class="yield-tab active" onclick="switchYieldTab('fields')" data-tab="fields" style="flex: 1; padding: 0.75rem; border: none; background: white; cursor: pointer; font-weight: 600; border-bottom: 2px solid #f59e0b;">📊 Per-Field Breakdown</button>
+          <button class="yield-tab" onclick="switchYieldTab('unmatched')" data-tab="unmatched" style="flex: 1; padding: 0.75rem; border: none; background: #f8fafc; cursor: pointer; font-weight: 500; border-bottom: 2px solid transparent;">⚠️ Unmatched Samples</button>
+          <button class="yield-tab" onclick="switchYieldTab('map')" data-tab="map" style="flex: 1; padding: 0.75rem; border: none; background: #f8fafc; cursor: pointer; font-weight: 500; border-bottom: 2px solid transparent;">🗺️ Map View</button>
+        </div>
+
+        <!-- Tab Content -->
+        <div id="yieldTabFields" class="yield-tab-content" style="padding: 1rem; max-height: 400px; overflow-y: auto;"></div>
+        <div id="yieldTabUnmatched" class="yield-tab-content" style="display: none; padding: 1rem; max-height: 400px; overflow-y: auto;"></div>
+        <div id="yieldTabMap" class="yield-tab-content" style="display: none; padding: 0;">
+          <div id="yieldMatchMap" style="height: 400px; width: 100%;"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="button" style="background: #059669; color: white;" onclick="closeYieldSummary()">Done</button>
       </div>
     </div>
   </div>
@@ -1171,8 +1204,25 @@
         afterImportSuccess();
 
         const yearInfo = detectedYear ? `📅 Auto-detected year: ${detectedYear}<br>` : '';
-        statusEl.innerHTML = `<span style="color: #22c55e;">${yearInfo}✓ Processed ${newPoints.length} yield points<br>✓ Matched ${correlationResults.matched} of ${correlationResults.total} soil samples<br>✓ Raw yield data cleared (correlated data saved on samples)</span>`;
-        
+        const matchRate = Math.round((correlationResults.matched / correlationResults.total) * 100);
+        const matchColor = matchRate === 100 ? '#22c55e' : (matchRate >= 80 ? '#f59e0b' : '#ef4444');
+
+        statusEl.innerHTML = `
+          <span style="color: #22c55e;">${yearInfo}✓ Processed ${newPoints.length.toLocaleString()} yield points</span><br>
+          <span style="color: ${matchColor};">✓ Matched ${correlationResults.matched} of ${correlationResults.total} soil samples (${matchRate}%)</span><br>
+          <button onclick="showYieldSummary(lastYieldResults)" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: #f59e0b; color: white; border: none; border-radius: 0.25rem; cursor: pointer; font-weight: 600;">
+            📊 View Import Summary
+          </button>
+        `;
+
+        // Store results for later viewing
+        lastYieldResults = correlationResults;
+
+        // Auto-show summary if there are unmatched samples
+        if (correlationResults.skippedLocation > 0) {
+          setTimeout(() => showYieldSummary(correlationResults), 500);
+        }
+
         fileInput.value = '';
         
       } catch (e) {
@@ -1353,14 +1403,18 @@
       let skippedLocation = 0;
       const yieldYear_int = parseInt(yieldYear);
 
+      // Per-field tracking
+      const fieldStats = {};
+      const unmatchedSamples = [];
+
       // Filter yield data for this year
       const yearYield = yieldData.filter(y => y.year === yieldYear_int);
 
       if (yearYield.length === 0) {
-        return { matched: 0, total: sampleData.length, skippedYear: 0, skippedLocation: 0, noYieldData: true };
+        return { matched: 0, total: sampleData.length, skippedYear: 0, skippedLocation: 0, noYieldData: true, fieldStats: {}, unmatchedSamples: [] };
       }
 
-      // Get yield data bounding box for debugging
+      // Get yield data bounding box
       const yieldLats = yearYield.map(y => y.lat);
       const yieldLons = yearYield.map(y => y.lon);
       const yieldBounds = {
@@ -1368,36 +1422,38 @@
         minLon: Math.min(...yieldLons), maxLon: Math.max(...yieldLons)
       };
 
-      // Get sample bounds for comparison
-      const sampleLats = sampleData.map(s => s.lat).filter(v => v);
-      const sampleLons = sampleData.map(s => s.lon).filter(v => v);
-      const sampleBounds = sampleLats.length > 0 ? {
-        minLat: Math.min(...sampleLats), maxLat: Math.max(...sampleLats),
-        minLon: Math.min(...sampleLons), maxLon: Math.max(...sampleLons)
-      } : null;
-
-      console.log('=== YIELD CORRELATION DEBUG ===');
-      console.log('Yield points:', yearYield.length);
-      console.log('Yield bounds:', yieldBounds);
-      console.log('Sample count:', sampleData.length);
-      console.log('Sample bounds:', sampleBounds);
-      console.log('Radius (ft):', radiusFeet, '→ Lat deg:', radiusLatDeg.toFixed(6), 'Lon deg:', radiusLonDeg.toFixed(6));
-
-      // Find nearest yield point to first few samples
-      sampleData.slice(0, 5).forEach((sample, i) => {
-        let minDist = Infinity;
-        let nearest = null;
-        yearYield.forEach(y => {
-          const dist = Math.sqrt(Math.pow(y.lat - sample.lat, 2) + Math.pow(y.lon - sample.lon, 2));
-          if (dist < minDist) { minDist = dist; nearest = y; }
-        });
-        const minDistFeet = minDist * 364000; // rough conversion
-        console.log(`Sample ${i} (${sample.field}): lat=${sample.lat}, lon=${sample.lon} → Nearest yield: ${minDistFeet.toFixed(0)} ft away`);
+      // Count yield points per field (approximate by checking which field boundary contains them)
+      const yieldPointsPerField = {};
+      yearYield.forEach(y => {
+        let foundField = null;
+        for (const [fieldName, boundary] of Object.entries(fieldBoundaries)) {
+          if (pointInPolygon([y.lat, y.lon], boundary)) {
+            foundField = fieldName;
+            break;
+          }
+        }
+        if (foundField) {
+          yieldPointsPerField[foundField] = (yieldPointsPerField[foundField] || 0) + 1;
+        }
       });
 
-      sampleData.forEach(sample => {
-        // Match yield to ALL soil samples regardless of year (correlate by location)
-        // The yield year is stored with the correlation data
+      // Initialize field stats
+      const fields = [...new Set(sampleData.map(s => s.field).filter(f => f && f !== 'Unknown' && f !== 'Unassigned'))];
+      fields.forEach(field => {
+        fieldStats[field] = {
+          sampleCount: 0,
+          yieldPoints: yieldPointsPerField[field] || 0,
+          matchedCount: 0,
+          unmatchedSamples: []
+        };
+      });
+
+      sampleData.forEach((sample, idx) => {
+        const field = sample.field || 'Unknown';
+        if (!fieldStats[field]) {
+          fieldStats[field] = { sampleCount: 0, yieldPoints: 0, matchedCount: 0, unmatchedSamples: [] };
+        }
+        fieldStats[field].sampleCount++;
 
         // Find all yield points within radius
         const nearbyYields = yearYield.filter(y => {
@@ -1421,17 +1477,309 @@
           };
 
           matched++;
+          fieldStats[field].matchedCount++;
         } else {
           skippedLocation++;
+
+          // Find nearest yield point for diagnosis
+          let minDist = Infinity;
+          yearYield.forEach(y => {
+            const dist = Math.sqrt(Math.pow(y.lat - sample.lat, 2) + Math.pow(y.lon - sample.lon, 2));
+            if (dist < minDist) minDist = dist;
+          });
+          const nearestFeet = Math.round(minDist * 364000);
+
+          // Determine reason for no match
+          let reason = 'No yield data nearby';
+          if (nearestFeet < 500) {
+            reason = `Nearest yield ${nearestFeet}ft away (increase radius?)`;
+          } else if (nearestFeet < 2000) {
+            reason = `Nearest yield ${nearestFeet}ft away`;
+          } else {
+            // Check if sample is outside yield bounds
+            if (sample.lat < yieldBounds.minLat || sample.lat > yieldBounds.maxLat ||
+                sample.lon < yieldBounds.minLon || sample.lon > yieldBounds.maxLon) {
+              reason = 'Outside yield data coverage area';
+            } else {
+              reason = `Nearest yield ${nearestFeet}ft away (gap in yield data?)`;
+            }
+          }
+
+          const unmatchedInfo = {
+            sampleId: sample.sampleId || idx,
+            field: field,
+            lat: sample.lat,
+            lon: sample.lon,
+            year: sample.year,
+            reason: reason,
+            nearestFeet: nearestFeet
+          };
+          unmatchedSamples.push(unmatchedInfo);
+          fieldStats[field].unmatchedSamples.push(unmatchedInfo);
         }
       });
+
+      // Calculate match rates
+      for (const field of Object.keys(fieldStats)) {
+        const stats = fieldStats[field];
+        stats.matchRate = stats.sampleCount > 0 ? Math.round((stats.matchedCount / stats.sampleCount) * 100) : 0;
+      }
 
       // Save updated samples
       saveLocalData();
 
-      return { matched, total: sampleData.length, skippedYear, skippedLocation, yieldBounds };
+      return {
+        matched,
+        total: sampleData.length,
+        skippedYear,
+        skippedLocation,
+        yieldBounds,
+        yieldYear: yieldYear_int,
+        radiusFeet,
+        fieldStats,
+        unmatchedSamples,
+        yieldPointCount: yearYield.length
+      };
     }
-    
+
+    // Helper: check if point is inside polygon
+    function pointInPolygon(point, polygon) {
+      if (!polygon || polygon.length < 3) return false;
+      const [lat, lon] = point;
+      let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const [yi, xi] = polygon[i];
+        const [yj, xj] = polygon[j];
+        if (((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
+          inside = !inside;
+        }
+      }
+      return inside;
+    }
+
+    // ========== YIELD SUMMARY MODAL ==========
+    let yieldSummaryMap = null;
+    let lastYieldResults = null;
+
+    function showYieldSummary(results) {
+      lastYieldResults = results;
+      const modal = document.getElementById('yieldSummaryModal');
+
+      // Summary stats
+      const fieldsFullyMatched = Object.values(results.fieldStats).filter(f => f.matchRate === 100).length;
+      const totalFields = Object.keys(results.fieldStats).length;
+
+      document.getElementById('yieldSummaryStats').innerHTML = `
+        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
+          <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">${results.total}</div>
+          <div style="font-size: 0.75rem; color: #64748b;">Total Soil Samples</div>
+        </div>
+        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #22c55e;">
+          <div style="font-size: 1.5rem; font-weight: 700; color: #16a34a;">${results.matched}</div>
+          <div style="font-size: 0.75rem; color: #64748b;">With Yield Matches</div>
+        </div>
+        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid ${results.skippedLocation > 0 ? '#f59e0b' : '#e2e8f0'};">
+          <div style="font-size: 1.5rem; font-weight: 700; color: ${results.skippedLocation > 0 ? '#d97706' : '#1e293b'};">${results.skippedLocation}</div>
+          <div style="font-size: 0.75rem; color: #64748b;">Without Yield</div>
+        </div>
+        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
+          <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">${fieldsFullyMatched}/${totalFields}</div>
+          <div style="font-size: 0.75rem; color: #64748b;">Fields Fully Matched</div>
+        </div>
+      `;
+
+      // Per-field breakdown
+      const fieldRows = Object.entries(results.fieldStats)
+        .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
+        .map(([field, stats]) => {
+          const isLowMatch = stats.matchRate < 80;
+          const rateColor = stats.matchRate === 100 ? '#16a34a' : (isLowMatch ? '#dc2626' : '#d97706');
+          const rateBg = stats.matchRate === 100 ? '#f0fdf4' : (isLowMatch ? '#fef2f2' : '#fffbeb');
+          return `
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 0.5rem; font-weight: 600;">${field}</td>
+              <td style="padding: 0.5rem; text-align: center;">${stats.sampleCount}</td>
+              <td style="padding: 0.5rem; text-align: center; color: #64748b;">${stats.yieldPoints.toLocaleString()}</td>
+              <td style="padding: 0.5rem; text-align: center; color: #16a34a;">${stats.matchedCount}</td>
+              <td style="padding: 0.5rem; text-align: center;">
+                <span style="background: ${rateBg}; color: ${rateColor}; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">
+                  ${isLowMatch ? '⚠️ ' : ''}${stats.matchRate}%
+                </span>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+      document.getElementById('yieldTabFields').innerHTML = `
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+          <thead>
+            <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+              <th style="padding: 0.5rem; text-align: left;">Field</th>
+              <th style="padding: 0.5rem; text-align: center;">Soil Samples</th>
+              <th style="padding: 0.5rem; text-align: center;">Yield Points</th>
+              <th style="padding: 0.5rem; text-align: center;">Matches</th>
+              <th style="padding: 0.5rem; text-align: center;">Match Rate</th>
+            </tr>
+          </thead>
+          <tbody>${fieldRows}</tbody>
+        </table>
+        <div style="margin-top: 1rem; padding: 0.75rem; background: #f8fafc; border-radius: 0.375rem; font-size: 0.8125rem; color: #64748b;">
+          <strong>Import Settings:</strong> Year ${results.yieldYear}, Radius ${results.radiusFeet}ft, ${results.yieldPointCount.toLocaleString()} yield points processed
+        </div>
+      `;
+
+      // Unmatched samples
+      if (results.unmatchedSamples.length > 0) {
+        const groupedByReason = {};
+        results.unmatchedSamples.forEach(s => {
+          const key = s.reason.split(' (')[0]; // Group by main reason
+          if (!groupedByReason[key]) groupedByReason[key] = [];
+          groupedByReason[key].push(s);
+        });
+
+        let unmatchedHtml = '';
+        for (const [reason, samples] of Object.entries(groupedByReason)) {
+          unmatchedHtml += `
+            <div style="margin-bottom: 1rem;">
+              <div style="font-weight: 600; color: #991b1b; margin-bottom: 0.5rem;">
+                ${reason} (${samples.length} samples)
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                ${samples.slice(0, 20).map(s => `
+                  <span style="background: #fef2f2; border: 1px solid #fca5a5; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;">
+                    ${s.field} #${s.sampleId}
+                  </span>
+                `).join('')}
+                ${samples.length > 20 ? `<span style="color: #64748b; font-size: 0.75rem;">... and ${samples.length - 20} more</span>` : ''}
+              </div>
+            </div>
+          `;
+        }
+        document.getElementById('yieldTabUnmatched').innerHTML = unmatchedHtml;
+      } else {
+        document.getElementById('yieldTabUnmatched').innerHTML = `
+          <div style="text-align: center; padding: 2rem; color: #16a34a;">
+            <div style="font-size: 2rem;">✓</div>
+            <div style="font-weight: 600;">All samples matched!</div>
+          </div>
+        `;
+      }
+
+      modal.classList.add('active');
+
+      // Reset to first tab
+      switchYieldTab('fields');
+    }
+
+    function switchYieldTab(tab) {
+      // Update tab buttons
+      document.querySelectorAll('.yield-tab').forEach(btn => {
+        const isActive = btn.dataset.tab === tab;
+        btn.style.background = isActive ? 'white' : '#f8fafc';
+        btn.style.fontWeight = isActive ? '600' : '500';
+        btn.style.borderBottom = isActive ? '2px solid #f59e0b' : '2px solid transparent';
+      });
+
+      // Show/hide content
+      document.getElementById('yieldTabFields').style.display = tab === 'fields' ? 'block' : 'none';
+      document.getElementById('yieldTabUnmatched').style.display = tab === 'unmatched' ? 'block' : 'none';
+      document.getElementById('yieldTabMap').style.display = tab === 'map' ? 'block' : 'none';
+
+      // Initialize map if switching to map tab
+      if (tab === 'map' && lastYieldResults) {
+        setTimeout(() => initYieldSummaryMap(), 100);
+      }
+    }
+
+    function initYieldSummaryMap() {
+      const mapContainer = document.getElementById('yieldMatchMap');
+
+      // Destroy existing map if any
+      if (yieldSummaryMap) {
+        yieldSummaryMap.remove();
+        yieldSummaryMap = null;
+      }
+
+      // Create map
+      yieldSummaryMap = L.map(mapContainer).setView([40, -95], 4);
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '© Esri'
+      }).addTo(yieldSummaryMap);
+
+      const matchedMarkers = [];
+      const unmatchedMarkers = [];
+
+      // Add matched samples as green markers
+      sampleData.forEach((sample, idx) => {
+        if (!sample.lat || !sample.lon) return;
+
+        const hasYield = sample.yieldCorrelations && sample.yieldCorrelations[lastYieldResults.yieldYear];
+        const color = hasYield ? '#22c55e' : '#ef4444';
+        const fillColor = hasYield ? '#86efac' : '#fca5a5';
+
+        const marker = L.circleMarker([sample.lat, sample.lon], {
+          radius: 6,
+          fillColor: fillColor,
+          color: color,
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.8
+        });
+
+        const yieldInfo = hasYield ? `<br>Yield: ${sample.yieldCorrelations[lastYieldResults.yieldYear].avgYield}` : '';
+        marker.bindPopup(`<b>${sample.field}</b><br>Sample ${sample.sampleId || idx}${yieldInfo}`);
+
+        if (hasYield) {
+          matchedMarkers.push(marker);
+        } else {
+          unmatchedMarkers.push(marker);
+        }
+        marker.addTo(yieldSummaryMap);
+      });
+
+      // Add field boundaries
+      for (const [name, coords] of Object.entries(fieldBoundaries)) {
+        if (coords && coords.length > 2) {
+          L.polygon(coords, {
+            color: '#3b82f6',
+            weight: 2,
+            fillOpacity: 0.1
+          }).addTo(yieldSummaryMap);
+        }
+      }
+
+      // Fit to bounds
+      const allMarkers = [...matchedMarkers, ...unmatchedMarkers];
+      if (allMarkers.length > 0) {
+        const group = L.featureGroup(allMarkers);
+        yieldSummaryMap.fitBounds(group.getBounds().pad(0.1));
+      }
+
+      // Add legend
+      const legend = L.control({ position: 'bottomright' });
+      legend.onAdd = function() {
+        const div = L.DomUtil.create('div', 'info legend');
+        div.style.background = 'white';
+        div.style.padding = '8px 12px';
+        div.style.borderRadius = '4px';
+        div.style.boxShadow = '0 1px 4px rgba(0,0,0,0.2)';
+        div.innerHTML = `
+          <div style="margin-bottom: 4px;"><span style="display:inline-block;width:12px;height:12px;background:#86efac;border:2px solid #22c55e;border-radius:50%;margin-right:6px;"></span>Matched (${lastYieldResults.matched})</div>
+          <div><span style="display:inline-block;width:12px;height:12px;background:#fca5a5;border:2px solid #ef4444;border-radius:50%;margin-right:6px;"></span>Unmatched (${lastYieldResults.skippedLocation})</div>
+        `;
+        return div;
+      };
+      legend.addTo(yieldSummaryMap);
+    }
+
+    function closeYieldSummary() {
+      document.getElementById('yieldSummaryModal').classList.remove('active');
+      if (yieldSummaryMap) {
+        yieldSummaryMap.remove();
+        yieldSummaryMap = null;
+      }
+    }
+
     async function loadJSZip() {
       // JSZip should already be loaded from earlier script
       if (window.JSZip) return window.JSZip;
