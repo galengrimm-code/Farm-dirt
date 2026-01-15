@@ -484,8 +484,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.19";
-    const BUILD_DATE = "2026-01-15T07:26:15";
+    const APP_VERSION = "v1.0.20";
+    const BUILD_DATE = "2026-01-15T07:58:23";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -725,13 +725,15 @@
       spatialFieldSel.innerHTML += '<option value="__all__">All Fields (Operation-Wide)</option>';
       fields.forEach(f => { spatialFieldSel.innerHTML += `<option value="${f}">${f}</option>`; });
 
+      // Default to All Fields (Operation-Wide)
+      spatialFieldSel.value = '__all__';
+
       const spatialNutrientSel = document.getElementById('spatialNutrientSelect');
       spatialNutrientSel.innerHTML = '';
       visibleNutrients.forEach(n => { spatialNutrientSel.innerHTML += `<option value="${n}">${CONFIG.NUTRIENT_NAMES[n] || n}</option>`; });
 
-      // Spatial year selectors start empty - will populate when field is selected
-      document.getElementById('spatialBaseYearSelect').innerHTML = '<option value="">Select field first</option>';
-      document.getElementById('spatialCompareYearSelect').innerHTML = '<option value="">Select field first</option>';
+      // Initialize year selectors with All Fields selection
+      updateSpatialYearSelectors('__all__');
     }
 
     function updateSpatialYearSelectors(field) {
@@ -751,11 +753,11 @@
         return;
       }
 
-      // Base year dropdown - oldest first (ascending)
-      spatialBaseYearSel.innerHTML = '';
+      // Base year dropdown - "Earliest Available" as default, then specific years
+      spatialBaseYearSel.innerHTML = '<option value="earliest">Earliest Available (per field)</option>';
       fieldYears.forEach(y => { spatialBaseYearSel.innerHTML += `<option value="${y}">${y}</option>`; });
 
-      // Compare year dropdown - includes "All Years" option, newest first (descending)
+      // Compare year dropdown - includes "All Years" option (default), newest first (descending)
       const descendingYears = [...fieldYears].sort((a, b) => b - a);
       spatialCompareYearSel.innerHTML = '<option value="all">All Years</option>';
       descendingYears.forEach(y => { spatialCompareYearSel.innerHTML += `<option value="${y}">${y}</option>`; });
@@ -3559,9 +3561,10 @@
       const container = document.getElementById('spatialContent');
       const field = document.getElementById('spatialFieldSelect').value;
       const nutrient = document.getElementById('spatialNutrientSelect').value;
-      const baseYear = parseInt(document.getElementById('spatialBaseYearSelect').value);
+      const baseYearSelection = document.getElementById('spatialBaseYearSelect').value;
       const compareYear = document.getElementById('spatialCompareYearSelect').value;
       const radiusFt = parseInt(document.getElementById('spatialRadiusSelect').value);
+      const useEarliestPerField = baseYearSelection === 'earliest';
 
       if (!field) {
         container.innerHTML = '<div class="no-data">Select a field to analyze spatial changes over time.</div>';
@@ -3579,10 +3582,37 @@
         return;
       }
 
-      // Get base year samples
-      const baseSamples = fieldSamples.filter(s => s.year === baseYear);
+      // Calculate earliest year per field (for "Earliest Available" option)
+      const earliestYearByField = {};
+      if (useEarliestPerField) {
+        const allFields = [...new Set(fieldSamples.map(s => s.field).filter(f => f))];
+        allFields.forEach(f => {
+          const fieldYears = fieldSamples
+            .filter(s => s.field === f && s.year)
+            .map(s => s.year)
+            .sort((a, b) => a - b);
+          if (fieldYears.length > 0) {
+            earliestYearByField[f] = fieldYears[0];
+          }
+        });
+      }
+
+      // Get base year samples - either specific year or earliest per field
+      let baseSamples;
+      let baseYearDisplay;
+      if (useEarliestPerField) {
+        // Get samples from each field's earliest year
+        baseSamples = fieldSamples.filter(s => s.field && earliestYearByField[s.field] === s.year);
+        const uniqueBaseYears = [...new Set(Object.values(earliestYearByField))].sort();
+        baseYearDisplay = uniqueBaseYears.length === 1 ? uniqueBaseYears[0] : `${Math.min(...uniqueBaseYears)}-${Math.max(...uniqueBaseYears)}`;
+      } else {
+        const baseYear = parseInt(baseYearSelection);
+        baseSamples = fieldSamples.filter(s => s.year === baseYear);
+        baseYearDisplay = baseYear;
+      }
+
       if (baseSamples.length === 0) {
-        container.innerHTML = `<div class="no-data">No samples found for ${fieldDisplayName} in ${baseYear}</div>`;
+        container.innerHTML = `<div class="no-data">No samples found for ${fieldDisplayName} in baseline year(s)</div>`;
         return;
       }
 
@@ -3607,15 +3637,24 @@
       // Classify base year samples into zones
       const zonedSamples = baseWithValues.map(s => ({
         ...s,
+        baseYear: useEarliestPerField ? earliestYearByField[s.field] : parseInt(baseYearSelection),
         baseValue: parseFloat(s[nutrient]),
         zone: parseFloat(s[nutrient]) <= lowThreshold ? 'low' :
               parseFloat(s[nutrient]) >= highThreshold ? 'high' : 'medium'
       }));
 
       // Determine which years to compare
-      const compareYears = compareYear === 'all'
-        ? years.filter(y => y !== baseYear)
-        : [parseInt(compareYear)];
+      let compareYears;
+      if (compareYear === 'all') {
+        if (useEarliestPerField) {
+          // Compare to all years after each field's baseline
+          compareYears = years; // Will filter per-sample below
+        } else {
+          compareYears = years.filter(y => y !== parseInt(baseYearSelection));
+        }
+      } else {
+        compareYears = [parseInt(compareYear)];
+      }
 
       // For each zoned sample, find matching samples in compare years
       const radiusMeters = radiusFt * 0.3048;
@@ -3623,10 +3662,17 @@
 
       zonedSamples.forEach(baseSample => {
         const matches = { base: baseSample, years: {} };
-        matches.years[baseYear] = baseSample.baseValue;
+        const sampleBaseYear = baseSample.baseYear;
+        matches.years[sampleBaseYear] = baseSample.baseValue;
 
-        compareYears.forEach(year => {
-          const yearSamples = fieldSamples.filter(s => s.year === year);
+        // Get comparison years for this sample (only years after its baseline)
+        const sampleCompareYears = compareYear === 'all'
+          ? years.filter(y => y > sampleBaseYear)
+          : compareYears.filter(y => y > sampleBaseYear);
+
+        sampleCompareYears.forEach(year => {
+          // Only look at samples from the same field for matching
+          const yearSamples = fieldSamples.filter(s => s.year === year && (!isAllFields || s.field === baseSample.field));
           // Find closest sample within radius
           let closest = null;
           let closestDist = Infinity;

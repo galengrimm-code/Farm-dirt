@@ -21,6 +21,12 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 - Compare mode now desktop-only (hidden on mobile < 768px)
 - Mobile map keeps only essential controls: Field, Attribute, Year
 
+### Spatial Change Analysis
+- **Default to All Fields**: Operation-wide view selected by default
+- **Earliest Available Baseline**: New option uses each field's earliest sample as baseline (not just 2013)
+- **Per-field baseline**: When using "Earliest Available", each field uses its own first sample year
+- Supports fields with different starting years in the same analysis
+
 ---
 
 ## [v1.0.17] - January 14, 2026
