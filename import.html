@@ -373,36 +373,47 @@
       </div>
     </div>
 
-    <!-- Field Management Section -->
+    <!-- Field Management Section (Collapsible) -->
     <div class="import-section" style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-color: #0ea5e9;">
-      <h3 style="color: #0369a1;">🗺️ Manage Field Boundaries</h3>
-      <p style="color: #0c4a6e; font-size: 0.875rem; margin-bottom: 1rem;">View, rename, or delete field boundaries and their associated soil samples.</p>
-
-      <!-- Field Table -->
-      <div id="fieldManagementTable" style="background: white; border-radius: 0.5rem; border: 1px solid #bae6fd; overflow: hidden;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
-          <thead style="background: #f0f9ff;">
-            <tr>
-              <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #bae6fd; color: #0369a1;">Field Name</th>
-              <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #bae6fd; color: #0369a1;">Acres</th>
-              <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #bae6fd; color: #0369a1;">Samples</th>
-              <th style="padding: 0.75rem; text-align: center; border-bottom: 2px solid #bae6fd; color: #0369a1;">Years</th>
-              <th style="padding: 0.75rem; text-align: center; border-bottom: 2px solid #bae6fd; color: #0369a1; width: 150px;">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="fieldTableBody">
-            <tr>
-              <td colspan="5" style="padding: 2rem; text-align: center; color: #64748b;">
-                <em>No field boundaries loaded</em>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleFieldManagement()">
+        <div>
+          <h3 style="color: #0369a1; margin: 0;">🗺️ Manage Field Boundaries</h3>
+          <p style="color: #0c4a6e; font-size: 0.875rem; margin: 0.25rem 0 0 0;">View, rename, or delete field boundaries and their associated soil samples.</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <span id="fieldManagementQuickSummary" style="font-size: 0.8rem; color: #0369a1; background: #e0f2fe; padding: 0.25rem 0.5rem; border-radius: 0.25rem;"></span>
+          <span id="fieldManagementToggleIcon" style="font-size: 1.25rem; color: #0369a1; transition: transform 0.2s;">▼</span>
+        </div>
       </div>
 
-      <!-- Summary -->
-      <div id="fieldManagementSummary" style="margin-top: 1rem; padding: 0.75rem; background: #e0f2fe; border-radius: 0.5rem; font-size: 0.8rem; color: #0369a1; display: none;">
-        <span id="fieldSummaryText"></span>
+      <!-- Collapsible Content -->
+      <div id="fieldManagementContent" style="margin-top: 1rem;">
+        <!-- Field Table -->
+        <div id="fieldManagementTable" style="background: white; border-radius: 0.5rem; border: 1px solid #bae6fd; overflow: hidden;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+            <thead style="background: #f0f9ff;">
+              <tr>
+                <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #bae6fd; color: #0369a1;">Field Name</th>
+                <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #bae6fd; color: #0369a1;">Acres</th>
+                <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #bae6fd; color: #0369a1;">Samples</th>
+                <th style="padding: 0.75rem; text-align: center; border-bottom: 2px solid #bae6fd; color: #0369a1;">Years</th>
+                <th style="padding: 0.75rem; text-align: center; border-bottom: 2px solid #bae6fd; color: #0369a1; width: 150px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="fieldTableBody">
+              <tr>
+                <td colspan="5" style="padding: 2rem; text-align: center; color: #64748b;">
+                  <em>No field boundaries loaded</em>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Summary -->
+        <div id="fieldManagementSummary" style="margin-top: 1rem; padding: 0.75rem; background: #e0f2fe; border-radius: 0.5rem; font-size: 0.8rem; color: #0369a1; display: none;">
+          <span id="fieldSummaryText"></span>
+        </div>
       </div>
     </div>
   </div>
@@ -766,8 +777,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.43";
-    const BUILD_DATE = "2026-01-15T16:48:20";
+    const APP_VERSION = "v1.0.44";
+    const BUILD_DATE = "2026-01-15T17:26:34";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -4569,6 +4580,7 @@
           </tr>
         `;
         summaryDiv.style.display = 'none';
+        document.getElementById('fieldManagementQuickSummary').textContent = '0 fields';
         return;
       }
 
@@ -4615,7 +4627,26 @@
 
       // Show summary
       summaryDiv.style.display = 'block';
-      summaryText.textContent = `${fieldNames.length} fields • ${totalAcres.toFixed(1)} total acres • ${totalSamples.toLocaleString()} samples`;
+      const summaryStr = `${fieldNames.length} fields • ${totalAcres.toFixed(1)} acres • ${totalSamples.toLocaleString()} samples`;
+      summaryText.textContent = summaryStr;
+
+      // Update quick summary (shown when collapsed)
+      document.getElementById('fieldManagementQuickSummary').textContent = `${fieldNames.length} fields`;
+    }
+
+    // Toggle field management section
+    function toggleFieldManagement() {
+      const content = document.getElementById('fieldManagementContent');
+      const icon = document.getElementById('fieldManagementToggleIcon');
+      const isHidden = content.style.display === 'none';
+
+      if (isHidden) {
+        content.style.display = 'block';
+        icon.style.transform = 'rotate(0deg)';
+      } else {
+        content.style.display = 'none';
+        icon.style.transform = 'rotate(-90deg)';
+      }
     }
 
     // Calculate field acres from polygon coordinates
