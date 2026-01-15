@@ -83,6 +83,12 @@
     .csv-map-select { width: 100%; padding: 0.375rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; font-size: 0.8rem; background: white; }
     .csv-mapping-field { display: flex; flex-direction: column; gap: 0.25rem; }
     .csv-step-tab.active { border-bottom: 3px solid #8b5cf6; color: #7c3aed; }
+    /* Shapefile Mapping Modal */
+    .shp-map-select { width: 100%; padding: 0.375rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; font-size: 0.8rem; background: white; }
+    .shp-mapping-field { display: flex; flex-direction: column; gap: 0.25rem; }
+    .shp-preview-values { font-size: 0.7rem; color: #059669; font-style: italic; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .shp-step-tab.active { border-bottom: 3px solid #3b82f6; color: #1d4ed8; }
+    .shp-unmapped-chip { background: #fef3c7; border: 1px solid #fde047; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; color: #854d0e; }
   </style>
 </head>
 <body>
@@ -499,6 +505,127 @@
     </div>
   </div>
 
+  <!-- Shapefile Attribute Mapping Modal -->
+  <div id="shpMappingModal" class="modal-overlay">
+    <div class="modal" style="max-width: 950px; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
+        <h3>📍 Shapefile Attribute Mapping</h3>
+        <button class="modal-close" onclick="closeShpMappingModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="flex: 1; overflow-y: auto; padding: 0;">
+        <!-- Summary bar -->
+        <div id="shpSummaryBar" style="padding: 0.75rem 1rem; background: #f0f9ff; border-bottom: 1px solid #bae6fd; display: flex; justify-content: space-between; align-items: center;">
+          <span id="shpSummaryText" style="font-weight: 600; color: #0369a1;"></span>
+          <span id="shpAttrCount" style="font-size: 0.85rem; color: #64748b;"></span>
+        </div>
+
+        <!-- Step Indicator -->
+        <div style="display: flex; border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
+          <div id="shpStep1Tab" class="shp-step-tab active" style="flex: 1; padding: 0.75rem; text-align: center; font-weight: 600; border-bottom: 3px solid #3b82f6; color: #1d4ed8;">
+            1. Map Attributes
+          </div>
+          <div id="shpStep2Tab" class="shp-step-tab" style="flex: 1; padding: 0.75rem; text-align: center; font-weight: 500; color: #94a3b8;">
+            2. Preview & Import
+          </div>
+        </div>
+
+        <!-- Step 1: Attribute Mapping -->
+        <div id="shpMappingStep1" style="padding: 1rem;">
+          <!-- Instructions -->
+          <div style="margin-bottom: 1rem; padding: 0.75rem; background: #eff6ff; border: 1px solid #93c5fd; border-radius: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <span style="font-size: 1.1rem;">📋</span>
+              <strong style="color: #1e40af;">Map shapefile attributes to soil sample fields:</strong>
+            </div>
+            <div style="font-size: 0.8rem; color: #1e40af; display: flex; align-items: center; gap: 0.5rem;">
+              <span style="background: #dbeafe; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">Standard Field</span>
+              <span>←</span>
+              <span style="background: #e0e7ff; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">Shapefile Attribute</span>
+              <span>→</span>
+              <span style="background: #f0fdf4; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-style: italic;">Preview values</span>
+            </div>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.75rem; color: #64748b;">
+              Lat/Lon are extracted from point geometry. For each field, select which shapefile attribute contains that data.
+            </p>
+          </div>
+
+          <!-- Required Fields -->
+          <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
+            <h4 style="margin: 0 0 0.5rem 0; color: #0369a1; font-size: 0.9rem;">📍 Required Fields</h4>
+            <p style="margin: 0 0 0.75rem 0; font-size: 0.7rem; color: #0369a1;">Coordinates extracted from geometry. Sample ID helps identify records.</p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem;">
+              <div class="shp-mapping-field">
+                <label style="font-size: 0.8rem; font-weight: 600; color: #0369a1;">Latitude <span style="font-weight: 400; color: #64748b;">(from geometry)</span></label>
+                <div style="padding: 0.375rem 0.5rem; background: #e0f2fe; border-radius: 0.25rem; font-size: 0.8rem; color: #0c4a6e;">Auto-extracted from point coordinates</div>
+              </div>
+              <div class="shp-mapping-field">
+                <label style="font-size: 0.8rem; font-weight: 600; color: #0369a1;">Longitude <span style="font-weight: 400; color: #64748b;">(from geometry)</span></label>
+                <div style="padding: 0.375rem 0.5rem; background: #e0f2fe; border-radius: 0.25rem; font-size: 0.8rem; color: #0c4a6e;">Auto-extracted from point coordinates</div>
+              </div>
+              <div class="shp-mapping-field">
+                <label style="font-size: 0.8rem; font-weight: 500;">Sample ID <span style="font-weight: 400; color: #64748b;">← attribute:</span></label>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                  <select id="shpMapSampleId" class="shp-map-select" style="flex: 1;"></select>
+                  <span id="shpPreviewSampleId" class="shp-preview-values"></span>
+                </div>
+              </div>
+              <div class="shp-mapping-field">
+                <label style="font-size: 0.8rem; font-weight: 500;">Field Name <span style="font-weight: 400; color: #64748b;">← attribute:</span></label>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                  <select id="shpMapField" class="shp-map-select" style="flex: 1;"></select>
+                  <span id="shpPreviewField" class="shp-preview-values"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Nutrient Fields -->
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
+            <h4 style="margin: 0 0 0.5rem 0; color: #166534; font-size: 0.9rem;">🧪 Nutrient Fields</h4>
+            <p style="margin: 0 0 0.75rem 0; font-size: 0.7rem; color: #166534;">Match nutrients to shapefile attributes. Preview values shown to verify correct mapping.</p>
+            <div id="shpNutrientMappings" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem;"></div>
+          </div>
+
+          <!-- Unmapped Attributes -->
+          <div id="shpUnmappedSection" style="background: #fefce8; border: 1px solid #fde047; border-radius: 0.5rem; padding: 1rem; display: none;">
+            <h4 style="margin: 0 0 0.5rem 0; color: #854d0e; font-size: 0.9rem;">📦 Unmapped Shapefile Attributes</h4>
+            <p style="margin: 0 0 0.5rem 0; font-size: 0.7rem; color: #a16207;">These attributes exist in your shapefile but aren't mapped to standard fields. They'll be imported as-is.</p>
+            <div id="shpUnmappedList" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+          </div>
+
+          <!-- Save Mapping Option -->
+          <div style="margin-top: 1rem; padding: 0.75rem; background: #f8fafc; border-radius: 0.375rem; display: flex; align-items: center; gap: 0.75rem;">
+            <input type="checkbox" id="shpSaveMapping" style="width: 18px; height: 18px;">
+            <label for="shpSaveMapping" style="font-size: 0.85rem; color: #475569;">Save new mappings as aliases for future imports</label>
+          </div>
+        </div>
+
+        <!-- Step 2: Preview -->
+        <div id="shpMappingStep2" style="display: none; padding: 1rem;">
+          <div style="margin-bottom: 1rem; padding: 0.75rem; background: #eff6ff; border: 1px solid #93c5fd; border-radius: 0.375rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 600; color: #1e40af;">Preview: First 5 rows of mapped data</span>
+              <span id="shpPreviewCount" style="font-size: 0.85rem; color: #3b82f6;"></span>
+            </div>
+          </div>
+          <div style="overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 0.375rem;">
+            <table id="shpPreviewTable" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+              <thead id="shpPreviewHead" style="background: #f1f5f9;"></thead>
+              <tbody id="shpPreviewBody"></tbody>
+            </table>
+          </div>
+          <div id="shpPreviewWarnings" style="margin-top: 1rem;"></div>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top: 1px solid #e2e8f0;">
+        <button class="button" style="background: #94a3b8;" onclick="closeShpMappingModal()">Cancel</button>
+        <button class="button" id="shpBackBtn" style="display: none; background: #64748b;" onclick="shpMappingBack()">← Back</button>
+        <button class="button" id="shpNextBtn" style="background: #3b82f6;" onclick="shpMappingNext()">Preview →</button>
+        <button class="button success" id="shpImportBtn" style="display: none;" onclick="shpImportConfirm()">Import Samples</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Yield Import Summary Modal -->
   <div id="yieldSummaryModal" class="modal-overlay">
     <div class="modal" style="max-width: 900px;">
@@ -535,8 +662,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.39";
-    const BUILD_DATE = "2026-01-15T11:57:03";
+    const APP_VERSION = "v1.0.40";
+    const BUILD_DATE = "2026-01-15T16:41:30";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -1166,29 +1293,32 @@
         const isZip = files.length === 1 && files[0].name.toLowerCase().endsWith('.zip');
         const csvFile = files.find(f => f.name.toLowerCase().endsWith('.csv'));
         const jsonFile = files.find(f => f.name.toLowerCase().match(/\.(geo)?json$/));
-        
-        if (isZip) {
-          // Zip file - may contain multiple shapefiles
-          const arrayBuffer = await files[0].arrayBuffer();
-          const result = await shp(arrayBuffer);
 
-          // shp() returns array if multiple shapefiles in zip, single object if one
-          if (Array.isArray(result)) {
-            console.log(`Found ${result.length} shapefiles in zip`);
-            result.forEach((geojson, i) => {
-              console.log(`Processing shapefile ${i + 1}: ${geojson.fileName || 'unnamed'}`);
-              const fileSamples = geojsonToSamples(geojson, year, depth);
-              samples = [...samples, ...fileSamples];
-            });
+        // For shapefiles, show mapping modal before importing
+        if (isZip || (shpFile && dbfFile)) {
+          let geojson;
+          if (isZip) {
+            const arrayBuffer = await files[0].arrayBuffer();
+            geojson = await shp(arrayBuffer);
+            // If multiple shapefiles in zip, combine them
+            if (Array.isArray(geojson)) {
+              const allFeatures = [];
+              geojson.forEach(gj => {
+                if (gj.features) allFeatures.push(...gj.features);
+              });
+              geojson = { type: 'FeatureCollection', features: allFeatures };
+            }
           } else {
-            samples = geojsonToSamples(result, year, depth);
+            const shpBuffer = await shpFile.arrayBuffer();
+            const dbfBuffer = await dbfFile.arrayBuffer();
+            geojson = await shp({ shp: shpBuffer, dbf: dbfBuffer });
           }
-        } else if (shpFile && dbfFile) {
-          // Multiple shapefile components - combine them
-          const shpBuffer = await shpFile.arrayBuffer();
-          const dbfBuffer = await dbfFile.arrayBuffer();
-          const geojson = await shp({ shp: shpBuffer, dbf: dbfBuffer });
-          samples = geojsonToSamples(geojson, year, depth);
+
+          // Store parsed data and show mapping modal
+          shpYear = year;
+          shpDepth = depth;
+          showShpMappingModal(geojson);
+          return; // Modal will call shpImportConfirm() when user confirms
         } else if (csvFile) {
           const text = await csvFile.text();
           samples = parseCSV(text, year, depth);
@@ -3341,6 +3471,13 @@
     let csvHeaders = [];      // Store CSV column headers
     let csvMappings = {};     // Current column mappings
 
+    // Shapefile mapping state
+    let shpParsedFeatures = [];  // Raw GeoJSON features from shapefile
+    let shpAttributes = [];      // List of attribute names in shapefile
+    let shpMappings = {};        // Current attribute mappings
+    let shpYear = null;          // Year from form
+    let shpDepth = null;         // Depth from form
+
     // Toggle between shapefile and CSV import options
     function selectImportType(type) {
       const shapefileBox = document.getElementById('shapefileImportBox');
@@ -3900,6 +4037,407 @@
           if (select) select.value = findHeader(mapping[n]);
         }
       });
+    }
+
+    // ============================================
+    // Shapefile Import with Attribute Mapping
+    // ============================================
+
+    function showShpMappingModal(geojson) {
+      // Extract features
+      const features = geojson.features || [geojson];
+      shpParsedFeatures = features.filter(f => f.geometry && f.geometry.type === 'Point');
+
+      if (shpParsedFeatures.length === 0) {
+        showStatus('No point features found in shapefile', false);
+        return;
+      }
+
+      // Extract attribute names from first feature
+      const firstProps = shpParsedFeatures[0].properties || {};
+      shpAttributes = Object.keys(firstProps);
+
+      console.log('Shapefile attributes:', shpAttributes);
+      console.log('Sample count:', shpParsedFeatures.length);
+
+      // Update summary bar
+      document.getElementById('shpSummaryText').textContent = `Found ${shpParsedFeatures.length} sample points`;
+      document.getElementById('shpAttrCount').textContent = `${shpAttributes.length} attributes`;
+
+      // Populate dropdowns and auto-map
+      populateShpMappingDropdowns();
+      autoMapShpColumns();
+
+      // Reset to step 1
+      document.getElementById('shpMappingStep1').style.display = 'block';
+      document.getElementById('shpMappingStep2').style.display = 'none';
+      document.getElementById('shpStep1Tab').style.borderBottom = '3px solid #3b82f6';
+      document.getElementById('shpStep1Tab').style.color = '#1d4ed8';
+      document.getElementById('shpStep2Tab').style.borderBottom = 'none';
+      document.getElementById('shpStep2Tab').style.color = '#94a3b8';
+      document.getElementById('shpBackBtn').style.display = 'none';
+      document.getElementById('shpNextBtn').style.display = 'inline-block';
+      document.getElementById('shpImportBtn').style.display = 'none';
+
+      document.getElementById('shpMappingModal').style.display = 'flex';
+      showStatus('', true); // Clear status
+    }
+
+    function populateShpMappingDropdowns() {
+      function escapeHtml(str) {
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      const options = '<option value="">(skip)</option>' +
+        shpAttributes.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('');
+
+      // Required fields
+      document.getElementById('shpMapSampleId').innerHTML = options;
+      document.getElementById('shpMapField').innerHTML = options;
+
+      // Nutrient fields
+      const nutrientContainer = document.getElementById('shpNutrientMappings');
+      nutrientContainer.innerHTML = '';
+
+      const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts'];
+
+      nutrients.forEach(nutrient => {
+        const div = document.createElement('div');
+        div.className = 'shp-mapping-field';
+        div.innerHTML = `
+          <label style="font-size: 0.8rem; font-weight: 600; color: #166534;">${nutrient}</label>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <select id="shpMap${nutrient}" class="shp-map-select" style="flex: 1;" onchange="updateShpPreview('${nutrient}')">${options}</select>
+            <span id="shpPreview${nutrient}" class="shp-preview-values"></span>
+          </div>
+        `;
+        nutrientContainer.appendChild(div);
+      });
+    }
+
+    function autoMapShpColumns() {
+      const aliases = getAliases();
+
+      // ID aliases
+      const idAliases = ['sampleid', 'sample_id', 'id', 'pointid', 'point_id', 'fid', 'org_id', 'objectid', 'sample id'];
+      const fieldAliases = ['field', 'fieldname', 'field_name', 'farm', 'farmname', 'name', 'farm_field'];
+
+      function findMatch(aliasList) {
+        for (const attr of shpAttributes) {
+          const a = attr.toLowerCase().trim();
+          if (aliasList.includes(a)) return attr;
+        }
+        return '';
+      }
+
+      // Map required fields
+      document.getElementById('shpMapSampleId').value = findMatch(idAliases);
+      document.getElementById('shpMapField').value = findMatch(fieldAliases);
+
+      // Extended aliases for lab formats
+      const labAliases = {
+        'pH': ['ph', 'wph', 'water ph', 'soil ph', '1:1 ph', 'ph 1:1', 'ph_1_1', 'ph_(1_1)'],
+        'Buffer_pH': ['bph', 'buffer ph', 'buffer_ph', 'sikora', 'smp', 'smp ph'],
+        'P': ['p', 'bray p1', 'bray_p1', 'bray p-1', 'mehlich p', 'olsen p', 'p1', 'p (m3)', 'p_m3', 'phosphorus'],
+        'P2': ['p2', 'bray_p2', 'bray p2'],
+        'K': ['k', 'aa k', 'potassium', 'k (m3)', 'k_m3', 'mehlich k', 'exchk', 'exch k'],
+        'OM': ['om', 'om (loi)', 'om_loi', 'organic matter', 'om%', 'o.m.', 'loi', 'organic_matter'],
+        'CEC': ['cec', 'c.e.c.', 'cation exchange', 'cec (calc)', 'cec_calc', 'cec meq'],
+        'Ca': ['ca', 'aa ca', 'calcium', 'exchca', 'exch ca', 'ca (m3)'],
+        'Mg': ['mg', 'aa mg', 'magnesium', 'exchmg', 'exch mg', 'mg (m3)'],
+        'Na': ['na', 'aa na', 'sodium', 'exchna', 'exch na', 'na (m3)'],
+        'S': ['s', 'sulfur', 'so4-s', 'sulfate', 's (m3)'],
+        'Zn': ['zn', 'dtpa-zn', 'zinc', 'zn (m3)', 'mehlich zn'],
+        'Mn': ['mn', 'dtpa-mn', 'manganese', 'mn (m3)', 'mehlich mn'],
+        'Fe': ['fe', 'dtpa-fe', 'iron', 'fe (m3)', 'mehlich fe'],
+        'Cu': ['cu', 'dtpa-cu', 'copper', 'cu (m3)', 'mehlich cu'],
+        'Boron': ['b', 'dtpa-b', 'boron', 'hot water b', 'b (m3)'],
+        'Ca_sat': ['ca_sat', 'bs-ca', 'bs_ca', 'ca_base_sat', 'ca sat', 'ca sat %', 'ca%', '%ca'],
+        'Mg_sat': ['mg_sat', 'bs-mg', 'bs_mg', 'mg_base_sat', 'mg sat', 'mg sat %', 'mg%', '%mg'],
+        'K_Sat': ['k_sat', 'bs-k', 'bs_k', 'k_base_sat', 'k sat', 'k sat %', 'k%', '%k'],
+        'H_Sat': ['h_sat', 'bs-h', 'bs_h', 'h_base_sat', 'h sat', 'h sat %', 'h%', '%h'],
+        'Na_Sat': ['na_sat', 'bs-na', 'bs_na', 'na_base_sat', 'na sat', 'na sat %', 'na%', '%na'],
+        'NO3': ['no3', 'no3-n', 'no3-n (ppm)', 'nitrate', 'nitrate-n'],
+        'NH4': ['nh4', 'nh4-n', 'ammonium', 'ammonium-n'],
+        'Soluble_Salts': ['soluble_salts', 'soluble_sal', 'sol_salts', 'salts', 'ss']
+      };
+
+      // Map nutrient fields
+      const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts'];
+      const mappedAttrs = new Set();
+
+      nutrients.forEach(nutrient => {
+        const select = document.getElementById(`shpMap${nutrient}`);
+        if (!select) return;
+
+        // Combine stored aliases with lab aliases
+        const storedAliases = aliases[nutrient] || [];
+        const defaultLabAliases = labAliases[nutrient] || [nutrient.toLowerCase()];
+        const nutrientAliases = [...new Set([...storedAliases.map(a => a.toLowerCase()), ...defaultLabAliases])];
+        let matched = '';
+
+        for (const attr of shpAttributes) {
+          const a = attr.toLowerCase().trim();
+          for (const alias of nutrientAliases) {
+            if (alias === a) {
+              matched = attr;
+              break;
+            }
+          }
+          if (matched) break;
+        }
+
+        if (matched) {
+          select.value = matched;
+          mappedAttrs.add(matched);
+          updateShpPreview(nutrient);
+        }
+      });
+
+      // Also mark required fields as mapped
+      const sampleIdVal = document.getElementById('shpMapSampleId').value;
+      const fieldVal = document.getElementById('shpMapField').value;
+      if (sampleIdVal) mappedAttrs.add(sampleIdVal);
+      if (fieldVal) mappedAttrs.add(fieldVal);
+
+      // Update preview for required fields
+      updateShpPreview('SampleId');
+      updateShpPreview('Field');
+
+      // Show unmapped attributes
+      showUnmappedAttributes(mappedAttrs);
+    }
+
+    function updateShpPreview(fieldName) {
+      // Get values from first few features for preview
+      const previewCount = 3;
+      let selectId = `shpMap${fieldName}`;
+      let previewId = `shpPreview${fieldName}`;
+
+      const select = document.getElementById(selectId);
+      const preview = document.getElementById(previewId);
+      if (!select || !preview) return;
+
+      const attr = select.value;
+      if (!attr) {
+        preview.textContent = '';
+        preview.title = '';
+        return;
+      }
+
+      const values = shpParsedFeatures.slice(0, previewCount)
+        .map(f => f.properties?.[attr])
+        .filter(v => v !== null && v !== undefined && v !== '')
+        .map(v => typeof v === 'number' ? v.toFixed(1) : v);
+
+      if (values.length > 0) {
+        preview.textContent = values.join(', ') + '...';
+        preview.title = `Values: ${values.join(', ')}`;
+      } else {
+        preview.textContent = '(no data)';
+        preview.title = 'No values found';
+      }
+    }
+
+    function showUnmappedAttributes(mappedAttrs) {
+      // System attributes to exclude from unmapped list
+      const systemAttrs = ['lat', 'lon', 'latitude', 'longitude', 'point_x', 'point_y', 'x', 'y', 'geometry', 'type'];
+
+      const unmapped = shpAttributes.filter(attr => {
+        const a = attr.toLowerCase();
+        return !mappedAttrs.has(attr) && !systemAttrs.includes(a);
+      });
+
+      const section = document.getElementById('shpUnmappedSection');
+      const list = document.getElementById('shpUnmappedList');
+
+      if (unmapped.length === 0) {
+        section.style.display = 'none';
+        return;
+      }
+
+      section.style.display = 'block';
+      list.innerHTML = unmapped.map(attr => `<span class="shp-unmapped-chip">${attr}</span>`).join('');
+    }
+
+    function closeShpMappingModal() {
+      document.getElementById('shpMappingModal').style.display = 'none';
+      shpParsedFeatures = [];
+      shpAttributes = [];
+      shpMappings = {};
+    }
+
+    function shpMappingNext() {
+      // Generate preview
+      generateShpPreview();
+
+      // Switch to step 2
+      document.getElementById('shpMappingStep1').style.display = 'none';
+      document.getElementById('shpMappingStep2').style.display = 'block';
+      document.getElementById('shpStep1Tab').style.borderBottom = 'none';
+      document.getElementById('shpStep1Tab').style.color = '#94a3b8';
+      document.getElementById('shpStep2Tab').style.borderBottom = '3px solid #3b82f6';
+      document.getElementById('shpStep2Tab').style.color = '#1d4ed8';
+      document.getElementById('shpBackBtn').style.display = 'inline-block';
+      document.getElementById('shpNextBtn').style.display = 'none';
+      document.getElementById('shpImportBtn').style.display = 'inline-block';
+    }
+
+    function shpMappingBack() {
+      document.getElementById('shpMappingStep1').style.display = 'block';
+      document.getElementById('shpMappingStep2').style.display = 'none';
+      document.getElementById('shpStep1Tab').style.borderBottom = '3px solid #3b82f6';
+      document.getElementById('shpStep1Tab').style.color = '#1d4ed8';
+      document.getElementById('shpStep2Tab').style.borderBottom = 'none';
+      document.getElementById('shpStep2Tab').style.color = '#94a3b8';
+      document.getElementById('shpBackBtn').style.display = 'none';
+      document.getElementById('shpNextBtn').style.display = 'inline-block';
+      document.getElementById('shpImportBtn').style.display = 'none';
+    }
+
+    function generateShpPreview() {
+      // Collect current mappings
+      shpMappings = {
+        sampleId: document.getElementById('shpMapSampleId').value,
+        field: document.getElementById('shpMapField').value
+      };
+
+      const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts'];
+      nutrients.forEach(n => {
+        const select = document.getElementById(`shpMap${n}`);
+        if (select && select.value) {
+          shpMappings[n] = select.value;
+        }
+      });
+
+      // Build columns to show (lat, lon always shown, plus mapped fields)
+      const mappedFields = [
+        { standard: 'Lat', source: '(geometry)' },
+        { standard: 'Lon', source: '(geometry)' },
+        ...Object.entries(shpMappings)
+          .filter(([key, val]) => val)
+          .map(([key, val]) => ({ standard: key, source: val }))
+      ];
+
+      // Build preview table header
+      const thead = document.getElementById('shpPreviewHead');
+      thead.innerHTML = `<tr>${mappedFields.map(f =>
+        `<th style="padding: 0.5rem; text-align: left; border-bottom: 1px solid #e2e8f0;">
+          <div style="font-weight: 600; color: #1e293b;">${f.standard}</div>
+          <div style="font-size: 0.7rem; color: #64748b; font-weight: normal;">← ${f.source}</div>
+        </th>`
+      ).join('')}</tr>`;
+
+      // Build preview table body (first 5 rows)
+      const tbody = document.getElementById('shpPreviewBody');
+      const previewRows = shpParsedFeatures.slice(0, 5);
+
+      tbody.innerHTML = previewRows.map(feature => {
+        const coords = feature.geometry.coordinates;
+        const props = feature.properties || {};
+        return `<tr>${mappedFields.map(f => {
+          let val;
+          if (f.standard === 'Lat') val = coords[1]?.toFixed(5);
+          else if (f.standard === 'Lon') val = coords[0]?.toFixed(5);
+          else val = props[f.source];
+
+          if (typeof val === 'number') val = val.toFixed(2);
+          return `<td style="padding: 0.5rem; border-bottom: 1px solid #f1f5f9;">${val ?? '-'}</td>`;
+        }).join('')}</tr>`;
+      }).join('');
+
+      // Update count
+      document.getElementById('shpPreviewCount').textContent = `Total: ${shpParsedFeatures.length} samples`;
+
+      // Show warnings
+      const warningsDiv = document.getElementById('shpPreviewWarnings');
+      const warnings = [];
+
+      // Check for missing nutrient data
+      let noNutrientCount = 0;
+      shpParsedFeatures.forEach(f => {
+        const props = f.properties || {};
+        const hasNutrient = nutrients.some(n => shpMappings[n] && props[shpMappings[n]] !== null && props[shpMappings[n]] !== undefined);
+        if (!hasNutrient) noNutrientCount++;
+      });
+
+      if (noNutrientCount > 0 && noNutrientCount < shpParsedFeatures.length) {
+        warnings.push(`⚠️ ${noNutrientCount} samples have no nutrient data in the mapped columns`);
+      }
+
+      // Check if any nutrients were mapped
+      const mappedNutrients = nutrients.filter(n => shpMappings[n]);
+      if (mappedNutrients.length === 0) {
+        warnings.push(`⚠️ No nutrient fields mapped. Consider mapping pH, P, K, etc. for analysis.`);
+      }
+
+      if (warnings.length > 0) {
+        warningsDiv.innerHTML = warnings.map(w =>
+          `<div style="padding: 0.5rem; background: #fef3c7; border: 1px solid #fcd34d; border-radius: 0.25rem; margin-bottom: 0.5rem; font-size: 0.85rem; color: #92400e;">${w}</div>`
+        ).join('');
+      } else {
+        warningsDiv.innerHTML = `<div style="padding: 0.5rem; background: #dcfce7; border: 1px solid #22c55e; border-radius: 0.25rem; font-size: 0.85rem; color: #166534;">✓ ${mappedNutrients.length} nutrient fields mapped. Ready to import!</div>`;
+      }
+    }
+
+    async function shpImportConfirm() {
+      // Save new mappings as aliases if requested
+      if (document.getElementById('shpSaveMapping').checked) {
+        const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts'];
+        nutrients.forEach(n => {
+          if (shpMappings[n] && shpMappings[n].toLowerCase() !== n.toLowerCase()) {
+            saveAlias(n, shpMappings[n]);
+          }
+        });
+      }
+
+      // Convert features to samples using mappings
+      const samples = [];
+      shpParsedFeatures.forEach((feature, idx) => {
+        const coords = feature.geometry.coordinates;
+        const props = feature.properties || {};
+
+        const sample = {
+          lat: coords[1],
+          lon: coords[0],
+          year: shpYear,
+          depth: shpDepth || '6',
+          sampleId: shpMappings.sampleId ? (props[shpMappings.sampleId] || `S${idx + 1}`) : `S${idx + 1}`,
+          field: null // Will be assigned by GPS matching
+        };
+
+        // Apply nutrient mappings
+        const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts'];
+        nutrients.forEach(n => {
+          if (shpMappings[n]) {
+            const val = props[shpMappings[n]];
+            if (val !== null && val !== undefined && val !== '' && val !== 0) {
+              const num = parseFloat(val);
+              sample[n] = isNaN(num) ? val : num;
+            }
+          }
+        });
+
+        // Also copy any unmapped attributes (as raw data)
+        Object.entries(props).forEach(([k, v]) => {
+          if (sample[k] === undefined && v !== null && v !== undefined) {
+            const num = parseFloat(v);
+            sample[k] = isNaN(num) ? v : num;
+          }
+        });
+
+        samples.push(sample);
+      });
+
+      // Close modal first
+      closeShpMappingModal();
+
+      // Finish import using existing function
+      await finishSampleImport(samples);
+
+      // Clear file input
+      document.getElementById('sampleFiles').value = '';
+      document.getElementById('sampleYear').value = '';
     }
 
   </script>
