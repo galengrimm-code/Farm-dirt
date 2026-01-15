@@ -518,8 +518,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.33";
-    const BUILD_DATE = "2026-01-15T11:40:58";
+    const APP_VERSION = "v1.0.34";
+    const BUILD_DATE = "2026-01-15T11:45:15";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -3373,14 +3373,27 @@
 
     // Populate dropdowns with CSV headers
     function populateCsvMappingDropdowns() {
+      // HTML escape function for safe display
+      function escapeHtml(str) {
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      console.log('Populating dropdowns with headers:', csvHeaders);
+      console.log('Number of headers:', csvHeaders.length);
+
       const options = '<option value="">(skip)</option>' +
-        csvHeaders.map(h => `<option value="${h}">${h}</option>`).join('');
+        csvHeaders.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
+
+      console.log('Generated options count:', csvHeaders.length + 1);
 
       // Required fields
       document.getElementById('csvMapLat').innerHTML = options;
       document.getElementById('csvMapLon').innerHTML = options;
       document.getElementById('csvMapSampleId').innerHTML = options;
       document.getElementById('csvMapField').innerHTML = options;
+
+      // Verify options were added
+      console.log('Lat dropdown options:', document.getElementById('csvMapLat').options.length);
 
       // Nutrient fields - get all standard fields
       const nutrientContainer = document.getElementById('csvNutrientMappings');
