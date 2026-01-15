@@ -227,7 +227,7 @@
           </select>
         </div>
         <div class="control-group">
-          <label>Yield Year</label>
+          <label>Yield Year <span onclick="toggleYieldYearInfo()" style="cursor: pointer; font-size: 0.9rem; color: #3b82f6;" title="Learn about yield year options">ℹ️</span></label>
           <select id="yieldYearSelect"></select>
         </div>
         <div class="control-group">
@@ -248,6 +248,44 @@
           <span onclick="toggleNormalizeInfo()" style="cursor: pointer; font-size: 1rem; color: #3b82f6; margin-left: -0.25rem;" title="Learn about normalization">ℹ️</span>
         </div>
         <button onclick="exportYieldCorrelation()" class="export-btn">📄 Export Report</button>
+      </div>
+
+      <!-- Yield Year explanation (hidden by default) -->
+      <div id="yieldYearInfoBox" style="display: none; background: linear-gradient(to right, #f0fdf4, #ecfdf5); border: 1px solid #22c55e; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: #166534;">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem;">
+          <strong style="font-size: 1rem;">📅 Understanding Yield Year Options</strong>
+          <span onclick="toggleYieldYearInfo()" style="cursor: pointer; color: #64748b; font-size: 1.2rem;">&times;</span>
+        </div>
+
+        <div style="display: grid; gap: 0.75rem;">
+          <div style="background: white; border-radius: 0.375rem; padding: 0.75rem; border-left: 4px solid #3b82f6;">
+            <div style="font-weight: 600; color: #1e40af; margin-bottom: 0.25rem;">All Years (Averaged)</div>
+            <p style="font-size: 0.8rem; color: #475569; margin: 0;">
+              For each soil sample location, calculates the <strong>average yield</strong> across all years.<br>
+              <em>Example: If a location had 180 bu/ac in 2024 and 200 bu/ac in 2025, uses 190 bu/ac</em><br>
+              <strong>Best for:</strong> Smoothing out year-to-year variation, finding consistent patterns<br>
+              <strong>Data points</strong> = number of sample locations
+            </p>
+          </div>
+
+          <div style="background: white; border-radius: 0.375rem; padding: 0.75rem; border-left: 4px solid #8b5cf6;">
+            <div style="font-weight: 600; color: #6d28d9; margin-bottom: 0.25rem;">All Years (Combined)</div>
+            <p style="font-size: 0.8rem; color: #475569; margin: 0;">
+              Treats each year as a <strong>separate data point</strong>.<br>
+              <em>Example: Same location counts twice - once for 2024 yield, once for 2025 yield</em><br>
+              <strong>Best for:</strong> Maximum statistical power, more data points<br>
+              <strong>Data points</strong> = locations × years
+            </p>
+          </div>
+
+          <div style="background: white; border-radius: 0.375rem; padding: 0.75rem; border-left: 4px solid #f59e0b;">
+            <div style="font-weight: 600; color: #b45309; margin-bottom: 0.25rem;">Individual Year (e.g., "2024")</div>
+            <p style="font-size: 0.8rem; color: #475569; margin: 0;">
+              Only uses yield from that <strong>specific harvest year</strong>.<br>
+              <strong>Best for:</strong> Analyzing a specific season's results, comparing year-over-year changes
+            </p>
+          </div>
+        </div>
       </div>
 
       <!-- Normalization explanation (hidden by default) -->
@@ -484,8 +522,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.24";
-    const BUILD_DATE = "2026-01-15T08:42:16";
+    const APP_VERSION = "v1.0.25";
+    const BUILD_DATE = "2026-01-15T09:47:03";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -1777,9 +1815,17 @@
       const correlations = [];
 
       console.log('=== YIELD CORRELATION DEBUG ===');
+      console.log('Crop filter:', cropFilter);
       console.log('Year filter:', yearFilter);
+      console.log('Yield years found for this crop:', sortedYieldYears);
       console.log('Data points:', dataPoints.length);
       console.log('Unique locations:', uniqueLocations);
+      // Debug: show sample yieldCorrelations structure
+      if (samplesWithYield.length > 0) {
+        const sampleYC = samplesWithYield[0].yieldCorrelations;
+        console.log('Sample yieldCorrelations keys:', Object.keys(sampleYC));
+        console.log('Sample yieldCorrelations crops:', Object.values(sampleYC).map(v => v.crop));
+      }
 
       visibleNutrients.forEach(nutrient => {
         // Filter for valid numeric values - must handle strings, empty values, etc.
@@ -2592,6 +2638,12 @@
       `;
     }
 
+    // Toggle yield year explanation info box
+    function toggleYieldYearInfo() {
+      const box = document.getElementById('yieldYearInfoBox');
+      box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    }
+
     // Toggle normalization explanation info box
     function toggleNormalizeInfo() {
       const box = document.getElementById('normalizeInfoBox');
@@ -2979,6 +3031,101 @@
       `;
       document.getElementById('multiSummaryContent').innerHTML = summaryHtml;
 
+      // Build interpretation section FIRST (before table)
+      const r2Pct = (model.R2 * 100).toFixed(0);
+      const remainingPct = (100 - model.R2 * 100).toFixed(0);
+
+      // Sort variables by significance (excluding intercept)
+      const varResults = model.vars.slice(1).map((v, i) => ({
+        name: v,
+        displayName: CONFIG.NUTRIENT_NAMES[v] || v,
+        coef: model.beta[i + 1],
+        pValue: model.pValues[i + 1],
+        sig: model.pValues[i + 1] < 0.001 ? '***' : model.pValues[i + 1] < 0.01 ? '**' : model.pValues[i + 1] < 0.05 ? '*' : ''
+      })).sort((a, b) => a.pValue - b.pValue);
+
+      const sigVars = varResults.filter(v => v.pValue < 0.05);
+      const marginalVars = varResults.filter(v => v.pValue >= 0.05 && v.pValue < 0.1);
+
+      // Build key findings list
+      let keyFindings = '';
+      varResults.forEach(v => {
+        if (v.pValue < 0.05) {
+          const effect = v.coef >= 0 ? 'positive' : 'negative';
+          const effectDesc = v.coef >= 0 ? 'Higher values = higher yields' : 'Higher values = lower yields';
+          const noteText = v.coef < 0 ? ' <span style="color: #92400e; font-size: 0.75rem;">(Note: This may indicate high-${v.displayName} soils have other limiting factors, not that ${v.displayName} hurts yield)</span>' : '';
+          keyFindings += `<div style="padding: 0.5rem; background: #f0fdf4; border-left: 3px solid #22c55e; margin-bottom: 0.5rem; border-radius: 0 0.25rem 0.25rem 0;">
+            <strong style="color: #166534;">${v.displayName}</strong> <span style="color: #166534;">(${v.sig})</span> - Strong ${effect} effect. ${effectDesc}.${v.coef < 0 ? noteText : ''}
+          </div>`;
+        } else if (v.pValue < 0.1) {
+          keyFindings += `<div style="padding: 0.5rem; background: #fefce8; border-left: 3px solid #eab308; margin-bottom: 0.5rem; border-radius: 0 0.25rem 0.25rem 0;">
+            <strong style="color: #a16207;">${v.displayName}</strong> <span style="color: #a16207;">(.)</span> - Marginal effect. May be meaningful but not conclusive.
+          </div>`;
+        }
+      });
+
+      const notSigVars = varResults.filter(v => v.pValue >= 0.1).map(v => v.displayName).join(', ');
+      if (notSigVars) {
+        keyFindings += `<div style="padding: 0.5rem; background: #f8fafc; border-left: 3px solid #94a3b8; margin-bottom: 0.5rem; border-radius: 0 0.25rem 0.25rem 0; color: #64748b;">
+          <strong>${notSigVars}</strong> - Not significant in this model when other nutrients are considered.
+        </div>`;
+      }
+
+      // Significance bar chart
+      let barChart = '<div style="margin-top: 1rem;"><strong style="font-size: 0.85rem;">Variable Significance:</strong>';
+      barChart += '<div style="margin-top: 0.5rem;">';
+      varResults.forEach(v => {
+        const maxWidth = 200;
+        // Use -log10(pValue) for bar width, capped at 4 (-log10(0.0001))
+        const logP = Math.min(-Math.log10(Math.max(v.pValue, 0.0001)), 4);
+        const width = (logP / 4) * maxWidth;
+        const barColor = v.pValue < 0.05 ? (v.coef >= 0 ? '#22c55e' : '#ef4444') : v.pValue < 0.1 ? '#eab308' : '#cbd5e1';
+        const textColor = v.pValue < 0.05 ? '#166534' : v.pValue < 0.1 ? '#a16207' : '#64748b';
+        barChart += `
+          <div style="display: flex; align-items: center; margin-bottom: 0.375rem; gap: 0.5rem;">
+            <div style="width: 80px; font-size: 0.75rem; color: ${textColor}; text-align: right;">${v.displayName}</div>
+            <div style="flex: 1; background: #f1f5f9; border-radius: 0.25rem; height: 20px; position: relative; max-width: ${maxWidth}px;">
+              <div style="width: ${width}px; height: 100%; background: ${barColor}; border-radius: 0.25rem;"></div>
+            </div>
+            <div style="font-size: 0.7rem; color: ${textColor}; width: 40px;">${v.sig || 'n.s.'}</div>
+          </div>`;
+      });
+      barChart += '</div></div>';
+
+      // Interpretation section
+      const interp = document.getElementById('multiInterpretation');
+      interp.innerHTML = `
+        <div style="margin-bottom: 1rem; padding: 1rem; background: #f8fafc; border-radius: 0.5rem;">
+          <h4 style="margin: 0 0 0.75rem 0; color: #1e293b; font-size: 1rem;">What This Means</h4>
+          <p style="margin: 0 0 0.75rem 0; color: #475569; font-size: 0.875rem;">
+            This model explains <strong>${r2Pct}%</strong> of yield variation using soil nutrients.
+            The remaining <strong>${remainingPct}%</strong> is due to other factors (weather, genetics, management, soil properties not measured, etc.).
+          </p>
+          ${sigVars.length > 0 ? `
+            <h5 style="margin: 0 0 0.5rem 0; color: #1e293b; font-size: 0.9rem;">Key Findings:</h5>
+            ${keyFindings}
+          ` : `
+            <div style="padding: 0.75rem; background: #fef3c7; border-radius: 0.375rem; color: #92400e;">
+              <strong>No significant relationships found.</strong> This doesn't mean nutrients don't matter - it may mean:
+              <ul style="margin: 0.5rem 0 0 1rem; padding: 0;">
+                <li>Sample size may be too small to detect effects</li>
+                <li>Other factors are more important in this dataset</li>
+                <li>Nutrient levels may not vary enough to show effect</li>
+              </ul>
+            </div>
+          `}
+          ${barChart}
+          <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0;">
+            <strong style="font-size: 0.8rem; color: #64748b;">How to read the table below:</strong>
+            <ul style="margin: 0.25rem 0 0 1rem; padding: 0; font-size: 0.75rem; color: #64748b;">
+              <li><strong>Coefficient:</strong> Yield change (bu/ac) for each 1-unit increase in that nutrient</li>
+              <li><strong>p-value:</strong> Lower = more confident the effect is real (&lt;0.05 = significant)</li>
+              <li><strong>Sig:</strong> *** = very strong, ** = strong, * = moderate, . = marginal, - = not significant</li>
+            </ul>
+          </div>
+        </div>
+      `;
+
       // Coefficients Table
       const tbody = document.getElementById('multiCoeffBody');
       tbody.innerHTML = model.vars.map((v, i) => {
@@ -3013,36 +3160,6 @@
           '<br><br>Consider removing one of the correlated variables for more reliable estimates.';
       } else {
         collinearDiv.style.display = 'none';
-      }
-
-      // Interpretation
-      const sigVars = model.vars.filter((v, i) => i > 0 && model.pValues[i] < 0.05);
-      const interp = document.getElementById('multiInterpretation');
-
-      if (sigVars.length === 0) {
-        interp.innerHTML = `
-          <p>No variables reached statistical significance (p < 0.05) in this model.</p>
-          <p>This could mean:</p>
-          <ul style="margin: 0.5rem 0; padding-left: 1.25rem;">
-            <li>The selected nutrients don't strongly predict yield in this dataset</li>
-            <li>The sample size may be too small to detect effects</li>
-            <li>Other factors not measured may be more important</li>
-          </ul>
-        `;
-      } else {
-        const examples = sigVars.slice(0, 3).map(v => {
-          const idx = model.vars.indexOf(v);
-          const coef = model.beta[idx];
-          const name = CONFIG.NUTRIENT_NAMES[v] || v;
-          const effect = coef >= 0 ? 'increases' : 'decreases';
-          return `<li><strong>${name}</strong>: A 1-unit increase in ${v} ${effect} yield by ${Math.abs(coef).toFixed(2)} bu/ac, holding other nutrients constant.</li>`;
-        }).join('');
-
-        interp.innerHTML = `
-          <p><strong>${sigVars.length} variable(s)</strong> significantly predict yield:</p>
-          <ul style="margin: 0.5rem 0; padding-left: 1.25rem;">${examples}</ul>
-          <p style="margin-top: 0.5rem;">The model explains <strong>${(model.R2 * 100).toFixed(1)}%</strong> of yield variation. The remaining ${(100 - model.R2 * 100).toFixed(1)}% is due to factors not in the model (weather, management, soil properties not measured, etc.).</p>
-        `;
       }
 
       // Setup predictor inputs
