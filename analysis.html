@@ -243,9 +243,9 @@
           </select>
         </div>
         <div class="control-group" style="display: flex; align-items: center; gap: 0.5rem;">
-          <label style="margin: 0; white-space: nowrap;">Normalize by Field</label>
           <input type="checkbox" id="yieldNormalizeToggle" style="width: 18px; height: 18px; cursor: pointer;" title="Convert yield to % of field average to isolate nutrient effect from field productivity">
-          <span onclick="toggleNormalizeInfo()" style="cursor: pointer; font-size: 1rem; color: #3b82f6;" title="Learn about normalization">ℹ️</span>
+          <label style="margin: 0; white-space: nowrap;">Normalize by Field</label>
+          <span onclick="toggleNormalizeInfo()" style="cursor: pointer; font-size: 1rem; color: #3b82f6; margin-left: -0.25rem;" title="Learn about normalization">ℹ️</span>
         </div>
         <button onclick="exportYieldCorrelation()" class="export-btn">📄 Export Report</button>
       </div>
@@ -484,8 +484,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.21";
-    const BUILD_DATE = "2026-01-15T08:07:00";
+    const APP_VERSION = "v1.0.22";
+    const BUILD_DATE = "2026-01-15T08:09:46";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -721,8 +721,7 @@
 
       // Spatial Change Analysis selectors
       const spatialFieldSel = document.getElementById('spatialFieldSelect');
-      spatialFieldSel.innerHTML = '<option value="">-- Select Field --</option>';
-      spatialFieldSel.innerHTML += '<option value="__all__">All Fields (Operation-Wide)</option>';
+      spatialFieldSel.innerHTML = '<option value="__all__">All Fields (Operation-Wide)</option>';
       fields.forEach(f => { spatialFieldSel.innerHTML += `<option value="${f}">${f}</option>`; });
 
       // Default to All Fields (Operation-Wide)
