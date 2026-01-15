@@ -30,6 +30,17 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 - **Lab-specific aliases**: Added Midwest Labs column names (WpH, BpH, AA K, DTPA-Zn, etc.)
 - **Clearer mapping UI**: Instructions and hints clarify which dropdown is standard vs CSV
 
+### Shapefile Attribute Mapping
+- **New mapping interface**: Preview and map shapefile attributes before importing
+- **Summary bar**: Shows sample count and number of attributes found
+- **Two-step wizard**: Map Attributes → Preview & Import
+- **Auto-detection**: Automatically matches attributes using lab aliases (pH, P_M3, etc.)
+- **Preview values**: Shows sample values next to each dropdown (e.g., "6.2, 6.8, 7.1...")
+- **Unmapped attributes**: Yellow chips show which attributes aren't mapped to standard fields
+- **Data preview table**: Review first 5 rows with mapped data before importing
+- **Geometry extraction**: Lat/Lon automatically extracted from point coordinates
+- **Save aliases**: Option to save new mappings for future imports
+
 ---
 
 ## [v1.0.27] - January 15, 2026
