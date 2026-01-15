@@ -290,7 +290,22 @@
         </div>
       </div>
 
-      <div id="yieldContent">
+      <!-- Sub-tabs for Yield Correlation -->
+      <div class="yield-subtabs" style="display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem;">
+        <button class="yield-subtab active" data-subtab="single" onclick="switchYieldSubtab('single')" style="padding: 0.5rem 1rem; border: none; background: #3b82f6; color: white; border-radius: 0.375rem 0.375rem 0 0; font-weight: 500; cursor: pointer;">
+          📊 Individual Correlations
+        </button>
+        <button class="yield-subtab" data-subtab="multi" onclick="switchYieldSubtab('multi')" style="padding: 0.5rem 1rem; border: none; background: #f1f5f9; color: #64748b; border-radius: 0.375rem 0.375rem 0 0; font-weight: 500; cursor: pointer;">
+          🔬 Combined Model
+        </button>
+      </div>
+
+      <!-- Single Nutrient Tab Content -->
+      <div id="yieldSingleTab" class="yield-subtab-content">
+        <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 0.375rem; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem; color: #166534;">
+          <strong>Individual Correlations:</strong> Analyzes each nutrient separately. Shows how each nutrient relates to yield independently - useful for exploring individual relationships.
+        </div>
+        <div id="yieldContent">
         <div class="no-data">No yield data available. Import yield maps on the Import page to see correlations.</div>
       </div>
 
@@ -338,6 +353,93 @@
         <h4 style="margin: 0 0 1rem 0; color: #92400e;">Data Verification Report</h4>
         <div id="yieldDebugContent" style="font-family: monospace; font-size: 0.75rem; white-space: pre-wrap; color: #78350f; max-height: 500px; overflow-y: auto;"></div>
       </div>
+      </div><!-- End yieldSingleTab -->
+
+      <!-- Multivariate Model Tab Content -->
+      <div id="yieldMultiTab" class="yield-subtab-content" style="display: none;">
+        <div style="background: #eff6ff; border: 1px solid #93c5fd; border-radius: 0.375rem; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem; color: #1e40af;">
+          <strong>Combined Model:</strong> Multiple regression analyzes all nutrients together. Shows which nutrients significantly affect yield <em>after controlling for the others</em> - answers "What matters when everything is considered?"
+        </div>
+
+        <!-- Variable Selection -->
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h4 style="margin: 0; color: #1e293b; font-size: 0.95rem;">📋 Select Variables for Model</h4>
+            <div>
+              <button onclick="selectAllMultiVars()" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; background: white; cursor: pointer; margin-right: 0.25rem;">Select All</button>
+              <button onclick="selectCoreMultiVars()" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; background: white; cursor: pointer;">Core Only</button>
+            </div>
+          </div>
+          <div id="multiVarCheckboxes" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+          <div id="multiVarWarning" style="margin-top: 0.75rem; font-size: 0.8rem; color: #92400e;"></div>
+        </div>
+
+        <!-- Run Model Button -->
+        <div style="margin-bottom: 1rem;">
+          <button onclick="runMultivariateRegression()" style="padding: 0.75rem 1.5rem; background: #3b82f6; color: white; border: none; border-radius: 0.375rem; font-weight: 600; cursor: pointer; font-size: 0.95rem;">
+            🔬 Run Multivariate Regression
+          </button>
+        </div>
+
+        <!-- Model Results -->
+        <div id="multiModelResults" style="display: none;">
+          <!-- Model Summary -->
+          <div id="multiModelSummary" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #22c55e; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
+            <h4 style="margin: 0 0 0.75rem 0; color: #166534;">📊 Model Summary</h4>
+            <div id="multiSummaryContent" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;"></div>
+          </div>
+
+          <!-- Coefficients Table -->
+          <div style="background: white; border: 1px solid #e2e8f0; border-radius: 0.5rem; overflow: hidden; margin-bottom: 1rem;">
+            <div style="background: #f8fafc; padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0;">
+              <h4 style="margin: 0; color: #1e293b; font-size: 0.95rem;">📈 Regression Coefficients</h4>
+              <p style="margin: 0.25rem 0 0 0; font-size: 0.75rem; color: #64748b;">Each coefficient shows the nutrient's effect on yield while holding other nutrients constant</p>
+            </div>
+            <div style="overflow-x: auto;">
+              <table id="multiCoeffTable" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                <thead>
+                  <tr style="background: #f1f5f9;">
+                    <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e2e8f0;">Variable</th>
+                    <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #e2e8f0;">Coefficient</th>
+                    <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #e2e8f0;">Std Error</th>
+                    <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #e2e8f0;">t-value</th>
+                    <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #e2e8f0;">p-value</th>
+                    <th style="padding: 0.75rem; text-align: center; border-bottom: 2px solid #e2e8f0;">Sig.</th>
+                  </tr>
+                </thead>
+                <tbody id="multiCoeffBody"></tbody>
+              </table>
+            </div>
+            <div style="padding: 0.5rem 1rem; background: #f8fafc; font-size: 0.75rem; color: #64748b;">
+              Significance: *** p < 0.001, ** p < 0.01, * p < 0.05, . p < 0.1
+            </div>
+          </div>
+
+          <!-- Collinearity Warning -->
+          <div id="multiCollinearityWarning" style="display: none; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
+            <h4 style="margin: 0 0 0.5rem 0; color: #92400e; font-size: 0.9rem;">⚠️ Collinearity Warning</h4>
+            <p style="margin: 0 0 0.5rem 0; font-size: 0.8rem; color: #78350f;">Some variables are highly correlated with each other, which can make coefficient estimates unreliable.</p>
+            <div id="collinearityDetails" style="font-size: 0.8rem; color: #78350f;"></div>
+          </div>
+
+          <!-- Interpretation Help -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
+            <h4 style="margin: 0 0 0.75rem 0; color: #1e293b; font-size: 0.9rem;">💡 How to Interpret</h4>
+            <div id="multiInterpretation" style="font-size: 0.8rem; color: #475569;"></div>
+          </div>
+
+          <!-- Yield Predictor -->
+          <div style="background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); border: 2px solid #a855f7; border-radius: 0.5rem; padding: 1rem;">
+            <h4 style="margin: 0 0 0.75rem 0; color: #7c3aed; font-size: 0.95rem;">🎯 Yield Predictor</h4>
+            <p style="margin: 0 0 0.75rem 0; font-size: 0.8rem; color: #6b21a8;">Enter nutrient values to predict yield based on the model.</p>
+            <div id="predictorInputs" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.75rem; margin-bottom: 0.75rem;"></div>
+            <button onclick="predictYield()" style="padding: 0.5rem 1rem; background: #a855f7; color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-weight: 500;">
+              Predict Yield
+            </button>
+            <div id="predictionResult" style="margin-top: 0.75rem; padding: 0.75rem; background: white; border-radius: 0.375rem; display: none;"></div>
+          </div>
+        </div>
+      </div><!-- End yieldMultiTab -->
     </div>
 
     <!-- Tab: Spatial Change Analysis -->
@@ -382,8 +484,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.18";
-    const BUILD_DATE = "2026-01-15T07:21:29";
+    const APP_VERSION = "v1.0.19";
+    const BUILD_DATE = "2026-01-15T07:26:15";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -2480,6 +2582,498 @@
     function toggleNormalizeInfo() {
       const box = document.getElementById('normalizeInfoBox');
       box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    }
+
+    // ========== MULTIVARIATE REGRESSION ==========
+    let lastMultiModel = null;
+    const CORE_NUTRIENTS = ['P', 'K', 'pH', 'OM'];
+
+    // Switch between yield correlation sub-tabs
+    function switchYieldSubtab(tab) {
+      // Update tab buttons
+      document.querySelectorAll('.yield-subtab').forEach(btn => {
+        if (btn.dataset.subtab === tab) {
+          btn.style.background = '#3b82f6';
+          btn.style.color = 'white';
+          btn.classList.add('active');
+        } else {
+          btn.style.background = '#f1f5f9';
+          btn.style.color = '#64748b';
+          btn.classList.remove('active');
+        }
+      });
+
+      // Show/hide content
+      document.getElementById('yieldSingleTab').style.display = tab === 'single' ? 'block' : 'none';
+      document.getElementById('yieldMultiTab').style.display = tab === 'multi' ? 'block' : 'none';
+
+      // Initialize multivariate tab if switching to it
+      if (tab === 'multi') {
+        initMultiVariableCheckboxes();
+      }
+    }
+
+    // Initialize checkboxes for variable selection in multivariate model
+    function initMultiVariableCheckboxes() {
+      const container = document.getElementById('multiVarCheckboxes');
+      const nutrients = CONFIG.NUTRIENTS.filter(n => {
+        const vis = JSON.parse(localStorage.getItem('nutrientVisibility') || '{}');
+        return vis[n] !== false;
+      });
+
+      container.innerHTML = nutrients.map(n => {
+        const checked = CORE_NUTRIENTS.includes(n) ? 'checked' : '';
+        return `
+          <label style="display: flex; align-items: center; gap: 0.25rem; padding: 0.375rem 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.375rem; cursor: pointer; font-size: 0.8rem;">
+            <input type="checkbox" class="multi-var-checkbox" value="${n}" ${checked} onchange="updateMultiVarWarning()">
+            ${CONFIG.NUTRIENT_NAMES[n] || n}
+          </label>
+        `;
+      }).join('');
+
+      updateMultiVarWarning();
+    }
+
+    function selectAllMultiVars() {
+      document.querySelectorAll('.multi-var-checkbox').forEach(cb => cb.checked = true);
+      updateMultiVarWarning();
+    }
+
+    function selectCoreMultiVars() {
+      document.querySelectorAll('.multi-var-checkbox').forEach(cb => {
+        cb.checked = CORE_NUTRIENTS.includes(cb.value);
+      });
+      updateMultiVarWarning();
+    }
+
+    function updateMultiVarWarning() {
+      const selected = document.querySelectorAll('.multi-var-checkbox:checked').length;
+      const dataPoints = getYieldDataPoints();
+      const n = dataPoints.length;
+      const warningDiv = document.getElementById('multiVarWarning');
+
+      if (n === 0) {
+        warningDiv.innerHTML = '<span style="color: #dc2626;">⚠️ No data available. Check your filter selections.</span>';
+      } else if (selected === 0) {
+        warningDiv.innerHTML = '<span style="color: #dc2626;">⚠️ Select at least one variable.</span>';
+      } else if (n < selected * 10) {
+        warningDiv.innerHTML = `<span style="color: #f59e0b;">⚠️ Sample size warning: You have ${n} data points and ${selected} variables. Rule of thumb: need at least 10 observations per variable (${selected * 10} recommended).</span>`;
+      } else {
+        warningDiv.innerHTML = `<span style="color: #166534;">✓ ${n} data points, ${selected} variables selected. Good sample size.</span>`;
+      }
+    }
+
+    // Matrix operations for regression
+    function matrixMultiply(A, B) {
+      const rowsA = A.length, colsA = A[0].length, colsB = B[0].length;
+      const result = Array(rowsA).fill().map(() => Array(colsB).fill(0));
+      for (let i = 0; i < rowsA; i++) {
+        for (let j = 0; j < colsB; j++) {
+          for (let k = 0; k < colsA; k++) {
+            result[i][j] += A[i][k] * B[k][j];
+          }
+        }
+      }
+      return result;
+    }
+
+    function matrixTranspose(A) {
+      return A[0].map((_, i) => A.map(row => row[i]));
+    }
+
+    function matrixInverse(A) {
+      const n = A.length;
+      const augmented = A.map((row, i) => [...row, ...Array(n).fill(0).map((_, j) => i === j ? 1 : 0)]);
+
+      // Gaussian elimination with partial pivoting
+      for (let i = 0; i < n; i++) {
+        // Find pivot
+        let maxRow = i;
+        for (let k = i + 1; k < n; k++) {
+          if (Math.abs(augmented[k][i]) > Math.abs(augmented[maxRow][i])) maxRow = k;
+        }
+        [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
+
+        if (Math.abs(augmented[i][i]) < 1e-10) {
+          throw new Error('Matrix is singular');
+        }
+
+        // Scale row
+        const scale = augmented[i][i];
+        for (let j = 0; j < 2 * n; j++) augmented[i][j] /= scale;
+
+        // Eliminate column
+        for (let k = 0; k < n; k++) {
+          if (k !== i) {
+            const factor = augmented[k][i];
+            for (let j = 0; j < 2 * n; j++) augmented[k][j] -= factor * augmented[i][j];
+          }
+        }
+      }
+
+      return augmented.map(row => row.slice(n));
+    }
+
+    // t-distribution CDF approximation for p-values
+    function tCDF(t, df) {
+      // Approximation using the incomplete beta function
+      const x = df / (df + t * t);
+      const a = df / 2;
+      const b = 0.5;
+
+      // Simple approximation for large df
+      if (df > 100) {
+        // Use normal approximation
+        return 0.5 * (1 + erf(t / Math.sqrt(2)));
+      }
+
+      // Incomplete beta function approximation
+      let result = Math.pow(x, a) * Math.pow(1 - x, b) / (a * beta(a, b));
+      return t > 0 ? 1 - result / 2 : result / 2;
+    }
+
+    function erf(x) {
+      const a1 =  0.254829592, a2 = -0.284496736, a3 =  1.421413741;
+      const a4 = -1.453152027, a5 =  1.061405429, p  =  0.3275911;
+      const sign = x < 0 ? -1 : 1;
+      x = Math.abs(x);
+      const t = 1 / (1 + p * x);
+      const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+      return sign * y;
+    }
+
+    function beta(a, b) {
+      return Math.exp(lnGamma(a) + lnGamma(b) - lnGamma(a + b));
+    }
+
+    function lnGamma(x) {
+      const cof = [76.18009172947146, -86.50532032941677, 24.01409824083091,
+                   -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+      let y = x, tmp = x + 5.5;
+      tmp -= (x + 0.5) * Math.log(tmp);
+      let ser = 1.000000000190015;
+      for (let j = 0; j < 6; j++) ser += cof[j] / ++y;
+      return -tmp + Math.log(2.5066282746310005 * ser / x);
+    }
+
+    // Calculate p-value from t-statistic
+    function pValueFromT(t, df) {
+      // Two-tailed test
+      const absT = Math.abs(t);
+      // Approximation for p-value
+      if (df > 100) {
+        // Normal approximation
+        return 2 * (1 - 0.5 * (1 + erf(absT / Math.sqrt(2))));
+      }
+      // Use t-distribution approximation
+      const x = df / (df + absT * absT);
+      return x; // Simplified - would need proper beta function for accuracy
+    }
+
+    // Simple but more accurate p-value calculation
+    function calculatePValue(t, df) {
+      // Using normal approximation for simplicity (good for df > 30)
+      const absT = Math.abs(t);
+      const p = 2 * (1 - normalCDF(absT));
+      return Math.max(0.0001, Math.min(0.9999, p));
+    }
+
+    function normalCDF(x) {
+      return 0.5 * (1 + erf(x / Math.sqrt(2)));
+    }
+
+    // Run multiple linear regression
+    function runMultivariateRegression() {
+      const selectedVars = Array.from(document.querySelectorAll('.multi-var-checkbox:checked')).map(cb => cb.value);
+
+      if (selectedVars.length === 0) {
+        showStatus('Select at least one variable', false);
+        return;
+      }
+
+      const dataPoints = getYieldDataPoints();
+      if (dataPoints.length < selectedVars.length + 2) {
+        showStatus('Not enough data points for regression', false);
+        return;
+      }
+
+      // Build X matrix (with intercept) and Y vector
+      const n = dataPoints.length;
+      const p = selectedVars.length + 1; // +1 for intercept
+
+      const X = [];
+      const Y = [];
+      const validRows = [];
+
+      dataPoints.forEach((dp, idx) => {
+        const row = [1]; // Intercept
+        let valid = true;
+
+        selectedVars.forEach(v => {
+          const val = parseFloat(dp[v]);
+          if (isNaN(val) || val === 0) valid = false;
+          row.push(val);
+        });
+
+        if (valid && dp.avgYield && !isNaN(dp.avgYield)) {
+          X.push(row);
+          Y.push([dp.avgYield]);
+          validRows.push(idx);
+        }
+      });
+
+      if (X.length < p + 1) {
+        showStatus('Not enough valid data points after filtering missing values', false);
+        return;
+      }
+
+      try {
+        // Calculate regression: β = (X'X)^(-1) X'Y
+        const Xt = matrixTranspose(X);
+        const XtX = matrixMultiply(Xt, X);
+        const XtXinv = matrixInverse(XtX);
+        const XtY = matrixMultiply(Xt, Y);
+        const beta = matrixMultiply(XtXinv, XtY);
+
+        // Calculate predictions and residuals
+        const Yhat = matrixMultiply(X, beta);
+        const residuals = Y.map((y, i) => y[0] - Yhat[i][0]);
+
+        // Calculate statistics
+        const yMean = Y.reduce((sum, y) => sum + y[0], 0) / Y.length;
+        const SST = Y.reduce((sum, y) => sum + Math.pow(y[0] - yMean, 2), 0);
+        const SSE = residuals.reduce((sum, r) => sum + r * r, 0);
+        const SSR = SST - SSE;
+
+        const R2 = 1 - SSE / SST;
+        const adjR2 = 1 - (1 - R2) * (n - 1) / (n - p);
+        const MSE = SSE / (X.length - p);
+        const RMSE = Math.sqrt(MSE);
+
+        // F-statistic
+        const MSR = SSR / (p - 1);
+        const Fstat = MSR / MSE;
+
+        // Standard errors of coefficients
+        const varBeta = XtXinv.map(row => row.map(val => val * MSE));
+        const seBeta = varBeta.map((row, i) => Math.sqrt(Math.max(0, row[i])));
+
+        // t-statistics and p-values
+        const tStats = beta.map((b, i) => seBeta[i] > 0 ? b[0] / seBeta[i] : 0);
+        const pValues = tStats.map(t => calculatePValue(t, X.length - p));
+
+        // Store model for predictions
+        lastMultiModel = {
+          beta: beta.map(b => b[0]),
+          vars: ['Intercept', ...selectedVars],
+          seBeta,
+          tStats,
+          pValues,
+          R2,
+          adjR2,
+          Fstat,
+          RMSE,
+          n: X.length,
+          p: p
+        };
+
+        // Calculate VIF for collinearity check
+        const vifs = calculateVIF(X, selectedVars);
+
+        // Display results
+        displayMultiResults(lastMultiModel, vifs);
+
+      } catch (e) {
+        console.error('Regression error:', e);
+        showStatus('Regression failed: ' + e.message, false);
+      }
+    }
+
+    // Calculate Variance Inflation Factor for collinearity detection
+    function calculateVIF(X, vars) {
+      const vifs = {};
+
+      // Skip intercept column
+      for (let j = 1; j < X[0].length; j++) {
+        // Regress Xj on all other X variables
+        const y = X.map(row => row[j]);
+        const otherX = X.map(row => [1, ...row.slice(1, j), ...row.slice(j + 1)]);
+
+        try {
+          const Xt = matrixTranspose(otherX);
+          const XtX = matrixMultiply(Xt, otherX);
+          const XtXinv = matrixInverse(XtX);
+          const Xty = matrixMultiply(Xt, y.map(v => [v]));
+          const b = matrixMultiply(XtXinv, Xty);
+
+          // Calculate R² for this regression
+          const yhat = otherX.map(row => row.reduce((sum, x, i) => sum + x * b[i][0], 0));
+          const yMean = y.reduce((a, b) => a + b, 0) / y.length;
+          const SST = y.reduce((sum, yi) => sum + Math.pow(yi - yMean, 2), 0);
+          const SSE = y.reduce((sum, yi, i) => sum + Math.pow(yi - yhat[i], 2), 0);
+          const R2 = 1 - SSE / SST;
+
+          vifs[vars[j - 1]] = 1 / (1 - R2);
+        } catch (e) {
+          vifs[vars[j - 1]] = Infinity;
+        }
+      }
+
+      return vifs;
+    }
+
+    // Display multivariate regression results
+    function displayMultiResults(model, vifs) {
+      document.getElementById('multiModelResults').style.display = 'block';
+
+      // Model Summary
+      const summaryHtml = `
+        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem;">
+          <div style="font-size: 1.5rem; font-weight: 700; color: #166534;">${(model.R2 * 100).toFixed(1)}%</div>
+          <div style="font-size: 0.75rem; color: #64748b;">R² (Variance Explained)</div>
+        </div>
+        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem;">
+          <div style="font-size: 1.5rem; font-weight: 700; color: #1e40af;">${(model.adjR2 * 100).toFixed(1)}%</div>
+          <div style="font-size: 0.75rem; color: #64748b;">Adjusted R²</div>
+        </div>
+        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem;">
+          <div style="font-size: 1.5rem; font-weight: 700; color: #7c3aed;">${model.Fstat.toFixed(2)}</div>
+          <div style="font-size: 0.75rem; color: #64748b;">F-statistic</div>
+        </div>
+        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem;">
+          <div style="font-size: 1.5rem; font-weight: 700; color: #475569;">${model.n}</div>
+          <div style="font-size: 0.75rem; color: #64748b;">Observations</div>
+        </div>
+      `;
+      document.getElementById('multiSummaryContent').innerHTML = summaryHtml;
+
+      // Coefficients Table
+      const tbody = document.getElementById('multiCoeffBody');
+      tbody.innerHTML = model.vars.map((v, i) => {
+        const coef = model.beta[i];
+        const se = model.seBeta[i];
+        const t = model.tStats[i];
+        const p = model.pValues[i];
+        const sig = p < 0.001 ? '***' : p < 0.01 ? '**' : p < 0.05 ? '*' : p < 0.1 ? '.' : '';
+        const sigColor = p < 0.05 ? '#166534' : p < 0.1 ? '#ca8a04' : '#64748b';
+        const bgColor = p < 0.05 ? '#f0fdf4' : '';
+
+        return `
+          <tr style="background: ${bgColor};">
+            <td style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; font-weight: 500;">${v === 'Intercept' ? '(Intercept)' : CONFIG.NUTRIENT_NAMES[v] || v}</td>
+            <td style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: right; font-family: monospace;">${coef >= 0 ? '+' : ''}${coef.toFixed(4)}</td>
+            <td style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: right; font-family: monospace;">${se.toFixed(4)}</td>
+            <td style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: right; font-family: monospace;">${t.toFixed(3)}</td>
+            <td style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: right; font-family: monospace;">${p < 0.0001 ? '<0.0001' : p.toFixed(4)}</td>
+            <td style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: center; font-weight: 700; color: ${sigColor};">${sig || '-'}</td>
+          </tr>
+        `;
+      }).join('');
+
+      // Collinearity warning
+      const highVIF = Object.entries(vifs).filter(([k, v]) => v > 5);
+      const collinearDiv = document.getElementById('multiCollinearityWarning');
+      if (highVIF.length > 0) {
+        collinearDiv.style.display = 'block';
+        document.getElementById('collinearityDetails').innerHTML =
+          '<strong>High VIF values (>5):</strong><br>' +
+          highVIF.map(([k, v]) => `• ${CONFIG.NUTRIENT_NAMES[k] || k}: VIF = ${v.toFixed(2)}`).join('<br>') +
+          '<br><br>Consider removing one of the correlated variables for more reliable estimates.';
+      } else {
+        collinearDiv.style.display = 'none';
+      }
+
+      // Interpretation
+      const sigVars = model.vars.filter((v, i) => i > 0 && model.pValues[i] < 0.05);
+      const interp = document.getElementById('multiInterpretation');
+
+      if (sigVars.length === 0) {
+        interp.innerHTML = `
+          <p>No variables reached statistical significance (p < 0.05) in this model.</p>
+          <p>This could mean:</p>
+          <ul style="margin: 0.5rem 0; padding-left: 1.25rem;">
+            <li>The selected nutrients don't strongly predict yield in this dataset</li>
+            <li>The sample size may be too small to detect effects</li>
+            <li>Other factors not measured may be more important</li>
+          </ul>
+        `;
+      } else {
+        const examples = sigVars.slice(0, 3).map(v => {
+          const idx = model.vars.indexOf(v);
+          const coef = model.beta[idx];
+          const name = CONFIG.NUTRIENT_NAMES[v] || v;
+          const effect = coef >= 0 ? 'increases' : 'decreases';
+          return `<li><strong>${name}</strong>: A 1-unit increase in ${v} ${effect} yield by ${Math.abs(coef).toFixed(2)} bu/ac, holding other nutrients constant.</li>`;
+        }).join('');
+
+        interp.innerHTML = `
+          <p><strong>${sigVars.length} variable(s)</strong> significantly predict yield:</p>
+          <ul style="margin: 0.5rem 0; padding-left: 1.25rem;">${examples}</ul>
+          <p style="margin-top: 0.5rem;">The model explains <strong>${(model.R2 * 100).toFixed(1)}%</strong> of yield variation. The remaining ${(100 - model.R2 * 100).toFixed(1)}% is due to factors not in the model (weather, management, soil properties not measured, etc.).</p>
+        `;
+      }
+
+      // Setup predictor inputs
+      const predictorDiv = document.getElementById('predictorInputs');
+      predictorDiv.innerHTML = model.vars.filter(v => v !== 'Intercept').map(v => {
+        const name = CONFIG.NUTRIENT_NAMES[v] || v;
+        return `
+          <div>
+            <label style="font-size: 0.7rem; color: #64748b; display: block;">${name}</label>
+            <input type="number" id="predict_${v}" placeholder="${v}" style="width: 100%; padding: 0.375rem; border: 1px solid #d8b4fe; border-radius: 0.25rem; font-size: 0.85rem;">
+          </div>
+        `;
+      }).join('');
+
+      showStatus('Regression complete', true);
+    }
+
+    // Predict yield from entered values
+    function predictYield() {
+      if (!lastMultiModel) {
+        showStatus('Run regression first', false);
+        return;
+      }
+
+      const values = [1]; // Intercept
+      let missing = [];
+
+      lastMultiModel.vars.forEach((v, i) => {
+        if (v === 'Intercept') return;
+        const input = document.getElementById(`predict_${v}`);
+        const val = parseFloat(input?.value);
+        if (isNaN(val)) {
+          missing.push(CONFIG.NUTRIENT_NAMES[v] || v);
+          values.push(0);
+        } else {
+          values.push(val);
+        }
+      });
+
+      if (missing.length > 0) {
+        showStatus(`Enter values for: ${missing.join(', ')}`, false);
+        return;
+      }
+
+      // Calculate prediction
+      let prediction = 0;
+      for (let i = 0; i < lastMultiModel.beta.length; i++) {
+        prediction += lastMultiModel.beta[i] * values[i];
+      }
+
+      // Simple confidence interval (rough approximation)
+      const se = lastMultiModel.RMSE;
+      const ci95 = 1.96 * se;
+
+      const resultDiv = document.getElementById('predictionResult');
+      resultDiv.style.display = 'block';
+      resultDiv.innerHTML = `
+        <div style="text-align: center;">
+          <div style="font-size: 1.5rem; font-weight: 700; color: #7c3aed;">${prediction.toFixed(1)} bu/ac</div>
+          <div style="font-size: 0.8rem; color: #64748b;">Predicted Yield</div>
+          <div style="font-size: 0.75rem; color: #a855f7; margin-top: 0.5rem;">95% CI: ${(prediction - ci95).toFixed(1)} – ${(prediction + ci95).toFixed(1)} bu/ac</div>
+        </div>
+      `;
     }
 
     // Toggle yield debug panel

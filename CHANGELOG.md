@@ -4,6 +4,25 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 
 ---
 
+## [v1.0.19] - January 15, 2026
+
+### Multivariate Regression Analysis
+- **New sub-tabs** on Yield Correlation page: "Individual Correlations" and "Combined Model"
+- **Multiple linear regression**: Analyzes all nutrients together to find which matter when controlling for others
+- **Model Summary**: Shows R², Adjusted R², F-statistic, and observation count
+- **Coefficients Table**: Displays coefficient, std error, t-value, p-value, and significance for each variable
+- **Variable Selection**: Choose which nutrients to include with Select All / Core Only buttons
+- **Sample Size Warning**: Alerts when sample size is too small for number of variables (n < 10 per variable)
+- **Collinearity Detection**: Shows VIF (Variance Inflation Factor) warnings when variables are highly correlated
+- **Yield Predictor**: Enter nutrient values to predict yield with 95% confidence interval
+- **Interpretation Help**: Explains which variables are significant and what the coefficients mean
+
+### Map - Mobile Improvements
+- Compare mode now desktop-only (hidden on mobile < 768px)
+- Mobile map keeps only essential controls: Field, Attribute, Year
+
+---
+
 ## [v1.0.17] - January 14, 2026
 
 ### Data Quality / Outlier Removal
