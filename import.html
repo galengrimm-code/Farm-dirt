@@ -415,28 +415,41 @@
 
         <!-- Step 1: Column Mapping -->
         <div id="csvMappingStep1" style="padding: 1rem;">
-          <p style="margin: 0 0 1rem 0; color: #475569; font-size: 0.875rem;">
-            Map your CSV columns to standard fields. Required fields are marked with <span style="color: #dc2626;">*</span>
-          </p>
+          <!-- Instructions -->
+          <div style="margin-bottom: 1rem; padding: 0.75rem; background: #eff6ff; border: 1px solid #93c5fd; border-radius: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <span style="font-size: 1.1rem;">📋</span>
+              <strong style="color: #1e40af;">How to map columns:</strong>
+            </div>
+            <div style="font-size: 0.8rem; color: #1e40af; display: flex; align-items: center; gap: 0.5rem;">
+              <span style="background: #dbeafe; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">Standard Field</span>
+              <span>←</span>
+              <span style="background: #e0e7ff; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">Select your CSV column</span>
+            </div>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.75rem; color: #64748b;">
+              For each field below, choose which column from your CSV contains that data. Leave as "(skip)" if not available.
+            </p>
+          </div>
 
           <!-- Required Fields -->
           <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
-            <h4 style="margin: 0 0 0.75rem 0; color: #991b1b; font-size: 0.9rem;">Required Fields</h4>
+            <h4 style="margin: 0 0 0.5rem 0; color: #991b1b; font-size: 0.9rem;">📍 Required Fields</h4>
+            <p style="margin: 0 0 0.75rem 0; font-size: 0.7rem; color: #991b1b;">Latitude and Longitude are required. Select the CSV column that contains each value.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;">
               <div class="csv-mapping-field">
-                <label style="font-size: 0.8rem; font-weight: 600; color: #dc2626;">Latitude *</label>
+                <label style="font-size: 0.8rem; font-weight: 600; color: #dc2626;">Latitude * <span style="font-weight: 400; color: #64748b;">← CSV column:</span></label>
                 <select id="csvMapLat" class="csv-map-select"></select>
               </div>
               <div class="csv-mapping-field">
-                <label style="font-size: 0.8rem; font-weight: 600; color: #dc2626;">Longitude *</label>
+                <label style="font-size: 0.8rem; font-weight: 600; color: #dc2626;">Longitude * <span style="font-weight: 400; color: #64748b;">← CSV column:</span></label>
                 <select id="csvMapLon" class="csv-map-select"></select>
               </div>
               <div class="csv-mapping-field">
-                <label style="font-size: 0.8rem; font-weight: 500;">Sample ID</label>
+                <label style="font-size: 0.8rem; font-weight: 500;">Sample ID <span style="font-weight: 400; color: #64748b;">← CSV column:</span></label>
                 <select id="csvMapSampleId" class="csv-map-select"></select>
               </div>
               <div class="csv-mapping-field">
-                <label style="font-size: 0.8rem; font-weight: 500;">Field Name</label>
+                <label style="font-size: 0.8rem; font-weight: 500;">Field Name <span style="font-weight: 400; color: #64748b;">← CSV column:</span></label>
                 <select id="csvMapField" class="csv-map-select"></select>
               </div>
             </div>
@@ -444,7 +457,8 @@
 
           <!-- Nutrient Fields -->
           <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 0.5rem; padding: 1rem;">
-            <h4 style="margin: 0 0 0.75rem 0; color: #166534; font-size: 0.9rem;">Nutrient Fields</h4>
+            <h4 style="margin: 0 0 0.5rem 0; color: #166534; font-size: 0.9rem;">🧪 Nutrient Fields</h4>
+            <p style="margin: 0 0 0.75rem 0; font-size: 0.7rem; color: #166534;">Match each nutrient to the corresponding column in your CSV. Dropdowns show your CSV column names.</p>
             <div id="csvNutrientMappings" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;"></div>
           </div>
 
@@ -518,8 +532,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.36";
-    const BUILD_DATE = "2026-01-15T11:52:10";
+    const APP_VERSION = "v1.0.37";
+    const BUILD_DATE = "2026-01-15T11:53:32";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -3425,8 +3439,8 @@
         const div = document.createElement('div');
         div.className = 'csv-mapping-field';
         div.innerHTML = `
-          <label style="font-size: 0.8rem; font-weight: 500;">${nutrient}</label>
-          <select id="csvMap${nutrient}" class="csv-map-select">${options}</select>
+          <label style="font-size: 0.8rem; font-weight: 600; color: #166534;">${nutrient}</label>
+          <select id="csvMap${nutrient}" class="csv-map-select" title="Select CSV column for ${nutrient}">${options}</select>
         `;
         nutrientContainer.appendChild(div);
       });
