@@ -232,15 +232,6 @@
               </div>
             </div>
             <div>
-              <label style="font-size: 0.75rem; font-weight: 600; color: #475569;">Yield % of Field Avg</label>
-              <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <input type="number" id="outlierYieldPctMin" value="50" style="width: 70px; padding: 0.375rem; border: 1px solid #cbd5e1; border-radius: 0.25rem;">
-                <span style="color: #64748b;">% to</span>
-                <input type="number" id="outlierYieldPctMax" value="175" style="width: 70px; padding: 0.375rem; border: 1px solid #cbd5e1; border-radius: 0.25rem;">
-                <span style="color: #64748b;">%</span>
-              </div>
-            </div>
-            <div>
               <label style="font-size: 0.75rem; font-weight: 600; color: #475569;">pH Range</label>
               <div style="display: flex; gap: 0.5rem; align-items: center;">
                 <input type="number" id="outlierPHMin" value="4.5" step="0.1" style="width: 70px; padding: 0.375rem; border: 1px solid #cbd5e1; border-radius: 0.25rem;">
@@ -377,8 +368,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.22";
-    const BUILD_DATE = "2026-01-15T08:09:46";
+    const APP_VERSION = "v1.0.23";
+    const BUILD_DATE = "2026-01-15T08:18:39";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -2682,8 +2673,6 @@
         const thresholds = JSON.parse(saved);
         if (thresholds.yieldMin) document.getElementById('outlierYieldMin').value = thresholds.yieldMin;
         if (thresholds.yieldMax) document.getElementById('outlierYieldMax').value = thresholds.yieldMax;
-        if (thresholds.yieldPctMin) document.getElementById('outlierYieldPctMin').value = thresholds.yieldPctMin;
-        if (thresholds.yieldPctMax) document.getElementById('outlierYieldPctMax').value = thresholds.yieldPctMax;
         if (thresholds.pHMin) document.getElementById('outlierPHMin').value = thresholds.pHMin;
         if (thresholds.pHMax) document.getElementById('outlierPHMax').value = thresholds.pHMax;
         if (thresholds.pMax) document.getElementById('outlierPMax').value = thresholds.pMax;
@@ -2697,8 +2686,6 @@
       const thresholds = {
         yieldMin: parseFloat(document.getElementById('outlierYieldMin').value),
         yieldMax: parseFloat(document.getElementById('outlierYieldMax').value),
-        yieldPctMin: parseFloat(document.getElementById('outlierYieldPctMin').value),
-        yieldPctMax: parseFloat(document.getElementById('outlierYieldPctMax').value),
         pHMin: parseFloat(document.getElementById('outlierPHMin').value),
         pHMax: parseFloat(document.getElementById('outlierPHMax').value),
         pMax: parseFloat(document.getElementById('outlierPMax').value),
@@ -2715,7 +2702,6 @@
       if (saved) return JSON.parse(saved);
       return {
         yieldMin: 50, yieldMax: 350,
-        yieldPctMin: 50, yieldPctMax: 175,
         pHMin: 4.5, pHMax: 8.5,
         pMax: 300, kMax: 800, cecMax: 50, omMax: 15
       };
@@ -2728,26 +2714,6 @@
 
       // Make sure we have data loaded
       await loadLocalData();
-
-      // Calculate field averages for yield % calculation
-      const fieldYieldAvgs = {};
-      sampleData.forEach(s => {
-        if (s.yieldInfo && Array.isArray(s.yieldInfo)) {
-          s.yieldInfo.forEach(yi => {
-            const field = s.field || 'Unknown';
-            const key = `${field}_${yi.crop}`;
-            if (!fieldYieldAvgs[key]) fieldYieldAvgs[key] = [];
-            if (yi.avgYield && yi.avgYield > 0) {
-              fieldYieldAvgs[key].push(yi.avgYield);
-            }
-          });
-        }
-      });
-      // Calculate averages
-      Object.keys(fieldYieldAvgs).forEach(key => {
-        const vals = fieldYieldAvgs[key];
-        fieldYieldAvgs[key] = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-      });
 
       // Scan soil samples for nutrient outliers
       sampleData.forEach((sample, index) => {
@@ -2882,40 +2848,6 @@
                 value: avgYield.toFixed(1) + ' bu/ac',
                 crop: yi.crop
               });
-            }
-
-            // Percentage of field average check
-            const key = `${field}_${yi.crop}`;
-            const fieldAvg = fieldYieldAvgs[key];
-            if (fieldAvg && fieldAvg > 0) {
-              const pct = (avgYield / fieldAvg) * 100;
-              if (pct < thresholds.yieldPctMin) {
-                detectedOutliers.push({
-                  type: 'yield',
-                  sampleIndex: index,
-                  yieldIndex: yiIndex,
-                  field,
-                  year: yi.year || 'N/A',
-                  sampleId,
-                  dataType: `Yield (${yi.crop || 'unknown'})`,
-                  issue: 'Yield % too low',
-                  value: pct.toFixed(0) + '% of field avg',
-                  crop: yi.crop
-                });
-              } else if (pct > thresholds.yieldPctMax) {
-                detectedOutliers.push({
-                  type: 'yield',
-                  sampleIndex: index,
-                  yieldIndex: yiIndex,
-                  field,
-                  year: yi.year || 'N/A',
-                  sampleId,
-                  dataType: `Yield (${yi.crop || 'unknown'})`,
-                  issue: 'Yield % too high',
-                  value: pct.toFixed(0) + '% of field avg',
-                  crop: yi.crop
-                });
-              }
             }
           });
         }

@@ -484,8 +484,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.22";
-    const BUILD_DATE = "2026-01-15T08:09:46";
+    const APP_VERSION = "v1.0.23";
+    const BUILD_DATE = "2026-01-15T08:18:39";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -830,11 +830,24 @@
       document.getElementById('yieldCropSelect').addEventListener('change', () => {
         updateYieldFieldSelector();
         updateYieldAnalysis();
+        resetMultiModel();
       });
-      document.getElementById('yieldYearSelect').addEventListener('change', updateYieldAnalysis);
-      document.getElementById('soilYearSelect').addEventListener('change', updateYieldAnalysis);
-      document.getElementById('yieldFieldSelect').addEventListener('change', updateYieldAnalysis);
-      document.getElementById('yieldNormalizeToggle').addEventListener('change', updateYieldAnalysis);
+      document.getElementById('yieldYearSelect').addEventListener('change', () => {
+        updateYieldAnalysis();
+        resetMultiModel();
+      });
+      document.getElementById('soilYearSelect').addEventListener('change', () => {
+        updateYieldAnalysis();
+        resetMultiModel();
+      });
+      document.getElementById('yieldFieldSelect').addEventListener('change', () => {
+        updateYieldAnalysis();
+        resetMultiModel();
+      });
+      document.getElementById('yieldNormalizeToggle').addEventListener('change', () => {
+        updateYieldAnalysis();
+        resetMultiModel();
+      });
       // Spatial Change Analysis listeners
       document.getElementById('spatialFieldSelect').addEventListener('change', (e) => {
         updateSpatialYearSelectors(e.target.value);
@@ -2614,6 +2627,22 @@
       }
     }
 
+    // Reset multivariate model when data filters change
+    function resetMultiModel() {
+      const resultsDiv = document.getElementById('multiModelResults');
+      if (resultsDiv && resultsDiv.style.display !== 'none') {
+        resultsDiv.style.display = 'none';
+        // Show message that filters changed
+        const warningDiv = document.getElementById('multiVarWarning');
+        if (warningDiv) {
+          const dataPoints = getYieldDataPoints();
+          warningDiv.innerHTML = `<span style="color: #0369a1;">ℹ️ Data filters changed. ${dataPoints.length} data points available. Click "Run Multivariate Regression" to update results.</span>`;
+        }
+      }
+      // Also update warning to show current data point count
+      updateMultiVarWarning();
+    }
+
     // Initialize checkboxes for variable selection in multivariate model
     function initMultiVariableCheckboxes() {
       const container = document.getElementById('multiVarCheckboxes');
@@ -2652,15 +2681,17 @@
       const dataPoints = getYieldDataPoints();
       const n = dataPoints.length;
       const warningDiv = document.getElementById('multiVarWarning');
+      const crop = document.getElementById('yieldCropSelect').value;
+      const cropLabel = crop === 'all' ? 'all crops' : crop;
 
       if (n === 0) {
-        warningDiv.innerHTML = '<span style="color: #dc2626;">⚠️ No data available. Check your filter selections.</span>';
+        warningDiv.innerHTML = `<span style="color: #dc2626;">⚠️ No data available for ${cropLabel}. Check your filter selections.</span>`;
       } else if (selected === 0) {
-        warningDiv.innerHTML = '<span style="color: #dc2626;">⚠️ Select at least one variable.</span>';
+        warningDiv.innerHTML = `<span style="color: #dc2626;">⚠️ ${n} data points for ${cropLabel}. Select at least one variable.</span>`;
       } else if (n < selected * 10) {
-        warningDiv.innerHTML = `<span style="color: #f59e0b;">⚠️ Sample size warning: You have ${n} data points and ${selected} variables. Rule of thumb: need at least 10 observations per variable (${selected * 10} recommended).</span>`;
+        warningDiv.innerHTML = `<span style="color: #f59e0b;">⚠️ ${n} data points for ${cropLabel}, ${selected} variables. Sample size warning: need ~${selected * 10} for reliable results.</span>`;
       } else {
-        warningDiv.innerHTML = `<span style="color: #166534;">✓ ${n} data points, ${selected} variables selected. Good sample size.</span>`;
+        warningDiv.innerHTML = `<span style="color: #166534;">✓ ${n} data points for ${cropLabel}, ${selected} variables selected. Good sample size.</span>`;
       }
     }
 
