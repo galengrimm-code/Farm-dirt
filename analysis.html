@@ -527,8 +527,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.30";
-    const BUILD_DATE = "2026-01-15T11:09:09";
+    const APP_VERSION = "v1.0.31";
+    const BUILD_DATE = "2026-01-15T11:28:17";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -860,6 +860,11 @@
           document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
           tab.classList.add('active');
           document.getElementById(tab.dataset.tab).classList.add('active');
+
+          // Auto-run analysis when switching to spatial tab
+          if (tab.dataset.tab === 'spatial') {
+            updateSpatialAnalysis();
+          }
         });
       });
     }
