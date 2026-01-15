@@ -41,6 +41,18 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 - **Geometry extraction**: Lat/Lon automatically extracted from point coordinates
 - **Save aliases**: Option to save new mappings for future imports
 
+### Field Management
+- **New "Manage Field Boundaries" section** on Import page
+- **Field table**: Shows field name, acres, sample count, year range for each field
+- **Visual indicators**: Fields with no samples highlighted in yellow with badge
+- **Edit/Rename**: Click Edit to rename boundary AND update all associated samples
+- **Delete with options**: Three deletion modes:
+  - Delete boundary only (samples become "Unassigned")
+  - Delete boundary AND all soil samples
+  - Delete boundary and reassign samples to nearest field by GPS
+- **Acre calculation**: Computes field size from boundary polygon coordinates
+- **Summary bar**: Total fields, total acres, total samples
+
 ---
 
 ## [v1.0.27] - January 15, 2026
