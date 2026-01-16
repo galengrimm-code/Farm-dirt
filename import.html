@@ -794,8 +794,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.55";
-    const BUILD_DATE = "2026-01-16T09:05:57";
+    const APP_VERSION = "v1.0.56";
+    const BUILD_DATE = "2026-01-16T09:14:18";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -4135,8 +4135,19 @@
       sampleData.push(...samples);
 
       // Assign to fields if boundaries exist
+      let assignmentMsg = '';
       if (Object.keys(fieldBoundaries).length > 0) {
         assignSamplesToFields();
+        const assignedCount = samples.filter(s => s.field && s.field !== 'Unassigned' && s.field !== 'Unknown').length;
+        const unassignedCount = samples.length - assignedCount;
+        if (assignedCount > 0) {
+          assignmentMsg = `, ${assignedCount} assigned to fields`;
+        }
+        if (unassignedCount > 0) {
+          assignmentMsg += ` (${unassignedCount} outside boundaries)`;
+        }
+      } else {
+        assignmentMsg = '. Upload field boundaries to auto-assign field names.';
       }
 
       // Save data
@@ -4149,7 +4160,7 @@
       // Update UI
       afterImportSuccess();
 
-      let msg = `✓ Imported ${samples.length} samples`;
+      let msg = `✓ Imported ${samples.length} samples${assignmentMsg}`;
       if (skipped > 0) msg += ` (${skipped} rows skipped)`;
       showStatus(msg, true);
 
