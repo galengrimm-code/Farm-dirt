@@ -234,8 +234,8 @@
   
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.52";
-    const BUILD_DATE = "2026-01-16T08:35:46";
+    const APP_VERSION = "v1.0.53";
+    const BUILD_DATE = "2026-01-16T08:46:42";
 
     // ========== CONFIG ==========
     const CONFIG = {
@@ -1003,6 +1003,14 @@
       document.getElementById('fieldSelect').addEventListener('change', (e) => {
         selectedField = e.target.value;
         updateYearSelector(); // Update years based on selected field
+
+        // If in compare mode, update compare year options for new field
+        if (compareMode) {
+          console.log('Field changed while in compare mode - updating compare years');
+          updateCompareYearOptions();
+          updateCompareSummary();
+        }
+
         updateMap();
         zoomToField(selectedField);
         updateMobileFieldViewUI(); // Update mobile UI when field changes
@@ -1629,6 +1637,10 @@
 
     function updateMap() {
       console.log('updateMap called - selectedYear:', selectedYear, 'selectedField:', selectedField, 'selectedAttribute:', selectedAttribute);
+      console.log('Compare state - compareMode:', compareMode, 'compareYear:', compareYear);
+
+      // Close any open popups before clearing layers
+      map.closePopup();
 
       currentLayers.forEach(l => map.removeLayer(l));
       currentLayers = [];
@@ -1638,7 +1650,7 @@
 
       // Compare mode - show year-over-year change (always show samples)
       if (compareMode && selectedYear !== 'all' && compareYear) {
-        console.log('Rendering: Compare mode');
+        console.log('Rendering: Compare mode - baseline:', compareYear, 'compare to:', selectedYear);
         drawBoundaries(false);
         renderCompareMode();
         return;
