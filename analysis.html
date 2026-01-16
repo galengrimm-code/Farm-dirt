@@ -228,7 +228,7 @@
         </div>
         <div class="control-group">
           <label>Yield Year <span onclick="toggleYieldYearInfo()" style="cursor: pointer; font-size: 0.9rem; color: #3b82f6;" title="Learn about yield year options">ℹ️</span></label>
-          <select id="yieldYearSelect"></select>
+          <select id="yieldYearSelect" onchange="updateYieldYearDescription()"></select>
         </div>
         <div class="control-group">
           <label>Soil Sample Year</label>
@@ -250,6 +250,15 @@
         <button onclick="exportYieldCorrelation()" class="export-btn">📄 Export Report</button>
       </div>
 
+      <!-- Yield Year Description (shows based on selection) -->
+      <div id="yieldYearDescription" style="display: none; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 0.75rem 1rem; margin-bottom: 0.75rem; font-size: 0.8rem;">
+        <div id="yieldYearDescText" style="color: #475569;"></div>
+        <div id="yieldYearWarning" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 0.375rem; color: #92400e;">
+          <strong>⚠️ Warning:</strong> <span id="yieldYearWarningText"></span>
+        </div>
+        <div id="yieldYearAverages" style="display: none; margin-top: 0.5rem; padding: 0.5rem; background: #eff6ff; border-radius: 0.375rem; color: #1e40af; font-size: 0.75rem;"></div>
+      </div>
+
       <!-- Yield Year explanation (hidden by default) -->
       <div id="yieldYearInfoBox" style="display: none; background: linear-gradient(to right, #f0fdf4, #ecfdf5); border: 1px solid #22c55e; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: #166534;">
         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem;">
@@ -261,30 +270,46 @@
           <div style="background: white; border-radius: 0.375rem; padding: 0.75rem; border-left: 4px solid #3b82f6;">
             <div style="font-weight: 600; color: #1e40af; margin-bottom: 0.25rem;">All Years (Averaged)</div>
             <p style="font-size: 0.8rem; color: #475569; margin: 0;">
-              For each soil sample location, calculates the <strong>average yield</strong> across all years.<br>
-              <em>Example: If a location had 180 bu/ac in 2024 and 200 bu/ac in 2025, uses 190 bu/ac</em><br>
-              <strong>Best for:</strong> Smoothing out year-to-year variation, finding consistent patterns<br>
-              <strong>Data points</strong> = number of sample locations
+              Averages yield across all years at each location. A sample with 180 bu in 2024 and 220 bu in 2025 becomes 200 bu.<br>
+              <strong>Best for:</strong> Finding patterns that persist across years. Smooths out weather variation.
             </p>
           </div>
 
           <div style="background: white; border-radius: 0.375rem; padding: 0.75rem; border-left: 4px solid #8b5cf6;">
             <div style="font-weight: 600; color: #6d28d9; margin-bottom: 0.25rem;">All Years (Combined)</div>
             <p style="font-size: 0.8rem; color: #475569; margin: 0;">
-              Treats each year as a <strong>separate data point</strong>.<br>
-              <em>Example: Same location counts twice - once for 2024 yield, once for 2025 yield</em><br>
-              <strong>Best for:</strong> Maximum statistical power, more data points<br>
-              <strong>Data points</strong> = locations × years
+              Each year treated as separate data point. Same location counted multiple times (once per year).<br>
+              <strong>Best for:</strong> Maximum sample size when years had similar growing conditions.<br>
+              <span style="color: #b45309;">⚠️ Combines good and bad years together - results may be misleading if yields varied significantly.</span>
+            </p>
+          </div>
+
+          <div style="background: white; border-radius: 0.375rem; padding: 0.75rem; border-left: 4px solid #22c55e;">
+            <div style="font-weight: 600; color: #166534; margin-bottom: 0.25rem;">All Years (Year-Normalized)</div>
+            <p style="font-size: 0.8rem; color: #475569; margin: 0;">
+              Each year treated separately, but yields converted to % of that year's average.<br>
+              <em>Example: 200 bu yield in a 180 bu avg year = 111%. 250 bu yield in a 250 bu avg year = 100%.</em><br>
+              <strong>Best for:</strong> Comparing across years with different weather. Isolates nutrient effect from seasonal variation.
             </p>
           </div>
 
           <div style="background: white; border-radius: 0.375rem; padding: 0.75rem; border-left: 4px solid #f59e0b;">
             <div style="font-weight: 600; color: #b45309; margin-bottom: 0.25rem;">Individual Year (e.g., "2024")</div>
             <p style="font-size: 0.8rem; color: #475569; margin: 0;">
-              Only uses yield from that <strong>specific harvest year</strong>.<br>
-              <strong>Best for:</strong> Analyzing a specific season's results, comparing year-over-year changes
+              Only uses yield from that specific harvest year.<br>
+              <strong>Best for:</strong> Analyzing a specific season's results.
             </p>
           </div>
+        </div>
+
+        <div style="margin-top: 1rem; padding: 0.75rem; background: white; border-radius: 0.375rem; border: 1px dashed #22c55e;">
+          <div style="font-weight: 600; color: #166534; margin-bottom: 0.5rem;">🤔 How should I choose?</div>
+          <ul style="font-size: 0.8rem; color: #475569; margin: 0; padding-left: 1.25rem;">
+            <li><strong>Similar yields across years?</strong> → "Combined" gives you more data points</li>
+            <li><strong>Very different yields (drought vs good year)?</strong> → "Year-Normalized" controls for weather</li>
+            <li><strong>Want simplicity?</strong> → "Averaged" is most straightforward</li>
+            <li><strong>Analyzing specific season?</strong> → Select individual year</li>
+          </ul>
         </div>
       </div>
 
@@ -527,8 +552,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.49";
-    const BUILD_DATE = "2026-01-16T08:11:36";
+    const APP_VERSION = "v1.0.50";
+    const BUILD_DATE = "2026-01-16T08:27:15";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -772,8 +797,9 @@
       const yieldYearSel = document.getElementById('yieldYearSelect');
       const yieldYears = getYieldYears();
       const totalSamplesWithYield = sampleData.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0).length;
-      yieldYearSel.innerHTML = `<option value="avg">All Years (Average) - ${totalSamplesWithYield.toLocaleString()} samples</option>`;
-      yieldYearSel.innerHTML += `<option value="combined">All Years (Combined) - ${totalSamplesWithYield.toLocaleString()} samples</option>`;
+      yieldYearSel.innerHTML = `<option value="avg">All Years (Averaged)</option>`;
+      yieldYearSel.innerHTML += `<option value="combined">All Years (Combined)</option>`;
+      yieldYearSel.innerHTML += `<option value="normalized">All Years (Year-Normalized)</option>`;
       yieldYears.forEach(y => {
         if (y.count > 0) {
           // Year has matched yield data
@@ -783,6 +809,9 @@
           yieldYearSel.innerHTML += `<option value="${y.year}" disabled>${y.year} - ${y.rawCount.toLocaleString()} yield pts (not matched)</option>`;
         }
       });
+
+      // Initialize description display
+      updateYieldYearDescription();
 
       // Soil sample year selector
       const soilYearSel = document.getElementById('soilYearSelect');
@@ -1820,6 +1849,51 @@
             }
           });
         });
+      } else if (yearFilter === 'normalized') {
+        // ALL YEARS (YEAR-NORMALIZED): Each year separate, but yields as % of year average
+        // First calculate year averages
+        const yearTotals = {};
+        const yearCounts = {};
+        samplesWithYield.forEach(sample => {
+          Object.entries(sample.yieldCorrelations).forEach(([year, yieldInfo]) => {
+            if (cropFilter === 'all' || yieldInfo.crop === cropFilter) {
+              const yr = parseInt(year);
+              if (!yearTotals[yr]) {
+                yearTotals[yr] = 0;
+                yearCounts[yr] = 0;
+              }
+              yearTotals[yr] += yieldInfo.avgYield;
+              yearCounts[yr]++;
+            }
+          });
+        });
+
+        const yearAverages = {};
+        Object.keys(yearTotals).forEach(yr => {
+          yearAverages[yr] = yearTotals[yr] / yearCounts[yr];
+        });
+
+        // Now create data points with normalized yields
+        samplesWithYield.forEach(sample => {
+          Object.entries(sample.yieldCorrelations).forEach(([year, yieldInfo]) => {
+            if (cropFilter === 'all' || yieldInfo.crop === cropFilter) {
+              const yr = parseInt(year);
+              const yearAvg = yearAverages[yr];
+              const normalizedYield = (yieldInfo.avgYield / yearAvg) * 100; // % of year average
+
+              dataPoints.push({
+                ...sample,
+                yieldYear: yr,
+                avgYield: normalizedYield, // This is now % of year average
+                rawYield: yieldInfo.avgYield, // Store original
+                yearAvg: yearAvg,
+                crop: yieldInfo.crop,
+                yieldPointCount: yieldInfo.pointCount,
+                isYearNormalized: true
+              });
+            }
+          });
+        });
       } else {
         // SPECIFIC YEAR: Only use yield from that year
         samplesWithYield.forEach(sample => {
@@ -1841,11 +1915,14 @@
         return;
       }
 
+      // Check if year-normalized mode - adjust label
+      const isYearNormalized = yearFilter === 'normalized';
+
       // Check if normalization is enabled
       const normalizeByField = document.getElementById('yieldNormalizeToggle').checked;
       let fieldAverages = {};
       let fieldAvgRange = { min: Infinity, max: -Infinity };
-      let yieldLabel = 'Yield (bu/ac)';
+      let yieldLabel = isYearNormalized ? 'Yield (% of Year Avg)' : 'Yield (bu/ac)';
       let normalizeNote = '';
 
       if (normalizeByField) {
@@ -2227,6 +2304,41 @@
                 avgYield: yieldInfo.avgYield,
                 crop: yieldInfo.crop,
                 yieldPointCount: yieldInfo.pointCount
+              });
+            }
+          });
+        });
+      } else if (yearFilter === 'normalized') {
+        // ALL YEARS (YEAR-NORMALIZED): Each year separate, but yields as % of year average
+        const yearTotals = {};
+        const yearCounts = {};
+        samplesWithYield.forEach(sample => {
+          Object.entries(sample.yieldCorrelations).forEach(([year, yieldInfo]) => {
+            if (cropFilter === 'all' || yieldInfo.crop === cropFilter) {
+              const yr = parseInt(year);
+              if (!yearTotals[yr]) { yearTotals[yr] = 0; yearCounts[yr] = 0; }
+              yearTotals[yr] += yieldInfo.avgYield;
+              yearCounts[yr]++;
+            }
+          });
+        });
+        const yearAverages = {};
+        Object.keys(yearTotals).forEach(yr => { yearAverages[yr] = yearTotals[yr] / yearCounts[yr]; });
+
+        samplesWithYield.forEach(sample => {
+          Object.entries(sample.yieldCorrelations).forEach(([year, yieldInfo]) => {
+            if (cropFilter === 'all' || yieldInfo.crop === cropFilter) {
+              const yr = parseInt(year);
+              const normalizedYield = (yieldInfo.avgYield / yearAverages[yr]) * 100;
+              dataPoints.push({
+                ...sample,
+                yieldYear: yr,
+                avgYield: normalizedYield,
+                rawYield: yieldInfo.avgYield,
+                yearAvg: yearAverages[yr],
+                crop: yieldInfo.crop,
+                yieldPointCount: yieldInfo.pointCount,
+                isYearNormalized: true
               });
             }
           });
@@ -2756,6 +2868,90 @@
     function toggleYieldYearInfo() {
       const box = document.getElementById('yieldYearInfoBox');
       box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    }
+
+    // Calculate year averages for yield data
+    function calculateYearAverages() {
+      const yearTotals = {};
+      const yearCounts = {};
+      const cropFilter = document.getElementById('yieldCropSelect').value;
+
+      sampleData.forEach(sample => {
+        if (sample.yieldCorrelations) {
+          Object.entries(sample.yieldCorrelations).forEach(([year, yieldInfo]) => {
+            if (cropFilter === 'all' || yieldInfo.crop === cropFilter) {
+              const yr = parseInt(year);
+              if (!yearTotals[yr]) {
+                yearTotals[yr] = 0;
+                yearCounts[yr] = 0;
+              }
+              yearTotals[yr] += yieldInfo.avgYield;
+              yearCounts[yr]++;
+            }
+          });
+        }
+      });
+
+      const yearAverages = {};
+      Object.keys(yearTotals).forEach(yr => {
+        yearAverages[yr] = yearTotals[yr] / yearCounts[yr];
+      });
+      return yearAverages;
+    }
+
+    // Update description below dropdown based on selection
+    function updateYieldYearDescription() {
+      const yearFilter = document.getElementById('yieldYearSelect').value;
+      const descBox = document.getElementById('yieldYearDescription');
+      const descText = document.getElementById('yieldYearDescText');
+      const warningBox = document.getElementById('yieldYearWarning');
+      const warningText = document.getElementById('yieldYearWarningText');
+      const avgBox = document.getElementById('yieldYearAverages');
+
+      descBox.style.display = 'block';
+      warningBox.style.display = 'none';
+      avgBox.style.display = 'none';
+
+      const yearAverages = calculateYearAverages();
+      const years = Object.keys(yearAverages).map(Number).sort();
+
+      if (yearFilter === 'avg') {
+        descText.innerHTML = `<strong>Averaged:</strong> Averages yield across all years at each location. A sample with 180 bu in 2024 and 220 bu in 2025 becomes 200 bu.<br><em>Best for finding patterns that persist across years. Smooths out weather variation.</em>`;
+      } else if (yearFilter === 'combined') {
+        descText.innerHTML = `<strong>Combined:</strong> Each year treated as separate data point. Same location counted multiple times (once per year).<br><em>Best for maximum sample size when years had similar growing conditions.</em>`;
+
+        // Check if year averages differ by >15%
+        if (years.length >= 2) {
+          const avgValues = years.map(yr => yearAverages[yr]);
+          const minAvg = Math.min(...avgValues);
+          const maxAvg = Math.max(...avgValues);
+          const diffPercent = ((maxAvg - minAvg) / minAvg) * 100;
+
+          if (diffPercent > 15) {
+            warningBox.style.display = 'block';
+            warningText.textContent = `Yields varied by ${Math.round(diffPercent)}% between years. Consider using Year-Normalized to control for weather differences.`;
+          }
+
+          // Show year averages
+          avgBox.style.display = 'block';
+          avgBox.innerHTML = `<strong>Year averages:</strong> ${years.map(yr => `${yr}: ${Math.round(yearAverages[yr])} bu/ac`).join(' | ')}`;
+        }
+      } else if (yearFilter === 'normalized') {
+        descText.innerHTML = `<strong>Year-Normalized:</strong> Each year treated separately, but yields converted to % of that year's average. A 200 bu yield in a 180 bu avg year = 111%.<br><em>Best for comparing across years with different weather. Isolates nutrient effect from seasonal variation.</em>`;
+
+        // Show year averages
+        if (years.length > 0) {
+          avgBox.style.display = 'block';
+          avgBox.innerHTML = `<strong>Year averages being normalized:</strong> ${years.map(yr => `${yr}: ${Math.round(yearAverages[yr])} bu/ac`).join(' | ')}`;
+        }
+      } else {
+        // Individual year
+        descText.innerHTML = `<strong>${yearFilter}:</strong> Only uses yield from this specific harvest year.<br><em>Best for analyzing that season's results specifically.</em>`;
+        if (yearAverages[yearFilter]) {
+          avgBox.style.display = 'block';
+          avgBox.innerHTML = `<strong>${yearFilter} average:</strong> ${Math.round(yearAverages[yearFilter])} bu/ac`;
+        }
+      }
     }
 
     // Toggle normalization explanation info box
