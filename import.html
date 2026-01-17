@@ -231,35 +231,96 @@
     <div class="import-section yield yield-section">
       <h3>🌾 Import Yield Data</h3>
       <p style="color: #92400e; font-size: 0.875rem; margin-bottom: 1rem;">Upload yield maps to correlate soil nutrients with crop performance.</p>
-      <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-        <div class="form-group">
-          <label>Crop Year <small style="font-weight: normal; color: #64748b;">(auto-detects)</small></label>
-          <input type="text" id="yieldYear" placeholder="auto or enter" style="width: 120px;">
-        </div>
-        <div class="form-group">
-          <label>Crop Type</label>
-          <select id="yieldCrop" style="width: 140px;" required>
-            <option value="">-- Select Crop --</option>
-            <option value="corn">🌽 Corn</option>
-            <option value="soybeans">🫘 Soybeans</option>
-            <option value="amylose">🍚 Amylose</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Sample Radius</label>
-          <select id="yieldRadius" style="width: 100px;">
-            <option value="50">50 ft</option>
-            <option value="100" selected>100 ft</option>
-            <option value="150">150 ft</option>
-          </select>
-        </div>
+
+      <!-- Import Mode Toggle -->
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; background: #fef3c7; padding: 0.5rem; border-radius: 0.5rem;">
+        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; flex: 1; padding: 0.5rem; border-radius: 0.375rem; background: white; border: 2px solid #f59e0b;">
+          <input type="radio" name="yieldImportMode" value="quick" checked onchange="toggleYieldImportMode('quick')">
+          <div>
+            <strong style="color: #92400e;">⚡ Quick Import</strong>
+            <small style="display: block; color: #78716c; font-size: 0.7rem;">Auto-detect columns, minimal setup</small>
+          </div>
+        </label>
+        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; flex: 1; padding: 0.5rem; border-radius: 0.375rem; background: #f5f5f4; border: 2px solid transparent;" id="rawModeLabel">
+          <input type="radio" name="yieldImportMode" value="raw" onchange="toggleYieldImportMode('raw')">
+          <div>
+            <strong style="color: #57534e;">🔧 Raw Monitor Data</strong>
+            <small style="display: block; color: #78716c; font-size: 0.7rem;">Column mapping & data cleaning</small>
+          </div>
+        </label>
       </div>
-      <div class="form-group">
-        <label>Yield File (Shapefile)</label>
-        <input type="file" id="yieldFiles" multiple accept=".shp,.dbf,.prj,.shx,.zip">
-        <small>Batch upload supported: select up to 250 ZIPs or .shp/.dbf pairs at once (auto-matched by name)</small>
+
+      <!-- Quick Import Mode (default) -->
+      <div id="quickYieldMode">
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <div class="form-group">
+            <label>Crop Year <small style="font-weight: normal; color: #64748b;">(auto-detects)</small></label>
+            <input type="text" id="yieldYear" placeholder="auto or enter" style="width: 120px;">
+          </div>
+          <div class="form-group">
+            <label>Crop Type</label>
+            <select id="yieldCrop" style="width: 140px;" required>
+              <option value="">-- Select Crop --</option>
+              <option value="corn">🌽 Corn</option>
+              <option value="soybeans">🫘 Soybeans</option>
+              <option value="wheat">🌾 Wheat</option>
+              <option value="sorghum">🌿 Grain Sorghum</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Sample Radius</label>
+            <select id="yieldRadius" style="width: 100px;">
+              <option value="50">50 ft</option>
+              <option value="100" selected>100 ft</option>
+              <option value="150">150 ft</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Yield File (Shapefile)</label>
+          <input type="file" id="yieldFiles" multiple accept=".shp,.dbf,.prj,.shx,.zip">
+          <small>Batch upload supported: select up to 250 ZIPs or .shp/.dbf pairs at once (auto-matched by name)</small>
+        </div>
+        <button class="button" id="uploadYieldBtn" style="background: #f59e0b; color: white;">Upload Yield Data</button>
       </div>
-      <button class="button" id="uploadYieldBtn" style="background: #f59e0b; color: white;">Upload Yield Data</button>
+
+      <!-- Raw Monitor Data Mode -->
+      <div id="rawYieldMode" style="display: none;">
+        <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem;">
+          <strong style="color: #92400e;">📋 Raw Yield Monitor Import</strong>
+          <p style="color: #78716c; margin: 0.25rem 0 0 0;">Upload raw yield files from John Deere, Ag Leader, Climate FieldView, or other systems. You'll map columns and configure data cleaning filters.</p>
+        </div>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+          <div class="form-group">
+            <label>Crop Type</label>
+            <select id="rawYieldCrop" style="width: 140px;" onchange="updateRawYieldDefaults()">
+              <option value="corn">🌽 Corn</option>
+              <option value="soybeans">🫘 Soybeans</option>
+              <option value="wheat">🌾 Wheat</option>
+              <option value="sorghum">🌿 Grain Sorghum</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Crop Year</label>
+            <input type="text" id="rawYieldYear" placeholder="2024" style="width: 100px;">
+          </div>
+          <div class="form-group">
+            <label>Sample Radius</label>
+            <select id="rawYieldRadius" style="width: 100px;">
+              <option value="50">50 ft</option>
+              <option value="100" selected>100 ft</option>
+              <option value="150">150 ft</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Yield Monitor Files</label>
+          <input type="file" id="rawYieldFiles" multiple accept=".shp,.dbf,.prj,.shx,.zip,.geojson,.json">
+          <small>ZIP, Shapefile (.shp + .dbf + .shx), or GeoJSON • Select multiple files</small>
+        </div>
+        <button class="button" style="background: #f59e0b; color: white;" onclick="startRawYieldImport()">Upload & Map Columns →</button>
+      </div>
+
       <div id="yieldStatus" style="margin-top: 0.75rem;"></div>
     </div>
 
@@ -778,6 +839,208 @@
     </div>
   </div>
 
+  <!-- Raw Yield Attribute Mapping Modal -->
+  <div id="yieldMappingModal" class="modal-overlay">
+    <div class="modal" style="max-width: 900px; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+        <h3>📋 Yield Data Attribute Mapping</h3>
+        <button class="modal-close" onclick="closeYieldMappingModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="flex: 1; overflow-y: auto; padding: 0;">
+        <!-- Summary bar -->
+        <div id="yieldMappingSummary" style="padding: 0.75rem 1rem; background: #fffbeb; border-bottom: 1px solid #fcd34d; display: flex; justify-content: space-between; align-items: center;">
+          <span id="yieldMappingSummaryText" style="font-weight: 600; color: #92400e;">Found 0 yield points</span>
+          <span id="yieldMappingFileCount" style="font-size: 0.85rem; color: #78716c;"></span>
+        </div>
+
+        <div style="padding: 1rem;">
+          <!-- Instructions -->
+          <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 0.5rem; font-size: 0.85rem; color: #92400e;">
+            Detected columns from your yield monitor. Verify the mapping is correct. Preview values help confirm you selected the right columns.
+          </div>
+
+          <!-- Required Fields -->
+          <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
+            <h4 style="margin: 0 0 0.75rem 0; color: #92400e; font-size: 0.9rem;">📍 Required Fields</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem;">
+              <div class="shp-mapping-field">
+                <label style="font-size: 0.8rem; font-weight: 600; color: #92400e;">Latitude/Longitude</label>
+                <div style="padding: 0.375rem 0.5rem; background: #fef9c3; border-radius: 0.25rem; font-size: 0.8rem; color: #78716c;">Auto-extracted from geometry</div>
+              </div>
+              <div class="shp-mapping-field">
+                <label style="font-size: 0.8rem; font-weight: 500;">Yield (bu/ac) <span style="color: #dc2626;">*</span></label>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                  <select id="yieldMapYield" class="shp-map-select" style="flex: 1;" onchange="updateYieldMapPreview('yield')"></select>
+                  <span id="yieldPreviewYield" class="shp-preview-values" style="color: #059669;"></span>
+                </div>
+              </div>
+              <div class="shp-mapping-field">
+                <label style="font-size: 0.8rem; font-weight: 500;">Moisture % <span style="color: #64748b;">(optional)</span></label>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                  <select id="yieldMapMoisture" class="shp-map-select" style="flex: 1;" onchange="updateYieldMapPreview('moisture')"></select>
+                  <span id="yieldPreviewMoisture" class="shp-preview-values" style="color: #059669;"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Optional Fields for Filtering -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
+            <h4 style="margin: 0 0 0.75rem 0; color: #475569; font-size: 0.9rem;">🔧 Optional Fields (for filtering & metadata)</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.75rem;">
+              <div class="shp-mapping-field">
+                <label style="font-size: 0.8rem; font-weight: 500;">Speed (mph)</label>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                  <select id="yieldMapSpeed" class="shp-map-select" style="flex: 1;" onchange="updateYieldMapPreview('speed')"></select>
+                  <span id="yieldPreviewSpeed" class="shp-preview-values" style="color: #059669;"></span>
+                </div>
+              </div>
+              <div class="shp-mapping-field">
+                <label style="font-size: 0.8rem; font-weight: 500;">Swath Width (ft)</label>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                  <select id="yieldMapSwath" class="shp-map-select" style="flex: 1;" onchange="updateYieldMapPreview('swath')"></select>
+                  <span id="yieldPreviewSwath" class="shp-preview-values" style="color: #059669;"></span>
+                </div>
+              </div>
+              <div class="shp-mapping-field">
+                <label style="font-size: 0.8rem; font-weight: 500;">Timestamp</label>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                  <select id="yieldMapTimestamp" class="shp-map-select" style="flex: 1;" onchange="updateYieldMapPreview('timestamp')"></select>
+                  <span id="yieldPreviewTimestamp" class="shp-preview-values" style="color: #059669;"></span>
+                </div>
+              </div>
+              <div class="shp-mapping-field">
+                <label style="font-size: 0.8rem; font-weight: 500;">Field Name</label>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                  <select id="yieldMapFieldName" class="shp-map-select" style="flex: 1;" onchange="updateYieldMapPreview('fieldName')"></select>
+                  <span id="yieldPreviewFieldName" class="shp-preview-values" style="color: #059669;"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Data Cleaning Filters -->
+          <div style="background: #fef2f2; border: 1px solid #fca5a5; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
+            <h4 style="margin: 0 0 0.75rem 0; color: #dc2626; font-size: 0.9rem;">⚙️ Data Cleaning Filters</h4>
+            <p style="margin: 0 0 0.75rem 0; font-size: 0.75rem; color: #7f1d1d;">Filter out bad data points from starts, stops, turns, and sensor errors.</p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0.75rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" id="filterSlowSpeed" checked style="width: 16px; height: 16px;">
+                <label for="filterSlowSpeed" style="font-size: 0.8rem;">Remove slow/stopped points &lt;</label>
+                <input type="number" id="filterSlowSpeedVal" value="1.5" step="0.5" min="0" style="width: 60px; padding: 0.25rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; font-size: 0.8rem;">
+                <span style="font-size: 0.8rem; color: #64748b;">mph</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" id="filterHighSpeed" checked style="width: 16px; height: 16px;">
+                <label for="filterHighSpeed" style="font-size: 0.8rem;">Remove high-speed points &gt;</label>
+                <input type="number" id="filterHighSpeedVal" value="7.0" step="0.5" min="0" style="width: 60px; padding: 0.25rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; font-size: 0.8rem;">
+                <span style="font-size: 0.8rem; color: #64748b;">mph</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" id="filterYieldLow" checked style="width: 16px; height: 16px;">
+                <label for="filterYieldLow" style="font-size: 0.8rem;">Remove yield outliers below</label>
+                <input type="number" id="filterYieldLowVal" value="20" step="5" min="0" style="width: 60px; padding: 0.25rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; font-size: 0.8rem;">
+                <span style="font-size: 0.8rem; color: #64748b;">bu/ac</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" id="filterYieldHigh" checked style="width: 16px; height: 16px;">
+                <label for="filterYieldHigh" style="font-size: 0.8rem;">Remove yield outliers above</label>
+                <input type="number" id="filterYieldHighVal" value="400" step="10" min="0" style="width: 60px; padding: 0.25rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; font-size: 0.8rem;">
+                <span style="font-size: 0.8rem; color: #64748b;">bu/ac</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" id="filterMoistureLow" style="width: 16px; height: 16px;">
+                <label for="filterMoistureLow" style="font-size: 0.8rem;">Remove moisture below</label>
+                <input type="number" id="filterMoistureLowVal" value="8" step="1" min="0" style="width: 60px; padding: 0.25rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; font-size: 0.8rem;">
+                <span style="font-size: 0.8rem; color: #64748b;">%</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" id="filterMoistureHigh" style="width: 16px; height: 16px;">
+                <label for="filterMoistureHigh" style="font-size: 0.8rem;">Remove moisture above</label>
+                <input type="number" id="filterMoistureHighVal" value="35" step="1" min="0" style="width: 60px; padding: 0.25rem; border: 1px solid #cbd5e1; border-radius: 0.25rem; font-size: 0.8rem;">
+                <span style="font-size: 0.8rem; color: #64748b;">%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Unmapped Attributes -->
+          <div id="yieldUnmappedSection" style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 0.5rem; padding: 0.75rem; display: none;">
+            <h4 style="margin: 0 0 0.5rem 0; color: #475569; font-size: 0.85rem;">📦 Unmapped Attributes (will be ignored)</h4>
+            <div id="yieldUnmappedList" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+          </div>
+
+          <!-- Save Mapping Option -->
+          <div style="margin-top: 1rem; padding: 0.75rem; background: #f8fafc; border-radius: 0.375rem; display: flex; align-items: center; gap: 0.75rem;">
+            <input type="checkbox" id="yieldSaveMapping" checked style="width: 18px; height: 18px;">
+            <label for="yieldSaveMapping" style="font-size: 0.85rem; color: #475569;">Save these mappings for future yield imports</label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top: 1px solid #e2e8f0;">
+        <button class="button" style="background: #94a3b8;" onclick="closeYieldMappingModal()">Cancel</button>
+        <button class="button" style="background: #f59e0b; color: white;" onclick="previewYieldCleaning()">Preview & Clean Data →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Raw Yield Preview & Cleaning Modal -->
+  <div id="yieldPreviewModal" class="modal-overlay">
+    <div class="modal" style="max-width: 950px; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header" style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);">
+        <h3>📊 Yield Data Preview</h3>
+        <button class="modal-close" onclick="closeYieldPreviewModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="flex: 1; overflow-y: auto; padding: 0;">
+        <!-- Import Summary -->
+        <div style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 1rem;">
+          <h4 style="margin: 0 0 0.75rem 0; color: #1e293b; font-size: 0.95rem;">Import Summary</h4>
+          <div id="yieldCleaningSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem; font-size: 0.85rem;"></div>
+        </div>
+
+        <!-- Yield Statistics -->
+        <div style="background: #f0fdf4; border-bottom: 1px solid #bbf7d0; padding: 1rem;">
+          <h4 style="margin: 0 0 0.75rem 0; color: #166534; font-size: 0.95rem;">Yield Statistics (after cleaning)</h4>
+          <div id="yieldStatsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem;"></div>
+          <div id="yieldFieldBreakdown" style="margin-top: 1rem;"></div>
+        </div>
+
+        <!-- Sample Data Preview -->
+        <div style="padding: 1rem;">
+          <h4 style="margin: 0 0 0.75rem 0; color: #1e293b; font-size: 0.95rem;">Sample Data (first 10 rows)</h4>
+          <div style="overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 0.375rem;">
+            <table id="yieldPreviewTable" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+              <thead style="background: #f1f5f9;">
+                <tr id="yieldPreviewHead"></tr>
+              </thead>
+              <tbody id="yieldPreviewBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top: 1px solid #e2e8f0;">
+        <button class="button" style="background: #64748b;" onclick="backToYieldMapping()">← Back to Mapping</button>
+        <button class="button" style="background: #059669; color: white;" id="confirmYieldImportBtn" onclick="confirmRawYieldImport()">Import Points</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Yield Import Progress Modal -->
+  <div id="yieldProgressModal" class="modal-overlay">
+    <div class="modal" style="max-width: 500px;">
+      <div class="modal-header" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+        <h3>⏳ Importing Yield Data...</h3>
+      </div>
+      <div class="modal-body" style="text-align: center; padding: 2rem;">
+        <div style="background: #e2e8f0; border-radius: 9999px; height: 20px; margin-bottom: 1rem; overflow: hidden;">
+          <div id="yieldProgressBar" style="background: linear-gradient(90deg, #f59e0b, #fbbf24); height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+        </div>
+        <p id="yieldProgressText" style="font-size: 0.9rem; color: #475569; margin: 0;">Processing: 0 of 0 points</p>
+        <p id="yieldProgressMatched" style="font-size: 0.85rem; color: #059669; margin: 0.5rem 0 0 0;"></p>
+        <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 1rem;">Please wait... this may take a minute for large files.</p>
+      </div>
+    </div>
+  </div>
+
   <!-- Yield Import Summary Modal -->
   <div id="yieldSummaryModal" class="modal-overlay">
     <div class="modal" style="max-width: 900px;">
@@ -814,8 +1077,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.63";
-    const BUILD_DATE = "2026-01-17T05:55:48";
+    const APP_VERSION = "v1.0.64";
+    const BUILD_DATE = "2026-01-17T06:02:50";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -1953,7 +2216,716 @@
     }
 
     // ========== YIELD DATA FUNCTIONS ==========
-    
+
+    // ========== RAW YIELD MONITOR IMPORT ==========
+
+    // Crop-specific defaults for yield/moisture ranges
+    const CROP_DEFAULTS = {
+      corn: { yieldMin: 20, yieldMax: 400, moistureMin: 8, moistureMax: 35 },
+      soybeans: { yieldMin: 10, yieldMax: 120, moistureMin: 8, moistureMax: 20 },
+      wheat: { yieldMin: 15, yieldMax: 150, moistureMin: 8, moistureMax: 20 },
+      sorghum: { yieldMin: 20, yieldMax: 250, moistureMin: 8, moistureMax: 25 }
+    };
+
+    // Common yield field aliases from different monitors
+    const YIELD_FIELD_ALIASES = {
+      yield: ['Yld_Vol_Dr', 'YLD_VOL_DR', 'DryYield', 'Dry_Yield', 'YldVolDry', 'YldMassDry', 'VRYIELDVO', 'VRYIELDMA', 'Yld_Mass_D', 'Dry Yield', 'DryYld', 'Yield (Dry)', 'Yld', 'yield_bu_ac', 'YIELD', 'Yield'],
+      moisture: ['Moisture', 'MOISTURE', 'WetMoist', 'Moist', 'moisture_percent', 'Yld_Mass_W', 'WetMass'],
+      speed: ['Speed', 'SPEED', 'Spd', 'SPD', 'AvgSpeed'],
+      swath: ['SwathWidth', 'Swath', 'SWATH', 'Width', 'CutWidth', 'Head_Wdth'],
+      timestamp: ['TIMESTAMP', 'TimeStamp', 'IsoTime', 'ISOTIME', 'Date', 'DATE', 'HarvestDat', 'Time', 'TIME', 'DATETIME', 'DateTime', 'Harvest_Da', 'VRLOGTIME'],
+      fieldName: ['FieldName', 'Field', 'FIELD', 'Farm', 'FARM', 'Field_Name', 'Grower', 'Client']
+    };
+
+    // State for raw yield import
+    let rawYieldData = {
+      rawPoints: [],        // All parsed points before cleaning
+      cleanedPoints: [],    // Points after applying filters
+      fields: [],           // Detected field columns
+      sampleValues: {},     // Sample values for preview
+      removedCounts: {}     // Count of removed points by filter
+    };
+
+    // Toggle between Quick and Raw import modes
+    function toggleYieldImportMode(mode) {
+      const quickMode = document.getElementById('quickYieldMode');
+      const rawMode = document.getElementById('rawYieldMode');
+      const quickLabel = document.querySelector('label:has(input[value="quick"])');
+      const rawLabel = document.getElementById('rawModeLabel');
+
+      if (mode === 'quick') {
+        quickMode.style.display = 'block';
+        rawMode.style.display = 'none';
+        quickLabel.style.background = 'white';
+        quickLabel.style.border = '2px solid #f59e0b';
+        rawLabel.style.background = '#f5f5f4';
+        rawLabel.style.border = '2px solid transparent';
+      } else {
+        quickMode.style.display = 'none';
+        rawMode.style.display = 'block';
+        quickLabel.style.background = '#f5f5f4';
+        quickLabel.style.border = '2px solid transparent';
+        rawLabel.style.background = 'white';
+        rawLabel.style.border = '2px solid #f59e0b';
+      }
+    }
+
+    // Update filter defaults based on crop type
+    function updateRawYieldDefaults() {
+      const crop = document.getElementById('rawYieldCrop').value;
+      const defaults = CROP_DEFAULTS[crop] || CROP_DEFAULTS.corn;
+      document.getElementById('filterYieldLowVal').value = defaults.yieldMin;
+      document.getElementById('filterYieldHighVal').value = defaults.yieldMax;
+      document.getElementById('filterMoistureLowVal').value = defaults.moistureMin;
+      document.getElementById('filterMoistureHighVal').value = defaults.moistureMax;
+    }
+
+    // Start raw yield import - parse files and show mapping modal
+    async function startRawYieldImport() {
+      const fileInput = document.getElementById('rawYieldFiles');
+      const files = fileInput.files;
+      const statusEl = document.getElementById('yieldStatus');
+
+      if (!files.length) {
+        showStatus('Please select yield file(s)', false);
+        return;
+      }
+
+      statusEl.innerHTML = '<span style="color: #3b82f6;">⏳ Parsing yield files...</span>';
+
+      try {
+        rawYieldData = { rawPoints: [], cleanedPoints: [], fields: [], sampleValues: {}, removedCounts: {} };
+        let allFields = new Set();
+        let filesProcessed = 0;
+
+        // Process files
+        const zipFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.zip'));
+        const shpFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.shp'));
+        const dbfFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.dbf'));
+
+        if (zipFiles.length > 0) {
+          for (const zipFile of zipFiles) {
+            try {
+              statusEl.innerHTML = `<span style="color: #3b82f6;">⏳ Parsing ${zipFile.name}...</span>`;
+              const result = await parseRawYieldFromZip(zipFile);
+              rawYieldData.rawPoints.push(...result.points);
+              result.fields.forEach(f => allFields.add(f));
+              filesProcessed++;
+            } catch (err) {
+              console.warn(`Error parsing ${zipFile.name}:`, err);
+            }
+          }
+        } else if (shpFiles.length > 0) {
+          // Match SHP with DBF
+          const dbfByName = {};
+          dbfFiles.forEach(f => dbfByName[f.name.toLowerCase().replace('.dbf', '')] = f);
+
+          for (const shpFile of shpFiles) {
+            const baseName = shpFile.name.toLowerCase().replace('.shp', '');
+            const dbfFile = dbfByName[baseName];
+            if (!dbfFile) continue;
+
+            try {
+              statusEl.innerHTML = `<span style="color: #3b82f6;">⏳ Parsing ${shpFile.name}...</span>`;
+              const shpBuffer = await shpFile.arrayBuffer();
+              const dbfBuffer = await dbfFile.arrayBuffer();
+              const result = parseRawYieldShapefile(shpBuffer, dbfBuffer);
+              rawYieldData.rawPoints.push(...result.points);
+              result.fields.forEach(f => allFields.add(f));
+              filesProcessed++;
+            } catch (err) {
+              console.warn(`Error parsing ${shpFile.name}:`, err);
+            }
+          }
+        }
+
+        if (rawYieldData.rawPoints.length === 0) {
+          statusEl.innerHTML = '<span style="color: #ef4444;">❌ No yield points found in files</span>';
+          return;
+        }
+
+        rawYieldData.fields = Array.from(allFields);
+
+        // Get sample values for preview
+        const samplePoint = rawYieldData.rawPoints[0];
+        rawYieldData.sampleValues = {};
+        for (const field of rawYieldData.fields) {
+          const values = rawYieldData.rawPoints.slice(0, 5).map(p => p.attributes[field]).filter(v => v !== null && v !== undefined);
+          rawYieldData.sampleValues[field] = values.map(v => typeof v === 'number' ? v.toFixed(1) : String(v)).slice(0, 3).join(', ');
+        }
+
+        statusEl.innerHTML = `<span style="color: #059669;">✓ Found ${rawYieldData.rawPoints.toLocaleString()} points in ${filesProcessed} file(s)</span>`;
+
+        // Open mapping modal
+        openYieldMappingModal(filesProcessed);
+
+      } catch (err) {
+        console.error('Error in raw yield import:', err);
+        statusEl.innerHTML = `<span style="color: #ef4444;">❌ Error: ${err.message}</span>`;
+      }
+    }
+
+    // Parse raw yield from ZIP file (returns points with all attributes)
+    async function parseRawYieldFromZip(zipFile) {
+      const zip = await JSZip.loadAsync(zipFile);
+      const files = {};
+
+      for (const [name, file] of Object.entries(zip.files)) {
+        if (file.dir) continue;
+        const ext = name.split('.').pop().toLowerCase();
+        if (['shp', 'dbf', 'prj'].includes(ext)) {
+          files[ext] = await file.async('arraybuffer');
+        }
+      }
+
+      if (!files.shp || !files.dbf) {
+        throw new Error('ZIP must contain .shp and .dbf files');
+      }
+
+      return parseRawYieldShapefile(files.shp, files.dbf);
+    }
+
+    // Parse raw yield shapefile (returns all attributes for mapping)
+    function parseRawYieldShapefile(shpBuffer, dbfBuffer) {
+      const points = [];
+      const fields = [];
+
+      // Parse DBF
+      const dbfView = new DataView(dbfBuffer);
+      const numRecords = dbfView.getUint32(4, true);
+      const headerSize = dbfView.getUint16(8, true);
+      const recordSize = dbfView.getUint16(10, true);
+
+      const bytesToString = (buffer, start, length) => {
+        const bytes = new Uint8Array(buffer.slice(start, start + length));
+        let str = '';
+        for (let i = 0; i < bytes.length; i++) {
+          if (bytes[i] === 0) break;
+          str += String.fromCharCode(bytes[i]);
+        }
+        return str.trim();
+      };
+
+      // Parse field descriptors
+      const fieldDefs = [];
+      let offset = 32;
+      while (offset < headerSize - 1) {
+        const fieldName = bytesToString(dbfBuffer, offset, 11);
+        if (!fieldName) break;
+        const fieldType = String.fromCharCode(dbfView.getUint8(offset + 11));
+        const fieldLen = dbfView.getUint8(offset + 16);
+        const fieldDec = dbfView.getUint8(offset + 17);
+        fieldDefs.push({ name: fieldName, type: fieldType, length: fieldLen, decimals: fieldDec });
+        fields.push(fieldName);
+        offset += 32;
+      }
+
+      // Parse SHP for coordinates
+      const shpView = new DataView(shpBuffer);
+      let shpOffset = 100;
+      const coords = [];
+
+      while (shpOffset < shpBuffer.byteLength - 8) {
+        const contentLen = shpView.getInt32(shpOffset + 4, false) * 2;
+        const shapeType = shpView.getInt32(shpOffset + 8, true);
+
+        if (shapeType === 1 || shapeType === 11) {
+          const x = shpView.getFloat64(shpOffset + 12, true);
+          const y = shpView.getFloat64(shpOffset + 20, true);
+          coords.push({ lon: x, lat: y });
+        }
+        shpOffset += 8 + contentLen;
+      }
+
+      // Parse DBF records
+      let dbfOffset = headerSize;
+      for (let i = 0; i < Math.min(numRecords, coords.length); i++) {
+        dbfOffset++; // Skip deletion flag
+
+        const attributes = {};
+        let fieldOffset = 0;
+
+        for (const field of fieldDefs) {
+          const rawValue = bytesToString(dbfBuffer, dbfOffset + fieldOffset, field.length);
+
+          if (field.type === 'N' || field.type === 'F') {
+            attributes[field.name] = rawValue ? parseFloat(rawValue) : null;
+          } else {
+            attributes[field.name] = rawValue || null;
+          }
+          fieldOffset += field.length;
+        }
+
+        dbfOffset += recordSize - 1;
+
+        points.push({
+          lat: coords[i].lat,
+          lon: coords[i].lon,
+          attributes: attributes
+        });
+      }
+
+      return { points, fields };
+    }
+
+    // Open yield mapping modal
+    function openYieldMappingModal(fileCount) {
+      const modal = document.getElementById('yieldMappingModal');
+      const fields = rawYieldData.fields;
+
+      // Update summary
+      document.getElementById('yieldMappingSummaryText').textContent = `Found ${rawYieldData.rawPoints.toLocaleString()} yield points`;
+      document.getElementById('yieldMappingFileCount').textContent = `${fileCount} file(s)`;
+
+      // Populate dropdowns with auto-detection
+      const dropdowns = [
+        { id: 'yieldMapYield', aliases: YIELD_FIELD_ALIASES.yield },
+        { id: 'yieldMapMoisture', aliases: YIELD_FIELD_ALIASES.moisture },
+        { id: 'yieldMapSpeed', aliases: YIELD_FIELD_ALIASES.speed },
+        { id: 'yieldMapSwath', aliases: YIELD_FIELD_ALIASES.swath },
+        { id: 'yieldMapTimestamp', aliases: YIELD_FIELD_ALIASES.timestamp },
+        { id: 'yieldMapFieldName', aliases: YIELD_FIELD_ALIASES.fieldName }
+      ];
+
+      for (const { id, aliases } of dropdowns) {
+        const select = document.getElementById(id);
+        select.innerHTML = '<option value="">(none)</option>' + fields.map(f => `<option value="${f}">${f}</option>`).join('');
+
+        // Auto-detect based on aliases
+        let matched = null;
+        for (const alias of aliases) {
+          const found = fields.find(f => f.toLowerCase() === alias.toLowerCase());
+          if (found) { matched = found; break; }
+        }
+
+        // Also try partial matching
+        if (!matched) {
+          for (const alias of aliases) {
+            const found = fields.find(f => f.toLowerCase().includes(alias.toLowerCase()));
+            if (found) { matched = found; break; }
+          }
+        }
+
+        if (matched) {
+          select.value = matched;
+          updateYieldMapPreview(id.replace('yieldMap', '').toLowerCase());
+        }
+      }
+
+      // Show unmapped fields
+      updateYieldUnmappedList();
+
+      modal.style.display = 'flex';
+    }
+
+    // Update preview values for a mapped field
+    function updateYieldMapPreview(fieldType) {
+      const selectId = 'yieldMap' + fieldType.charAt(0).toUpperCase() + fieldType.slice(1);
+      const previewId = 'yieldPreview' + fieldType.charAt(0).toUpperCase() + fieldType.slice(1);
+      const select = document.getElementById(selectId);
+      const preview = document.getElementById(previewId);
+
+      if (!select || !preview) return;
+
+      const selectedField = select.value;
+      if (selectedField && rawYieldData.sampleValues[selectedField]) {
+        preview.textContent = rawYieldData.sampleValues[selectedField] + '...';
+      } else {
+        preview.textContent = '';
+      }
+
+      updateYieldUnmappedList();
+    }
+
+    // Update unmapped fields list
+    function updateYieldUnmappedList() {
+      const mappedFields = new Set();
+      ['yieldMapYield', 'yieldMapMoisture', 'yieldMapSpeed', 'yieldMapSwath', 'yieldMapTimestamp', 'yieldMapFieldName'].forEach(id => {
+        const val = document.getElementById(id)?.value;
+        if (val) mappedFields.add(val);
+      });
+
+      const unmapped = rawYieldData.fields.filter(f => !mappedFields.has(f));
+      const section = document.getElementById('yieldUnmappedSection');
+      const list = document.getElementById('yieldUnmappedList');
+
+      if (unmapped.length > 0) {
+        section.style.display = 'block';
+        list.innerHTML = unmapped.map(f => `<span class="shp-unmapped-chip">${f}</span>`).join('');
+      } else {
+        section.style.display = 'none';
+      }
+    }
+
+    // Close yield mapping modal
+    function closeYieldMappingModal() {
+      document.getElementById('yieldMappingModal').style.display = 'none';
+    }
+
+    // Preview yield data with cleaning filters applied
+    function previewYieldCleaning() {
+      const yieldField = document.getElementById('yieldMapYield').value;
+      if (!yieldField) {
+        showStatus('Please select a yield column', false);
+        return;
+      }
+
+      const moistureField = document.getElementById('yieldMapMoisture').value;
+      const speedField = document.getElementById('yieldMapSpeed').value;
+
+      // Get filter settings
+      const filters = {
+        slowSpeed: document.getElementById('filterSlowSpeed').checked ? parseFloat(document.getElementById('filterSlowSpeedVal').value) : null,
+        highSpeed: document.getElementById('filterHighSpeed').checked ? parseFloat(document.getElementById('filterHighSpeedVal').value) : null,
+        yieldLow: document.getElementById('filterYieldLow').checked ? parseFloat(document.getElementById('filterYieldLowVal').value) : null,
+        yieldHigh: document.getElementById('filterYieldHigh').checked ? parseFloat(document.getElementById('filterYieldHighVal').value) : null,
+        moistureLow: document.getElementById('filterMoistureLow').checked ? parseFloat(document.getElementById('filterMoistureLowVal').value) : null,
+        moistureHigh: document.getElementById('filterMoistureHigh').checked ? parseFloat(document.getElementById('filterMoistureHighVal').value) : null
+      };
+
+      // Apply filters
+      const removed = { slowSpeed: 0, highSpeed: 0, yieldLow: 0, yieldHigh: 0, moistureLow: 0, moistureHigh: 0 };
+      const cleaned = [];
+
+      for (const point of rawYieldData.rawPoints) {
+        const yieldVal = point.attributes[yieldField];
+        const moistureVal = moistureField ? point.attributes[moistureField] : null;
+        const speedVal = speedField ? point.attributes[speedField] : null;
+
+        // Check filters
+        let keep = true;
+
+        if (filters.slowSpeed !== null && speedVal !== null && speedVal < filters.slowSpeed) {
+          removed.slowSpeed++;
+          keep = false;
+        } else if (filters.highSpeed !== null && speedVal !== null && speedVal > filters.highSpeed) {
+          removed.highSpeed++;
+          keep = false;
+        } else if (filters.yieldLow !== null && yieldVal !== null && yieldVal < filters.yieldLow) {
+          removed.yieldLow++;
+          keep = false;
+        } else if (filters.yieldHigh !== null && yieldVal !== null && yieldVal > filters.yieldHigh) {
+          removed.yieldHigh++;
+          keep = false;
+        } else if (filters.moistureLow !== null && moistureVal !== null && moistureVal < filters.moistureLow) {
+          removed.moistureLow++;
+          keep = false;
+        } else if (filters.moistureHigh !== null && moistureVal !== null && moistureVal > filters.moistureHigh) {
+          removed.moistureHigh++;
+          keep = false;
+        }
+
+        if (keep && yieldVal !== null && !isNaN(yieldVal)) {
+          cleaned.push({
+            lat: point.lat,
+            lon: point.lon,
+            yield: yieldVal,
+            moisture: moistureVal,
+            speed: speedVal,
+            fieldName: document.getElementById('yieldMapFieldName').value ? point.attributes[document.getElementById('yieldMapFieldName').value] : null
+          });
+        }
+      }
+
+      rawYieldData.cleanedPoints = cleaned;
+      rawYieldData.removedCounts = removed;
+
+      // Show preview modal
+      showYieldPreviewModal(removed, filters);
+    }
+
+    // Show yield preview modal with cleaning results
+    function showYieldPreviewModal(removed, filters) {
+      const modal = document.getElementById('yieldPreviewModal');
+      const cleaned = rawYieldData.cleanedPoints;
+      const total = rawYieldData.rawPoints.length;
+      const totalRemoved = Object.values(removed).reduce((a, b) => a + b, 0);
+
+      // Cleaning summary
+      const summaryEl = document.getElementById('yieldCleaningSummary');
+      let summaryHtml = `
+        <div style="padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
+          <div style="font-size: 0.75rem; color: #64748b;">Total in files</div>
+          <div style="font-size: 1.1rem; font-weight: 600; color: #1e293b;">${total.toLocaleString()}</div>
+        </div>
+      `;
+
+      if (removed.slowSpeed > 0) {
+        summaryHtml += `<div style="padding: 0.5rem; background: #fef2f2; border-radius: 0.375rem; border: 1px solid #fca5a5;">
+          <div style="font-size: 0.75rem; color: #991b1b;">Slow/stopped</div>
+          <div style="font-size: 1rem; font-weight: 600; color: #dc2626;">-${removed.slowSpeed.toLocaleString()}</div>
+        </div>`;
+      }
+      if (removed.highSpeed > 0) {
+        summaryHtml += `<div style="padding: 0.5rem; background: #fef2f2; border-radius: 0.375rem; border: 1px solid #fca5a5;">
+          <div style="font-size: 0.75rem; color: #991b1b;">High speed</div>
+          <div style="font-size: 1rem; font-weight: 600; color: #dc2626;">-${removed.highSpeed.toLocaleString()}</div>
+        </div>`;
+      }
+      if (removed.yieldLow > 0 || removed.yieldHigh > 0) {
+        summaryHtml += `<div style="padding: 0.5rem; background: #fef2f2; border-radius: 0.375rem; border: 1px solid #fca5a5;">
+          <div style="font-size: 0.75rem; color: #991b1b;">Yield outliers</div>
+          <div style="font-size: 1rem; font-weight: 600; color: #dc2626;">-${(removed.yieldLow + removed.yieldHigh).toLocaleString()}</div>
+        </div>`;
+      }
+      if (removed.moistureLow > 0 || removed.moistureHigh > 0) {
+        summaryHtml += `<div style="padding: 0.5rem; background: #fef2f2; border-radius: 0.375rem; border: 1px solid #fca5a5;">
+          <div style="font-size: 0.75rem; color: #991b1b;">Moisture outliers</div>
+          <div style="font-size: 1rem; font-weight: 600; color: #dc2626;">-${(removed.moistureLow + removed.moistureHigh).toLocaleString()}</div>
+        </div>`;
+      }
+
+      const pctRetained = ((cleaned.length / total) * 100).toFixed(1);
+      summaryHtml += `<div style="padding: 0.5rem; background: #f0fdf4; border-radius: 0.375rem; border: 1px solid #86efac;">
+        <div style="font-size: 0.75rem; color: #166534;">Points to import</div>
+        <div style="font-size: 1.1rem; font-weight: 600; color: #059669;">${cleaned.length.toLocaleString()} <span style="font-size: 0.8rem; font-weight: 400;">(${pctRetained}%)</span></div>
+      </div>`;
+
+      summaryEl.innerHTML = summaryHtml;
+
+      // Yield statistics
+      const yields = cleaned.map(p => p.yield).filter(y => y !== null);
+      const moistures = cleaned.filter(p => p.moisture !== null).map(p => p.moisture);
+
+      const statsEl = document.getElementById('yieldStatsGrid');
+      const crop = document.getElementById('rawYieldCrop').value;
+      const year = document.getElementById('rawYieldYear').value || 'Unknown';
+
+      statsEl.innerHTML = `
+        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
+          <div style="font-size: 0.7rem; color: #64748b;">Crop</div>
+          <div style="font-weight: 600; color: #1e293b;">${crop.charAt(0).toUpperCase() + crop.slice(1)}</div>
+        </div>
+        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
+          <div style="font-size: 0.7rem; color: #64748b;">Year</div>
+          <div style="font-weight: 600; color: #1e293b;">${year}</div>
+        </div>
+        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
+          <div style="font-size: 0.7rem; color: #64748b;">Min Yield</div>
+          <div style="font-weight: 600; color: #ef4444;">${Math.min(...yields).toFixed(1)}</div>
+        </div>
+        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
+          <div style="font-size: 0.7rem; color: #64748b;">Max Yield</div>
+          <div style="font-weight: 600; color: #22c55e;">${Math.max(...yields).toFixed(1)}</div>
+        </div>
+        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
+          <div style="font-size: 0.7rem; color: #64748b;">Avg Yield</div>
+          <div style="font-weight: 600; color: #3b82f6;">${(yields.reduce((a, b) => a + b, 0) / yields.length).toFixed(1)}</div>
+        </div>
+        ${moistures.length > 0 ? `
+        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
+          <div style="font-size: 0.7rem; color: #64748b;">Avg Moisture</div>
+          <div style="font-weight: 600; color: #8b5cf6;">${(moistures.reduce((a, b) => a + b, 0) / moistures.length).toFixed(1)}%</div>
+        </div>
+        ` : ''}
+      `;
+
+      // Field breakdown
+      const fieldBreakdownEl = document.getElementById('yieldFieldBreakdown');
+      const fieldNames = [...new Set(cleaned.map(p => p.fieldName).filter(f => f))];
+      if (fieldNames.length > 0) {
+        let breakdownHtml = '<div style="font-size: 0.85rem; color: #166534; margin-bottom: 0.5rem;"><strong>Fields detected:</strong></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem;">';
+        for (const field of fieldNames) {
+          const fieldPoints = cleaned.filter(p => p.fieldName === field);
+          const avgYield = fieldPoints.reduce((a, b) => a + b.yield, 0) / fieldPoints.length;
+          breakdownHtml += `<div style="padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0; font-size: 0.8rem;">
+            <strong>${field}</strong>: ${fieldPoints.length.toLocaleString()} pts (avg ${avgYield.toFixed(1)} bu/ac)
+          </div>`;
+        }
+        breakdownHtml += '</div>';
+        fieldBreakdownEl.innerHTML = breakdownHtml;
+      } else {
+        fieldBreakdownEl.innerHTML = '';
+      }
+
+      // Preview table
+      const headRow = document.getElementById('yieldPreviewHead');
+      const tbody = document.getElementById('yieldPreviewBody');
+      headRow.innerHTML = '<th style="padding: 0.5rem; text-align: left; border-bottom: 1px solid #e2e8f0;">Lat</th><th style="padding: 0.5rem; text-align: left; border-bottom: 1px solid #e2e8f0;">Lon</th><th style="padding: 0.5rem; text-align: left; border-bottom: 1px solid #e2e8f0;">Yield</th><th style="padding: 0.5rem; text-align: left; border-bottom: 1px solid #e2e8f0;">Moisture</th><th style="padding: 0.5rem; text-align: left; border-bottom: 1px solid #e2e8f0;">Field</th>';
+
+      tbody.innerHTML = cleaned.slice(0, 10).map(p => `
+        <tr>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #f1f5f9;">${p.lat.toFixed(6)}</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #f1f5f9;">${p.lon.toFixed(6)}</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #f1f5f9; font-weight: 600;">${p.yield.toFixed(1)}</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #f1f5f9;">${p.moisture ? p.moisture.toFixed(1) + '%' : '-'}</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #f1f5f9;">${p.fieldName || '-'}</td>
+        </tr>
+      `).join('');
+
+      // Update import button
+      document.getElementById('confirmYieldImportBtn').textContent = `Import ${cleaned.length.toLocaleString()} Points`;
+
+      // Close mapping modal, show preview
+      document.getElementById('yieldMappingModal').style.display = 'none';
+      modal.style.display = 'flex';
+    }
+
+    // Go back to mapping modal
+    function backToYieldMapping() {
+      document.getElementById('yieldPreviewModal').style.display = 'none';
+      document.getElementById('yieldMappingModal').style.display = 'flex';
+    }
+
+    // Close yield preview modal
+    function closeYieldPreviewModal() {
+      document.getElementById('yieldPreviewModal').style.display = 'none';
+    }
+
+    // Confirm and process raw yield import
+    async function confirmRawYieldImport() {
+      const yieldYear = document.getElementById('rawYieldYear').value.trim();
+      const yieldCrop = document.getElementById('rawYieldCrop').value;
+      const radiusFeet = parseInt(document.getElementById('rawYieldRadius').value);
+
+      if (!yieldYear) {
+        showStatus('Please enter the crop year', false);
+        return;
+      }
+
+      const cleaned = rawYieldData.cleanedPoints;
+      if (cleaned.length === 0) {
+        showStatus('No points to import', false);
+        return;
+      }
+
+      // Close preview modal, show progress
+      document.getElementById('yieldPreviewModal').style.display = 'none';
+      document.getElementById('yieldProgressModal').style.display = 'flex';
+
+      // Convert to yield points format
+      const yieldPoints = cleaned.map(p => ({
+        lat: p.lat,
+        lon: p.lon,
+        yield: p.yield,
+        year: parseInt(yieldYear),
+        crop: yieldCrop,
+        moisture: p.moisture
+      }));
+
+      // Process yield data
+      try {
+        await processYieldDataWithProgress(yieldPoints, parseInt(yieldYear), yieldCrop, radiusFeet);
+      } catch (err) {
+        console.error('Error processing yield data:', err);
+        document.getElementById('yieldProgressModal').style.display = 'none';
+        showStatus('Error processing yield data: ' + err.message, false);
+      }
+    }
+
+    // Process yield data with progress updates (used by both quick and raw import)
+    async function processYieldDataWithProgress(yieldPoints, yieldYear, yieldCrop, radiusFeet) {
+      const progressBar = document.getElementById('yieldProgressBar');
+      const progressText = document.getElementById('yieldProgressText');
+      const progressMatched = document.getElementById('yieldProgressMatched');
+
+      const samples = JSON.parse(localStorage.getItem('soilSamples') || '[]');
+      const radiusMeters = radiusFeet * 0.3048;
+      let matchedCount = 0;
+      let processedCount = 0;
+      const totalPoints = yieldPoints.length;
+      const batchSize = 1000;
+
+      const breathe = () => new Promise(resolve => setTimeout(resolve, 10));
+
+      // Process in batches
+      for (let i = 0; i < totalPoints; i += batchSize) {
+        const batch = yieldPoints.slice(i, i + batchSize);
+
+        for (const yieldPoint of batch) {
+          for (const sample of samples) {
+            const dist = getDistanceMeters(sample.lat, sample.lon, yieldPoint.lat, yieldPoint.lon);
+            if (dist <= radiusMeters) {
+              if (!sample.yieldCorrelations) sample.yieldCorrelations = {};
+              if (!sample.yieldCorrelations[yieldYear]) {
+                sample.yieldCorrelations[yieldYear] = {
+                  yields: [],
+                  crop: yieldCrop,
+                  radiusFt: radiusFeet
+                };
+              }
+              sample.yieldCorrelations[yieldYear].yields.push(yieldPoint.yield);
+              matchedCount++;
+            }
+          }
+          processedCount++;
+        }
+
+        // Update progress
+        const pct = Math.round((processedCount / totalPoints) * 100);
+        progressBar.style.width = pct + '%';
+        progressText.textContent = `Processing: ${processedCount.toLocaleString()} of ${totalPoints.toLocaleString()} points`;
+        progressMatched.textContent = `Matched to soil samples: ${matchedCount.toLocaleString()}`;
+
+        await breathe();
+      }
+
+      // Calculate averages
+      let samplesWithYield = 0;
+      for (const sample of samples) {
+        if (sample.yieldCorrelations && sample.yieldCorrelations[yieldYear]) {
+          const yields = sample.yieldCorrelations[yieldYear].yields;
+          sample.yieldCorrelations[yieldYear].avgYield = yields.reduce((a, b) => a + b, 0) / yields.length;
+          sample.yieldCorrelations[yieldYear].pointCount = yields.length;
+          delete sample.yieldCorrelations[yieldYear].yields;
+          samplesWithYield++;
+        }
+      }
+
+      // Save
+      localStorage.setItem('soilSamples', JSON.stringify(samples));
+
+      // Store yield points
+      const existingYield = JSON.parse(localStorage.getItem('yieldData') || '[]');
+      const newYieldData = yieldPoints.map(p => ({ lat: p.lat, lon: p.lon, yield: p.yield, year: yieldYear, crop: yieldCrop }));
+      localStorage.setItem('yieldData', JSON.stringify([...existingYield, ...newYieldData]));
+
+      // Close progress modal
+      document.getElementById('yieldProgressModal').style.display = 'none';
+
+      // Show summary
+      document.getElementById('yieldStatus').innerHTML = `<span style="color: #059669;">✓ Imported ${totalPoints.toLocaleString()} yield points. ${samplesWithYield} samples matched.</span>`;
+      showStatus(`Imported ${totalPoints.toLocaleString()} yield points. ${samplesWithYield} soil samples now have yield data.`, true);
+
+      // Save mapping if checkbox checked
+      if (document.getElementById('yieldSaveMapping')?.checked) {
+        // Save the current mappings as aliases for future imports
+        const aliases = JSON.parse(localStorage.getItem('yieldColumnAliases') || '{}');
+        const yieldField = document.getElementById('yieldMapYield')?.value;
+        const moistureField = document.getElementById('yieldMapMoisture')?.value;
+        const speedField = document.getElementById('yieldMapSpeed')?.value;
+
+        if (yieldField && !YIELD_FIELD_ALIASES.yield.includes(yieldField)) {
+          aliases.yield = aliases.yield || [];
+          if (!aliases.yield.includes(yieldField)) aliases.yield.push(yieldField);
+        }
+        if (moistureField && !YIELD_FIELD_ALIASES.moisture.includes(moistureField)) {
+          aliases.moisture = aliases.moisture || [];
+          if (!aliases.moisture.includes(moistureField)) aliases.moisture.push(moistureField);
+        }
+        if (speedField && !YIELD_FIELD_ALIASES.speed.includes(speedField)) {
+          aliases.speed = aliases.speed || [];
+          if (!aliases.speed.includes(speedField)) aliases.speed.push(speedField);
+        }
+
+        localStorage.setItem('yieldColumnAliases', JSON.stringify(aliases));
+      }
+    }
+
+    // Distance calculation helper (in meters)
+    function getDistanceMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371000; // Earth radius in meters
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    // ========== QUICK YIELD IMPORT (original) ==========
+
     async function uploadYield() {
       const fileInput = document.getElementById('yieldFiles');
       const files = fileInput.files;
