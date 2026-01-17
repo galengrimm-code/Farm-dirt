@@ -552,8 +552,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.68";
-    const BUILD_DATE = "2026-01-17T08:22:04";
+    const APP_VERSION = "v1.0.69";
+    const BUILD_DATE = "2026-01-17T08:35:31";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -793,25 +793,8 @@
       rankYearSel.innerHTML = '<option value="most_recent" selected>Most Recent</option>';
       years.forEach(y => { rankYearSel.innerHTML += `<option value="${y}">${y}</option>`; });
       
-      // Yield selectors
-      const yieldYearSel = document.getElementById('yieldYearSelect');
-      const yieldYears = getYieldYears();
-      const totalSamplesWithYield = sampleData.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0).length;
-      yieldYearSel.innerHTML = `<option value="avg">All Years (Averaged)</option>`;
-      yieldYearSel.innerHTML += `<option value="combined">All Years (Combined)</option>`;
-      yieldYearSel.innerHTML += `<option value="normalized">All Years (Year-Normalized)</option>`;
-      yieldYears.forEach(y => {
-        if (y.count > 0) {
-          // Year has matched yield data
-          yieldYearSel.innerHTML += `<option value="${y.year}">${y.year} (${y.count.toLocaleString()} samples)</option>`;
-        } else if (y.rawCount > 0) {
-          // Year has raw yield data but not matched to samples
-          yieldYearSel.innerHTML += `<option value="${y.year}" disabled>${y.year} - ${y.rawCount.toLocaleString()} yield pts (not matched)</option>`;
-        }
-      });
-
-      // Initialize description display
-      updateYieldYearDescription();
+      // Yield year selector - filtered by selected crop
+      updateYieldYearSelector();
 
       // Soil sample year selector
       const soilYearSel = document.getElementById('soilYearSelect');
@@ -903,24 +886,27 @@
       return [...years].sort((a, b) => b - a);
     }
     
-    function getYieldYears() {
+    function getYieldYears(cropFilter = null) {
       const yearCounts = {};  // Matched samples with yield correlations
       const rawYearCounts = {}; // Raw yield points by year (may not be matched)
 
-      // Count matched yield correlations on soil samples
+      // Count matched yield correlations on soil samples - filter by crop if specified
       sampleData.forEach(s => {
         if (s.yieldCorrelations) {
-          Object.keys(s.yieldCorrelations).forEach(y => {
-            const year = parseInt(y);
-            yearCounts[year] = (yearCounts[year] || 0) + 1;
+          Object.entries(s.yieldCorrelations).forEach(([y, yieldInfo]) => {
+            // Only count if crop matches (or no filter)
+            if (!cropFilter || yieldInfo.crop === cropFilter) {
+              const year = parseInt(y);
+              yearCounts[year] = (yearCounts[year] || 0) + 1;
+            }
           });
         }
       });
 
-      // Also check raw yieldData for unmatched years
+      // Also check raw yieldData for unmatched years - filter by crop if specified
       if (yieldData && yieldData.length > 0) {
         yieldData.forEach(y => {
-          if (y.year) {
+          if (y.year && (!cropFilter || y.crop === cropFilter)) {
             rawYearCounts[y.year] = (rawYearCounts[y.year] || 0) + 1;
           }
         });
@@ -928,11 +914,9 @@
 
       // Debug logging
       console.log('=== YIELD YEARS DEBUG ===');
+      console.log('Crop filter:', cropFilter);
       console.log('Years in yieldCorrelations (matched):', yearCounts);
       console.log('Years in raw yieldData:', rawYearCounts);
-      console.log('Total samples:', sampleData.length);
-      console.log('Total yield points:', yieldData.length);
-      console.log('Samples with yieldCorrelations:', sampleData.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0).length);
 
       // Merge: include years from both matched and raw data
       const allYears = new Set([...Object.keys(yearCounts), ...Object.keys(rawYearCounts)]);
@@ -944,6 +928,26 @@
           count: yearCounts[year] || 0,
           rawCount: rawYearCounts[year] || 0
         }));
+    }
+
+    function updateYieldYearSelector() {
+      const cropFilter = document.getElementById('yieldCropSelect').value;
+      const yieldYearSel = document.getElementById('yieldYearSelect');
+      const yieldYears = getYieldYears(cropFilter);
+
+      yieldYearSel.innerHTML = `<option value="avg">All Years (Averaged)</option>`;
+      yieldYearSel.innerHTML += `<option value="combined">All Years (Combined)</option>`;
+      yieldYearSel.innerHTML += `<option value="normalized">All Years (Year-Normalized)</option>`;
+
+      yieldYears.forEach(y => {
+        if (y.count > 0) {
+          yieldYearSel.innerHTML += `<option value="${y.year}">${y.year} (${y.count.toLocaleString()} samples)</option>`;
+        } else if (y.rawCount > 0) {
+          yieldYearSel.innerHTML += `<option value="${y.year}" disabled>${y.year} - ${y.rawCount.toLocaleString()} yield pts (not matched)</option>`;
+        }
+      });
+
+      updateYieldYearDescription();
     }
 
     function setupTabs() {
@@ -969,6 +973,7 @@
       document.getElementById('rankingAttrSelect').addEventListener('change', updateRankings);
       document.getElementById('rankingYearSelect').addEventListener('change', updateRankings);
       document.getElementById('yieldCropSelect').addEventListener('change', () => {
+        updateYieldYearSelector();  // Update year dropdown to show only years with data for selected crop
         updateYieldFieldSelector();
         updateYieldAnalysis();
         resetMultiModel();
