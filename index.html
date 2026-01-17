@@ -107,15 +107,30 @@
       .stats-box.field-view-hidden { display: none !important; }
       /* Hide nav tabs in Field View mode */
       .nav-links.field-view-hidden { display: none !important; }
-      /* Back button to show nav */
-      .back-to-menu-btn { display: none; background: rgba(255,255,255,0.95); border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; font-size: 0.7rem; font-weight: 500; cursor: pointer; position: absolute; top: 10px; left: 10px; z-index: 1001; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
-      .back-to-menu-btn.visible { display: flex !important; align-items: center; gap: 4px; }
+      /* Back button to show nav - hamburger icon */
+      .back-to-menu-btn { display: none; background: rgba(255,255,255,0.95); border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; font-size: 1rem; font-weight: 500; cursor: pointer; position: absolute; top: 10px; left: 10px; z-index: 1001; box-shadow: 0 2px 6px rgba(0,0,0,0.15); line-height: 1; }
+      .back-to-menu-btn.visible { display: block !important; }
 
       /* Compare mode is desktop-only - hide all compare elements on mobile */
       #compareYearStack { display: none !important; }
       #compareInfoBar { display: none !important; }
       #mobileCompareBtn { display: none !important; }
       .compare-legend { display: none !important; }
+
+      /* Move zoom indicator above mobile toolbar */
+      #zoomIndicator {
+        bottom: 60px !important;
+        left: 8px !important;
+        padding: 4px 8px !important;
+        font-size: 10px !important;
+      }
+
+      /* Fix Leaflet attribution on mobile */
+      .leaflet-control-attribution {
+        bottom: 60px !important;
+        font-size: 8px !important;
+        max-width: 150px !important;
+      }
     }
     .mobile-toolbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #e2e8f0; padding: 0.5rem; z-index: 1000; justify-content: space-around; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
     .mobile-toolbar button { flex: 1; margin: 0 0.25rem; padding: 0.6rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; background: white; font-size: 0.7rem; cursor: pointer; font-weight: 500; }
@@ -228,7 +243,7 @@
     
     <div class="main-content" style="position: relative;">
       <div id="map"></div>
-      <button id="backToMenuBtn" class="back-to-menu-btn" onclick="showNavTabs()">← Menu</button>
+      <button id="backToMenuBtn" class="back-to-menu-btn" onclick="showNavTabs()" title="Menu">☰</button>
       <div id="statsBox" class="stats-box" style="position: absolute; top: 80px; right: 10px; background: white; padding: 8px 12px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); z-index: 1000; font-size: 12px;">
         <div class="stats-header" onclick="toggleStatsBox()" style="font-weight: 600; color: #374151; display: flex; justify-content: space-between; align-items: center;">
           <span id="statsTitle">Stats</span>
@@ -319,8 +334,8 @@
   
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.62";
-    const BUILD_DATE = "2026-01-16T16:14:20";
+    const APP_VERSION = "v1.0.63";
+    const BUILD_DATE = "2026-01-17T05:55:48";
 
     // ========== CONFIG ==========
     const CONFIG = {
