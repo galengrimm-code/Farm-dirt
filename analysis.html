@@ -135,7 +135,10 @@
       <button class="sign-in-btn" id="authBtn" onclick="handleAuth()">Sign In to Edit</button>
     </div>
   </div>
-  
+
+  <!-- Active Operation Indicator (shown when filtering by client/farm) -->
+  <div id="activeOperationIndicator" style="display: none; padding: 0.35rem 1rem; background: #f5f3ff; border-bottom: 1px solid #ddd6fe; font-size: 0.75rem; color: #6b21a8;"></div>
+
   <div class="analysis-container">
     <div class="tabs">
       <div class="tab active" data-tab="history">📈 Field Trends</div>
@@ -552,8 +555,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.69";
-    const BUILD_DATE = "2026-01-17T08:35:31";
+    const APP_VERSION = "v1.0.70";
+    const BUILD_DATE = "2026-01-17T17:10:14";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -624,7 +627,153 @@
     let yieldCorrelationsData = [];
     let yieldSortColumn = 'r'; // Default sort by correlation
     let yieldSortDirection = 'desc'; // desc = highest first
-    
+
+    // ========== CLIENT/FARM DATA ==========
+    let clientsData = [];
+    let farmsData = [];
+    let fieldBoundaries = {};
+    let activeClientId = 'all';
+    let activeFarmId = 'all';
+
+    // Generate unique IDs
+    function generateId(prefix) {
+      return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    // Load clients from localStorage
+    function loadClientsData() {
+      try {
+        const saved = localStorage.getItem('clientsData');
+        clientsData = saved ? JSON.parse(saved) : [];
+      } catch (e) { clientsData = []; }
+      return clientsData;
+    }
+
+    // Load farms from localStorage
+    function loadFarmsData() {
+      try {
+        const saved = localStorage.getItem('farmsData');
+        farmsData = saved ? JSON.parse(saved) : [];
+      } catch (e) { farmsData = []; }
+      return farmsData;
+    }
+
+    // Load field boundaries from localStorage
+    function loadFieldBoundaries() {
+      try {
+        const saved = localStorage.getItem('fieldBoundaries');
+        fieldBoundaries = saved ? JSON.parse(saved) : {};
+      } catch (e) { fieldBoundaries = {}; }
+      return fieldBoundaries;
+    }
+
+    // Load active selection from localStorage
+    function loadActiveSelection() {
+      activeClientId = localStorage.getItem('activeClientId') || 'all';
+      activeFarmId = localStorage.getItem('activeFarmId') || 'all';
+    }
+
+    // Migration: Convert legacy fieldBoundaries format
+    function migrateDataIfNeeded() {
+      const dataVersion = localStorage.getItem('dataVersion');
+      if (dataVersion === '2') return false;
+
+      const saved = localStorage.getItem('fieldBoundaries');
+      const boundaries = saved ? JSON.parse(saved) : {};
+
+      const hasLegacyBoundaries = Object.keys(boundaries).some(key => {
+        const val = boundaries[key];
+        return Array.isArray(val) || (val && !val.boundary);
+      });
+
+      if (!hasLegacyBoundaries) {
+        localStorage.setItem('dataVersion', '2');
+        return false;
+      }
+
+      // Create default client/farm if needed
+      const operationName = localStorage.getItem('operationName') || 'My Operation';
+      const existingClients = JSON.parse(localStorage.getItem('clientsData') || '[]');
+      let defaultClient = existingClients.find(c => c.isDefault);
+
+      if (!defaultClient) {
+        defaultClient = { id: generateId('cli'), name: operationName, isDefault: true, createdAt: new Date().toISOString() };
+        existingClients.push(defaultClient);
+        localStorage.setItem('clientsData', JSON.stringify(existingClients));
+      }
+
+      const existingFarms = JSON.parse(localStorage.getItem('farmsData') || '[]');
+      let defaultFarm = existingFarms.find(f => f.clientId === defaultClient.id && f.isDefault);
+
+      if (!defaultFarm) {
+        defaultFarm = { id: generateId('frm'), clientId: defaultClient.id, name: 'Default Farm', isDefault: true, createdAt: new Date().toISOString() };
+        existingFarms.push(defaultFarm);
+        localStorage.setItem('farmsData', JSON.stringify(existingFarms));
+      }
+
+      // Migrate boundaries
+      const migratedBoundaries = {};
+      Object.entries(boundaries).forEach(([fieldName, fieldData]) => {
+        if (Array.isArray(fieldData) || (fieldData && !fieldData.boundary)) {
+          migratedBoundaries[fieldName] = { boundary: Array.isArray(fieldData) ? fieldData : fieldData, farmId: defaultFarm.id, createdAt: new Date().toISOString() };
+        } else {
+          migratedBoundaries[fieldName] = fieldData;
+        }
+      });
+
+      localStorage.setItem('fieldBoundaries', JSON.stringify(migratedBoundaries));
+      localStorage.setItem('activeClientId', defaultClient.id);
+      localStorage.setItem('activeFarmId', 'all');
+      localStorage.setItem('dataVersion', '2');
+      return true;
+    }
+
+    // Get fields filtered by active client/farm selection
+    function getActiveFields() {
+      const allFieldNames = Object.keys(fieldBoundaries);
+
+      if (activeClientId === 'all' && activeFarmId === 'all') return allFieldNames;
+
+      if (activeFarmId !== 'all') {
+        return allFieldNames.filter(fieldName => {
+          const field = fieldBoundaries[fieldName];
+          return field && field.farmId === activeFarmId;
+        });
+      }
+
+      if (activeClientId !== 'all') {
+        const clientFarmIds = farmsData.filter(f => f.clientId === activeClientId).map(f => f.id);
+        return allFieldNames.filter(fieldName => {
+          const field = fieldBoundaries[fieldName];
+          return field && clientFarmIds.includes(field.farmId);
+        });
+      }
+
+      return allFieldNames;
+    }
+
+    // Update active operation indicator
+    function updateActiveOperationIndicator() {
+      const indicator = document.getElementById('activeOperationIndicator');
+      if (!indicator) return;
+
+      if (activeClientId === 'all') {
+        indicator.style.display = 'none';
+        return;
+      }
+
+      const client = clientsData.find(c => c.id === activeClientId);
+      let text = client?.name || 'Unknown Client';
+
+      if (activeFarmId !== 'all') {
+        const farm = farmsData.find(f => f.id === activeFarmId);
+        text += ` > ${farm?.name || 'Unknown Farm'}`;
+      }
+
+      indicator.innerHTML = `<span style="margin-right: 0.5rem;">👤</span>${text} <a href="settings.html" style="color: #3b82f6; margin-left: 0.5rem;">[change]</a>`;
+      indicator.style.display = 'block';
+    }
+
     const SheetsAPI = {
       isSignedIn: false,
       async init() {
@@ -674,11 +823,19 @@
     };
 
     document.addEventListener('DOMContentLoaded', async () => {
+      // Run migration first to ensure data structures are up to date
+      migrateDataIfNeeded();
+      loadClientsData();
+      loadFarmsData();
+      loadFieldBoundaries();
+      loadActiveSelection();
+
       try { await SheetsAPI.init(); SheetsAPI.onSignInChange = handleSignInChange; handleSignInChange(SheetsAPI.isSignedIn); } catch (e) {}
       loadLocalData();
       setupTabs();
       setupEventListeners();
       updateBackupFooter();
+      updateActiveOperationIndicator();
     });
 
     async function handleAuth() { if (SheetsAPI.isSignedIn) await SheetsAPI.signOut(); else await SheetsAPI.signIn(); }
@@ -763,8 +920,12 @@
     }
 
     function populateSelectors() {
-      const years = [...new Set(sampleData.map(s => s.year).filter(y => y))].sort((a, b) => b - a);
-      const fields = [...new Set(sampleData.map(s => s.field).filter(f => f && f !== 'Unknown'))].sort();
+      // Filter by active client/farm
+      const activeFields = getActiveFields();
+      const filteredSamples = sampleData.filter(s => activeFields.includes(s.field));
+
+      const years = [...new Set(filteredSamples.map(s => s.year).filter(y => y))].sort((a, b) => b - a);
+      const fields = [...new Set(filteredSamples.map(s => s.field).filter(f => f && f !== 'Unknown'))].sort();
       
       // Year comparison selectors - year1 is earlier (FROM), year2 is later (TO)
       const year1Sel = document.getElementById('year1Select');
