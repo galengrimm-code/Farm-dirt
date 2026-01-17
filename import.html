@@ -264,7 +264,6 @@
               <option value="corn">🌽 Corn</option>
               <option value="soybeans">🫘 Soybeans</option>
               <option value="wheat">🌾 Wheat</option>
-              <option value="sorghum">🌿 Grain Sorghum</option>
             </select>
           </div>
           <div class="form-group">
@@ -297,7 +296,6 @@
               <option value="corn">🌽 Corn</option>
               <option value="soybeans">🫘 Soybeans</option>
               <option value="wheat">🌾 Wheat</option>
-              <option value="sorghum">🌿 Grain Sorghum</option>
             </select>
           </div>
           <div class="form-group">
@@ -1103,8 +1101,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.65";
-    const BUILD_DATE = "2026-01-17T07:36:37";
+    const APP_VERSION = "v1.0.66";
+    const BUILD_DATE = "2026-01-17T07:47:52";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -2249,8 +2247,7 @@
     const CROP_DEFAULTS = {
       corn: { yieldMin: 20, yieldMax: 400, moistureMin: 8, moistureMax: 35 },
       soybeans: { yieldMin: 10, yieldMax: 120, moistureMin: 8, moistureMax: 20 },
-      wheat: { yieldMin: 15, yieldMax: 150, moistureMin: 8, moistureMax: 20 },
-      sorghum: { yieldMin: 20, yieldMax: 250, moistureMin: 8, moistureMax: 25 }
+      wheat: { yieldMin: 15, yieldMax: 150, moistureMin: 8, moistureMax: 20 }
     };
 
     // Common yield field aliases from different monitors
@@ -3136,31 +3133,73 @@
 
         afterImportSuccess();
 
-        const yearInfo = detectedYear ? `📅 Auto-detected year: ${detectedYear}<br>` : '';
-        const batchInfo = filesProcessed > 1 ? `📁 Processed ${filesProcessed} yield files<br>` : '';
-        const matchRate = correlationResults.totalSamples > 0
-          ? Math.round((correlationResults.samplesWithYield / correlationResults.totalSamples) * 100)
+        // Calculate coverage area match rate (samples matched / samples in coverage area)
+        const coverageMatchRate = correlationResults.samplesInCoverageArea > 0
+          ? Math.round((correlationResults.samplesWithYield / correlationResults.samplesInCoverageArea) * 100)
           : 0;
-        const matchColor = matchRate === 100 ? '#22c55e' : (matchRate >= 80 ? '#f59e0b' : '#ef4444');
+        const coverageMatchColor = coverageMatchRate >= 95 ? '#22c55e' : (coverageMatchRate >= 80 ? '#f59e0b' : '#ef4444');
 
-        let errorInfo = '';
+        // Calculate unmatched in coverage area
+        const unmatchedInCoverage = correlationResults.samplesInCoverageArea - correlationResults.samplesWithYield;
+        const unmatchedPct = correlationResults.samplesInCoverageArea > 0
+          ? Math.round((unmatchedInCoverage / correlationResults.samplesInCoverageArea) * 100)
+          : 0;
+
+        // Calculate overall data status
+        const totalWithYield = sampleData.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0).length;
+        const totalWithoutYield = sampleData.length - totalWithYield;
+        const overallPct = sampleData.length > 0 ? Math.round((totalWithYield / sampleData.length) * 100) : 0;
+        const overallColor = overallPct >= 50 ? '#22c55e' : (overallPct >= 25 ? '#f59e0b' : '#64748b');
+
+        // Build status HTML
+        let statusHtml = '<div style="font-size: 0.9rem; line-height: 1.6;">';
+
+        // Upload summary
+        if (detectedYear) statusHtml += `<span style="color: #22c55e;">✓ Auto-detected year: ${detectedYear}</span><br>`;
+        if (filesProcessed > 1) statusHtml += `<span style="color: #22c55e;">✓ Processed ${filesProcessed} yield files</span><br>`;
+        statusHtml += `<span style="color: #22c55e;">✓ Uploaded ${newPoints.length.toLocaleString()} yield points</span>`;
         if (fileErrors.length > 0) {
-          errorInfo = `<br><span style="color: #f59e0b;">⚠️ ${fileErrors.length} file(s) skipped due to errors</span>`;
+          statusHtml += `<br><span style="color: #f59e0b;">⚠ ${fileErrors.length} file(s) skipped due to errors</span>`;
         }
 
-        const yieldMatchRate = correlationResults.totalYieldPoints > 0
-          ? Math.round((correlationResults.totalYieldPointsMatched / correlationResults.totalYieldPoints) * 100)
-          : 0;
+        // Yield-to-Sample Matching section
+        statusHtml += `
+          <div style="margin-top: 0.75rem; padding: 0.5rem 0.75rem; background: #f8fafc; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
+            <div style="font-weight: 600; color: #475569; margin-bottom: 0.5rem; font-size: 0.8rem;">Yield-to-Sample Matching</div>
+            <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.25rem 1rem; font-size: 0.85rem;">
+              <span style="color: #64748b;">Samples in yield coverage area:</span>
+              <span style="font-weight: 600; text-align: right;">${correlationResults.samplesInCoverageArea.toLocaleString()}</span>
+              <span style="color: #64748b;">Samples successfully matched:</span>
+              <span style="font-weight: 600; color: ${coverageMatchColor}; text-align: right;">${correlationResults.samplesWithYield.toLocaleString()} (${coverageMatchRate}%)</span>
+              <span style="color: #64748b;">Samples with no yield match:</span>
+              <span style="font-weight: 600; color: ${unmatchedInCoverage > 0 ? '#f59e0b' : '#64748b'}; text-align: right;">${unmatchedInCoverage.toLocaleString()} (${unmatchedPct}%)</span>
+              <span style="color: #64748b;">Avg yield points per sample:</span>
+              <span style="font-weight: 600; text-align: right;">${correlationResults.avgYieldPointsPerSample}</span>
+            </div>
+          </div>`;
 
-        statusEl.innerHTML = `
-          <span style="color: #22c55e;">${yearInfo}${batchInfo}✓ Uploaded ${newPoints.length.toLocaleString()} yield points</span>${errorInfo}<br>
-          <span style="color: #3b82f6;">✓ ${correlationResults.totalYieldPointsMatched.toLocaleString()} yield points matched to samples (${yieldMatchRate}%)</span><br>
-          <span style="color: ${matchColor};">✓ ${correlationResults.samplesWithYield} of ${correlationResults.totalSamples} soil samples now have yield data (${matchRate}%)</span><br>
-          <span style="color: #64748b; font-size: 0.85rem;">Avg ${correlationResults.avgYieldPointsPerSample} yield points per sample</span><br>
-          <button onclick="showYieldSummary(lastYieldResults)" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: #f59e0b; color: white; border: none; border-radius: 0.25rem; cursor: pointer; font-weight: 600;">
-            📊 View Import Summary
+        // Overall Data Status section
+        statusHtml += `
+          <div style="margin-top: 0.5rem; padding: 0.5rem 0.75rem; background: #f0fdf4; border-radius: 0.375rem; border: 1px solid #bbf7d0;">
+            <div style="font-weight: 600; color: #166534; margin-bottom: 0.5rem; font-size: 0.8rem;">Overall Data Status</div>
+            <div style="display: grid; grid-template-columns: 1fr auto; gap: 0.25rem 1rem; font-size: 0.85rem;">
+              <span style="color: #64748b;">Total soil samples:</span>
+              <span style="font-weight: 600; text-align: right;">${sampleData.length.toLocaleString()}</span>
+              <span style="color: #64748b;">Samples with yield data:</span>
+              <span style="font-weight: 600; color: ${overallColor}; text-align: right;">${totalWithYield.toLocaleString()} (${overallPct}%)</span>
+              <span style="color: #64748b;">Samples without yield data:</span>
+              <span style="font-weight: 600; text-align: right;">${totalWithoutYield.toLocaleString()} (${100 - overallPct}%)</span>
+            </div>
+          </div>`;
+
+        statusHtml += '</div>';
+        statusHtml += `
+          <button onclick="showYieldSummary(lastYieldResults)" style="margin-top: 0.75rem; padding: 0.5rem 1rem; background: #f59e0b; color: white; border: none; border-radius: 0.25rem; cursor: pointer; font-weight: 600;">
+            📊 View Detailed Summary
           </button>
         `;
+
+        statusEl.innerHTML = statusHtml;
 
         // Store results for later viewing
         lastYieldResults = correlationResults;
@@ -3362,6 +3401,7 @@
       if (yearYield.length === 0) {
         return {
           totalSamples: sampleData.length,
+          samplesInCoverageArea: 0,
           samplesWithYield: 0,
           samplesWithoutYield: sampleData.length,
           totalYieldPoints: 0,
@@ -3375,6 +3415,30 @@
 
       // Helper for async breathing
       const breathe = () => new Promise(resolve => setTimeout(resolve, 0));
+
+      // Calculate bounding box of yield data (coverage area)
+      let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+      for (const yp of yearYield) {
+        if (yp.lat < minLat) minLat = yp.lat;
+        if (yp.lat > maxLat) maxLat = yp.lat;
+        if (yp.lon < minLon) minLon = yp.lon;
+        if (yp.lon > maxLon) maxLon = yp.lon;
+      }
+      // Add radius buffer to bounding box
+      minLat -= radiusLatDeg;
+      maxLat += radiusLatDeg;
+      minLon -= radiusLonDeg;
+      maxLon += radiusLonDeg;
+
+      // Count samples in yield coverage area (within bounding box)
+      let samplesInCoverageArea = 0;
+      for (const sample of sampleData) {
+        if (sample.lat && sample.lon &&
+            sample.lat >= minLat && sample.lat <= maxLat &&
+            sample.lon >= minLon && sample.lon <= maxLon) {
+          samplesInCoverageArea++;
+        }
+      }
 
       // Track results
       let samplesWithYieldCount = 0;
@@ -3485,12 +3549,14 @@
         : 0;
 
       console.log('=== YIELD MATCHING RESULTS ===');
+      console.log(`Samples in coverage area: ${samplesInCoverageArea}`);
       console.log(`Samples with yield data: ${samplesWithYieldCount}`);
       console.log(`Samples without yield data: ${samplesWithoutYieldCount}`);
       console.log(`Avg yield points per matched sample: ${avgYieldPointsPerSample}`);
 
       return {
         totalSamples: sampleData.length,
+        samplesInCoverageArea,
         samplesWithYield: samplesWithYieldCount,
         samplesWithoutYield: samplesWithoutYieldCount,
         totalYieldPoints: yearYield.length,
@@ -3525,33 +3591,56 @@
       lastYieldResults = results;
       const modal = document.getElementById('yieldSummaryModal');
 
-      // Calculate match rate
-      const matchRate = results.totalSamples > 0
-        ? Math.round((results.samplesWithYield / results.totalSamples) * 100)
+      // Calculate coverage area match rate
+      const coverageMatchRate = results.samplesInCoverageArea > 0
+        ? Math.round((results.samplesWithYield / results.samplesInCoverageArea) * 100)
         : 0;
-      const matchColor = matchRate === 100 ? '#16a34a' : (matchRate >= 80 ? '#d97706' : '#dc2626');
+      const coverageMatchColor = coverageMatchRate >= 95 ? '#16a34a' : (coverageMatchRate >= 80 ? '#d97706' : '#dc2626');
+
+      // Calculate overall data status
+      const totalWithYield = sampleData.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0).length;
+      const overallPct = sampleData.length > 0 ? Math.round((totalWithYield / sampleData.length) * 100) : 0;
 
       // Clear any existing debug section from previous opens
       const existingDebug = document.getElementById('gpsDebugSection');
       if (existingDebug) existingDebug.remove();
 
-      // Summary stats - soil-sample-centric
+      // Calculate unmatched in coverage area
+      const unmatchedInCoverage = (results.samplesInCoverageArea || 0) - results.samplesWithYield;
+      const unmatchedPct = results.samplesInCoverageArea > 0
+        ? Math.round((unmatchedInCoverage / results.samplesInCoverageArea) * 100)
+        : 0;
+
+      // Summary stats with coverage area focus
       document.getElementById('yieldSummaryStats').innerHTML = `
-        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
-          <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">${results.totalSamples.toLocaleString()}</div>
-          <div style="font-size: 0.75rem; color: #64748b;">Total Samples</div>
+        <div style="grid-column: span 4; margin-bottom: 0.5rem;">
+          <div style="font-weight: 600; color: #475569; font-size: 0.8rem; margin-bottom: 0.5rem;">This Import (Year ${results.yieldYear})</div>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
+            <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
+              <div style="font-size: 1.25rem; font-weight: 700; color: #1e293b;">${(results.samplesInCoverageArea || 0).toLocaleString()}</div>
+              <div style="font-size: 0.7rem; color: #64748b;">In Coverage Area</div>
+            </div>
+            <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #22c55e;">
+              <div style="font-size: 1.25rem; font-weight: 700; color: #16a34a;">${results.samplesWithYield.toLocaleString()}</div>
+              <div style="font-size: 0.7rem; color: #64748b;">Matched (${coverageMatchRate}%)</div>
+            </div>
+            <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid ${unmatchedInCoverage > 0 ? '#f59e0b' : '#e2e8f0'};">
+              <div style="font-size: 1.25rem; font-weight: 700; color: ${unmatchedInCoverage > 0 ? '#d97706' : '#64748b'};">${unmatchedInCoverage.toLocaleString()}</div>
+              <div style="font-size: 0.7rem; color: #64748b;">No Match (${unmatchedPct}%)</div>
+            </div>
+            <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
+              <div style="font-size: 1.25rem; font-weight: 700; color: #1e293b;">${results.avgYieldPointsPerSample}</div>
+              <div style="font-size: 0.7rem; color: #64748b;">Avg Pts/Sample</div>
+            </div>
+          </div>
         </div>
-        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #22c55e;">
-          <div style="font-size: 1.5rem; font-weight: 700; color: #16a34a;">${results.samplesWithYield.toLocaleString()}</div>
-          <div style="font-size: 0.75rem; color: #64748b;">With Yield Data</div>
-        </div>
-        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid ${results.samplesWithoutYield > 0 ? '#f59e0b' : '#e2e8f0'};">
-          <div style="font-size: 1.5rem; font-weight: 700; color: ${results.samplesWithoutYield > 0 ? '#d97706' : '#64748b'};">${results.samplesWithoutYield.toLocaleString()}</div>
-          <div style="font-size: 0.75rem; color: #64748b;">No Yield Nearby</div>
-        </div>
-        <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
-          <div style="font-size: 1.5rem; font-weight: 700; color: #1e293b;">${results.avgYieldPointsPerSample}</div>
-          <div style="font-size: 0.75rem; color: #64748b;">Avg Pts/Sample</div>
+        <div style="grid-column: span 4; margin-top: 0.5rem; padding: 0.5rem 0.75rem; background: #f0fdf4; border-radius: 0.375rem; border: 1px solid #bbf7d0;">
+          <div style="font-weight: 600; color: #166534; font-size: 0.8rem; margin-bottom: 0.25rem;">Overall Data Status</div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.85rem;">
+            <span style="color: #64748b;">Total samples: <strong style="color: #1e293b;">${sampleData.length.toLocaleString()}</strong></span>
+            <span style="color: #64748b;">With yield data: <strong style="color: #16a34a;">${totalWithYield.toLocaleString()} (${overallPct}%)</strong></span>
+            <span style="color: #64748b;">Without yield: <strong>${(sampleData.length - totalWithYield).toLocaleString()} (${100 - overallPct}%)</strong></span>
+          </div>
         </div>
       `;
 
