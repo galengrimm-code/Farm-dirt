@@ -589,8 +589,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.74";
-    const BUILD_DATE = "2026-01-19T08:10:50";
+    const APP_VERSION = "v1.0.75";
+    const BUILD_DATE = "2026-01-19T08:20:15";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -1033,9 +1033,13 @@
     }
 
     function updateSpatialYearSelectors(field) {
+      // Filter by active client/farm first
+      const activeFieldsList = getActiveFields();
+      const filteredSamples = sampleData.filter(s => activeFieldsList.includes(s.field));
+
       // Get years that have data for the selected field (or all fields if __all__)
       const fieldYears = [...new Set(
-        sampleData
+        filteredSamples
           .filter(s => (field === '__all__' || s.field === field) && s.year)
           .map(s => s.year)
       )].sort((a, b) => a - b); // Sort ascending (oldest first for base year)
@@ -4534,11 +4538,16 @@
 
       // Detect which tab is active
       const isMultiTab = document.getElementById('yieldMultiTab').style.display !== 'none';
+      const isBucketsTab = document.getElementById('yieldBucketsTab').style.display !== 'none';
 
       let reportContent = '';
       let reportTitle = '';
 
-      if (isMultiTab) {
+      if (isBucketsTab) {
+        // Export Yield by Nutrient Level results
+        reportTitle = 'Yield by Nutrient Level';
+        reportContent = document.getElementById('yieldBucketsContent').innerHTML;
+      } else if (isMultiTab) {
         // Export MVR results
         reportTitle = 'Multivariate Regression Analysis';
 
@@ -4643,10 +4652,14 @@
         return;
       }
 
+      // Filter by active client/farm first
+      const activeFieldsList = getActiveFields();
+      const filteredSamples = sampleData.filter(s => activeFieldsList.includes(s.field));
+
       // Get all samples for this field (or all fields if __all__)
       const isAllFields = field === '__all__';
       const fieldDisplayName = isAllFields ? 'All Fields' : field;
-      const fieldSamples = sampleData.filter(s => isAllFields || s.field === field);
+      const fieldSamples = filteredSamples.filter(s => isAllFields || s.field === field);
       const years = [...new Set(fieldSamples.map(s => s.year).filter(y => y))].sort();
 
       if (years.length < 2) {
