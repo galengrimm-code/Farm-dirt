@@ -1122,8 +1122,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.75";
-    const BUILD_DATE = "2026-01-19T08:20:15";
+    const APP_VERSION = "v1.0.76";
+    const BUILD_DATE = "2026-01-19T08:49:26";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -1830,8 +1830,8 @@
     }
 
     // Call saveBackup after successful imports
-    function afterImportSuccess() {
-      saveLocalData();
+    async function afterImportSuccess() {
+      await saveLocalData();
       saveBackup();
       updateSummary();
       updateBackupStatus();
@@ -1969,7 +1969,7 @@
         const client = clientsData.find(c => c.id === farm?.clientId);
         const farmLabel = client && farm ? `${client.name} > ${farm.name}` : 'selected farm';
 
-        afterImportSuccess(); showStatus(`✓ Imported ${total} field(s) to ${farmLabel}`, true);
+        await afterImportSuccess(); showStatus(`✓ Imported ${total} field(s) to ${farmLabel}`, true);
         document.getElementById('boundaryFiles').value = ''; document.getElementById('boundaryFieldName').value = '';
         // Auto-sync to Google Sheets if signed in
         if (SheetsAPI.isSignedIn) {
@@ -2133,13 +2133,13 @@
           assignSamplesToFields();
           const assignedCount = newSamples.filter(s => s.field && s.field !== 'Unassigned').length;
           const unassignedCount = newSamples.length - assignedCount;
-          afterImportSuccess();
+          await afterImportSuccess();
           let msg = `✓ Imported ${newSamples.length} samples, ${assignedCount} assigned to fields`;
           if (unassignedCount > 0) msg += ` (${unassignedCount} unassigned - outside boundaries)`;
           if (skipped > 0) msg += ` (${skipped} duplicates skipped)`;
           showStatus(msg, true);
         } else {
-          afterImportSuccess();
+          await afterImportSuccess();
           showStatus(`✓ Imported ${newSamples.length} samples. Upload boundaries to assign field names.${skipped > 0 ? ` (${skipped} duplicates skipped)` : ''}`, true);
         }
         document.getElementById('sampleFiles').value = ''; document.getElementById('sampleYear').value = '';
@@ -2476,7 +2476,7 @@
       });
       
       if (reassignedCount > 0) {
-        afterImportSuccess();
+        await afterImportSuccess();
         showStatus(`✓ Reassigned ${reassignedCount} samples to boundaries`, true);
         
         // Sync to Google Sheets if signed in
@@ -3424,7 +3424,7 @@
         yieldData = [];
         localStorage.removeItem('yieldData');
 
-        afterImportSuccess();
+        await afterImportSuccess();
 
         // Calculate coverage area match rate (samples matched / samples in coverage area)
         const coverageMatchRate = correlationResults.samplesInCoverageArea > 0
@@ -3846,7 +3846,7 @@
       }
 
       // Save updated samples
-      saveLocalData();
+      await saveLocalData();
 
       const avgYieldPointsPerSample = samplesWithYieldCount > 0
         ? Math.round(totalYieldPointsMatched / samplesWithYieldCount)
@@ -4291,7 +4291,7 @@
       if (!confirm('Clear all samples? Boundaries will be kept.')) return;
 
       sampleData = [];
-      saveLocalData();
+      await saveLocalData();
       saveBackup();
       updateSummary();
       updateBackupStatus();
@@ -4313,7 +4313,7 @@
       if (!confirm('Clear all field boundaries? Samples will be kept.')) return;
 
       fieldBoundaries = {};
-      saveLocalData();
+      await saveLocalData();
       saveBackup();
       updateSummary();
       updateBackupStatus();
@@ -4339,7 +4339,7 @@
         if (s.yieldCorrelations) delete s.yieldCorrelations;
       });
 
-      saveLocalData();
+      await saveLocalData();
       saveBackup();
       updateSummary();
       updateBackupStatus();
@@ -4351,7 +4351,7 @@
 
       sampleData = [];
       fieldBoundaries = {};
-      saveLocalData();
+      await saveLocalData();
       saveBackup();
       updateSummary();
       updateBackupStatus();
@@ -5677,7 +5677,7 @@
       closeCsvMappingModal();
 
       // Update UI
-      afterImportSuccess();
+      await afterImportSuccess();
 
       let msg = `✓ Imported ${samples.length} samples${assignmentMsg}`;
       if (skipped > 0) msg += ` (${skipped} rows skipped)`;
