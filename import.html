@@ -1122,8 +1122,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.76";
-    const BUILD_DATE = "2026-01-19T08:49:26";
+    const APP_VERSION = "v1.0.77";
+    const BUILD_DATE = "2026-01-19T14:50:01";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -2445,7 +2445,7 @@
       });
     }
     
-    function reassignSamplesToBoundaries() {
+    async function reassignSamplesToBoundaries() {
       if (Object.keys(fieldBoundaries).length === 0) {
         showStatus('No boundaries loaded. Upload boundaries first.', false);
         return;
