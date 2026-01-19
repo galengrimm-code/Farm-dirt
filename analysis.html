@@ -555,8 +555,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.71";
-    const BUILD_DATE = "2026-01-19T07:16:38";
+    const APP_VERSION = "v1.0.72";
+    const BUILD_DATE = "2026-01-19T07:36:02";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -1253,8 +1253,12 @@
       const toYearInfo = document.getElementById('toYearInfo');
       const fieldCheckboxes = document.getElementById('fieldCheckboxes');
       const mismatchWarning = document.getElementById('fieldMismatchWarning');
-      
-      if (!year2 || sampleData.length === 0) {
+
+      // Filter samples by active client/farm
+      const activeFields = getActiveFields();
+      const filteredSampleData = sampleData.filter(s => activeFields.includes(s.field));
+
+      if (!year2 || filteredSampleData.length === 0) {
         grid.innerHTML = '<div class="no-data">No data available. Import soil samples to see analysis.</div>';
         fromYearInfo.innerHTML = '';
         toYearInfo.innerHTML = '';
@@ -1262,9 +1266,9 @@
         mismatchWarning.innerHTML = '';
         return;
       }
-      
-      const allSamplesFrom = year1 ? sampleData.filter(s => String(s.year) === String(year1)) : [];
-      const allSamplesTo = sampleData.filter(s => String(s.year) === String(year2));
+
+      const allSamplesFrom = year1 ? filteredSampleData.filter(s => String(s.year) === String(year1)) : [];
+      const allSamplesTo = filteredSampleData.filter(s => String(s.year) === String(year2));
       
       // Get all fields from both years (exclude Unknown and Unassigned)
       const excludeFields = ['Unknown', 'Unassigned', 'unknown', 'unassigned', null, undefined, ''];
@@ -1508,17 +1512,21 @@
 
     // Operation-wide trends (All Fields)
     function renderOperationTrends(container) {
-      const years = [...new Set(sampleData.map(s => s.year).filter(y => y))].sort();
-      const allFields = [...new Set(sampleData.map(s => s.field).filter(f => f && f !== 'Unknown' && f !== 'Unassigned'))];
+      // Filter samples by active client/farm
+      const activeFieldsList = getActiveFields();
+      const filteredSamples = sampleData.filter(s => activeFieldsList.includes(s.field));
+
+      const years = [...new Set(filteredSamples.map(s => s.year).filter(y => y))].sort();
+      const allFields = [...new Set(filteredSamples.map(s => s.field).filter(f => f && f !== 'Unknown' && f !== 'Unassigned'))];
 
       if (years.length < 1) {
-        container.innerHTML = '<div class="no-data">No data available</div>';
+        container.innerHTML = '<div class="no-data">No data available for selected client/farm</div>';
         return;
       }
 
       // Calculate per-year statistics
       const yearStats = years.map(year => {
-        const yearSamples = sampleData.filter(s => String(s.year) === String(year));
+        const yearSamples = filteredSamples.filter(s => String(s.year) === String(year));
         const fieldsInYear = [...new Set(yearSamples.map(s => s.field).filter(f => f && f !== 'Unknown' && f !== 'Unassigned'))];
         return {
           year,
@@ -1528,7 +1536,7 @@
         };
       });
 
-      const totalSamples = sampleData.length;
+      const totalSamples = filteredSamples.length;
       const operationName = localStorage.getItem('operationName') || 'Operation';
 
       let html = `
@@ -1556,7 +1564,7 @@
             let hasData = false;
 
             years.forEach(year => {
-              const yearSamples = sampleData.filter(s => String(s.year) === String(year));
+              const yearSamples = filteredSamples.filter(s => String(s.year) === String(year));
               const stats = getStats(yearSamples, attr);
 
               // Calculate per-field averages for range band
@@ -1854,18 +1862,22 @@
       const container = document.getElementById('rankingsContent');
       const attr = document.getElementById('rankingAttrSelect').value;
       const yearOption = document.getElementById('rankingYearSelect').value;
-      
+
       if (!attr) {
         container.innerHTML = '<div class="no-data">Select nutrient</div>';
         return;
       }
-      
-      // Get all unique fields
-      const allFields = [...new Set(sampleData.map(s => s.field).filter(f => f && f !== 'Unknown'))];
-      
+
+      // Filter samples by active client/farm
+      const activeFieldsList = getActiveFields();
+      const filteredSamples = sampleData.filter(s => activeFieldsList.includes(s.field));
+
+      // Get all unique fields from filtered samples
+      const allFields = [...new Set(filteredSamples.map(s => s.field).filter(f => f && f !== 'Unknown'))];
+
       const fieldStats = allFields.map(field => {
         // Get samples for this field
-        let fieldSamples = sampleData.filter(s => s.field === field);
+        let fieldSamples = filteredSamples.filter(s => s.field === field);
         
         if (yearOption === 'most_recent') {
           // Find most recent year for this field
@@ -1915,8 +1927,12 @@
       const soilYearFilter = document.getElementById('soilYearSelect').value;
       const fieldFilter = document.getElementById('yieldFieldSelect').value;
 
+      // Filter by active client/farm first
+      const activeFieldsList = getActiveFields();
+      const filteredSamples = sampleData.filter(s => activeFieldsList.includes(s.field));
+
       // Get samples with yield correlations
-      let samplesWithYield = sampleData.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0);
+      let samplesWithYield = filteredSamples.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0);
 
       if (samplesWithYield.length === 0) {
         container.innerHTML = '<div class="no-data">No yield data available. Import yield maps on the Import page to see correlations.</div>';

@@ -352,8 +352,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.71";
-    const BUILD_DATE = "2026-01-19T07:16:38";
+    const APP_VERSION = "v1.0.72";
+    const BUILD_DATE = "2026-01-19T07:36:02";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -848,11 +848,11 @@
         editingIdInput.value = clientId;
         modalFarms = farmsData.filter(f => f.clientId === clientId).map(f => ({ ...f }));
       } else {
-        // Add mode
+        // Add mode - start with empty farm list
         titleEl.textContent = 'Add Client';
         nameInput.value = '';
         editingIdInput.value = '';
-        modalFarms = [{ id: generateId('frm'), name: 'Default Farm', isDefault: true, isNew: true }];
+        modalFarms = [];
       }
 
       renderModalFarmsList();

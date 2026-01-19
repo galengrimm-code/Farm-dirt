@@ -1122,8 +1122,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.71";
-    const BUILD_DATE = "2026-01-19T07:16:38";
+    const APP_VERSION = "v1.0.72";
+    const BUILD_DATE = "2026-01-19T07:36:02";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -2424,8 +2424,10 @@
         let assigned = false;
 
         // Always try to match sample to a boundary by GPS location
-        for (const [name, polys] of Object.entries(fieldBoundaries)) {
+        for (const [name, fieldData] of Object.entries(fieldBoundaries)) {
           if (assigned) break;
+          // Handle both legacy (array) and new format (object with boundary property)
+          const polys = fieldData.boundary || fieldData;
           const arr = Array.isArray(polys[0]?.[0]) ? polys : [polys];
           for (const poly of arr) {
             if (isPointInOrNearPolygon([sample.lat, sample.lon], poly)) {
@@ -2448,25 +2450,27 @@
         showStatus('No boundaries loaded. Upload boundaries first.', false);
         return;
       }
-      
+
       let reassignedCount = 0;
       sampleData.forEach(sample => {
         const oldField = sample.field;
         let assigned = false;
-        
+
         // Try to find a matching boundary
-        for (const [name, polys] of Object.entries(fieldBoundaries)) {
+        for (const [name, fieldData] of Object.entries(fieldBoundaries)) {
           if (assigned) break;
+          // Handle both legacy (array) and new format (object with boundary property)
+          const polys = fieldData.boundary || fieldData;
           const arr = Array.isArray(polys[0]?.[0]) ? polys : [polys];
-          for (const poly of arr) { 
-            if (isPointInOrNearPolygon([sample.lat, sample.lon], poly)) { 
+          for (const poly of arr) {
+            if (isPointInOrNearPolygon([sample.lat, sample.lon], poly)) {
               if (sample.field !== name) {
                 sample.field = name;
                 reassignedCount++;
               }
               assigned = true;
               break;
-            } 
+            }
           }
         }
       });
@@ -4149,7 +4153,8 @@
       });
 
       // Add field boundaries
-      for (const [name, coords] of Object.entries(fieldBoundaries)) {
+      for (const [name, fieldData] of Object.entries(fieldBoundaries)) {
+        const coords = fieldData.boundary || fieldData;
         if (coords && coords.length > 2) {
           L.polygon(coords, {
             color: '#3b82f6',
@@ -4800,7 +4805,8 @@
         let isInsideAnyBoundary = false;
 
         // Check if sample is inside any field boundary
-        for (const [fieldName, polys] of Object.entries(fieldBoundaries)) {
+        for (const [fieldName, fieldData] of Object.entries(fieldBoundaries)) {
+          const polys = fieldData.boundary || fieldData;
           const polyArray = Array.isArray(polys[0]?.[0]) ? polys : [polys];
           for (const poly of polyArray) {
             if (isPointInOrNearPolygon([sample.lat, sample.lon], poly, 0)) {
@@ -6553,7 +6559,8 @@
           affectedSamples.forEach(sample => {
             // Find nearest field by checking if sample falls within any boundary
             let assigned = false;
-            for (const [name, polys] of Object.entries(fieldBoundaries)) {
+            for (const [name, fieldData] of Object.entries(fieldBoundaries)) {
+              const polys = fieldData.boundary || fieldData;
               const arr = Array.isArray(polys[0]?.[0]) ? polys : [polys];
               for (const poly of arr) {
                 if (isPointInOrNearPolygon([sample.lat, sample.lon], poly)) {
@@ -6570,7 +6577,8 @@
               let nearestField = null;
               let nearestDist = Infinity;
 
-              for (const [name, polys] of Object.entries(fieldBoundaries)) {
+              for (const [name, fieldData] of Object.entries(fieldBoundaries)) {
+                const polys = fieldData.boundary || fieldData;
                 const centroid = getFieldCentroid(polys);
                 const dist = Math.sqrt(
                   Math.pow(sample.lat - centroid[0], 2) +
