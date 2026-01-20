@@ -357,6 +357,7 @@
       <h3>🔄 Data Management</h3>
       <div class="btn-row">
         <button class="button primary" id="syncBtn">☁️ Sync to Google Sheets</button>
+        <button class="button" id="loadFromSheetsBtn" style="background: #059669; color: white;">📥 Load from Google Sheets</button>
       </div>
       <div class="btn-row" style="margin-top: 0.75rem;">
         <button class="button" id="reassignBtn" style="background: #3b82f6; color: white;">🔄 Reassign Samples to Boundaries</button>
@@ -1122,8 +1123,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.82";
-    const BUILD_DATE = "2026-01-20T08:17:47";
+    const APP_VERSION = "v1.0.83";
+    const BUILD_DATE = "2026-01-20T08:36:02";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -1520,6 +1521,7 @@
       document.getElementById('uploadSampleBtn').addEventListener('click', uploadSamples);
       document.getElementById('uploadYieldBtn').addEventListener('click', uploadYield);
       document.getElementById('syncBtn').addEventListener('click', syncToSheets);
+      document.getElementById('loadFromSheetsBtn').addEventListener('click', loadFromSheets);
       document.getElementById('clearSamplesBtn').addEventListener('click', clearSamples);
       document.getElementById('clearBoundariesBtn').addEventListener('click', clearBoundaries);
       document.getElementById('clearYieldBtn').addEventListener('click', clearYieldData);
@@ -4381,6 +4383,118 @@
         const samplesWithYield = sampleData.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0).length;
         showStatus(`✓ Synced ${clientsData.length} clients, ${farmsData.length} farms, ${Object.keys(fieldBoundaries).length} fields, ${sampleData.length} samples`, true);
       } catch (e) { showStatus('Sync error: ' + e.message, false); console.error(e); }
+    }
+
+    async function loadFromSheets() {
+      if (!SheetsAPI.isSignedIn) { showStatus('Please sign in first', false); return; }
+      if (!CONFIG.SHEET_ID) { showStatus('No Google Sheet ID configured', false); return; }
+
+      showStatus('Loading from Google Sheets...', true);
+      try {
+        let loadedClients = 0, loadedFarms = 0, loadedFields = 0, loadedSamples = 0;
+
+        // Load Clients
+        try {
+          const clientsRes = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: CONFIG.SHEET_ID, range: 'Clients!A2:D1000'
+          });
+          if (clientsRes.result.values && clientsRes.result.values.length > 0) {
+            clientsData = clientsRes.result.values.map(row => ({
+              id: row[0] || '',
+              name: row[1] || '',
+              createdAt: row[2] || '',
+              updatedAt: row[3] || ''
+            })).filter(c => c.id && c.name);
+            loadedClients = clientsData.length;
+            localStorage.setItem('clientsData', JSON.stringify(clientsData));
+          }
+        } catch (e) { console.warn('Could not load Clients:', e); }
+
+        // Load Farms
+        try {
+          const farmsRes = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: CONFIG.SHEET_ID, range: 'Farms!A2:E1000'
+          });
+          if (farmsRes.result.values && farmsRes.result.values.length > 0) {
+            farmsData = farmsRes.result.values.map(row => ({
+              id: row[0] || '',
+              clientId: row[1] || '',
+              name: row[2] || '',
+              createdAt: row[3] || '',
+              updatedAt: row[4] || ''
+            })).filter(f => f.id && f.name);
+            loadedFarms = farmsData.length;
+            localStorage.setItem('farmsData', JSON.stringify(farmsData));
+          }
+        } catch (e) { console.warn('Could not load Farms:', e); }
+
+        // Load Fields
+        try {
+          const fieldsRes = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: CONFIG.SHEET_ID, range: 'Fields!A2:F10000'
+          });
+          if (fieldsRes.result.values && fieldsRes.result.values.length > 0) {
+            fieldBoundaries = {};
+            fieldsRes.result.values.forEach(row => {
+              const name = row[1];
+              if (name) {
+                try {
+                  const boundary = JSON.parse(row[2] || '[]');
+                  fieldBoundaries[name] = {
+                    boundary: boundary.boundary || boundary, // Handle both formats
+                    acres: parseFloat(row[3]) || 0,
+                    farmId: row[4] || '',
+                    createdAt: row[5] || ''
+                  };
+                  loadedFields++;
+                } catch (e) { console.warn('Could not parse field:', name); }
+              }
+            });
+          }
+        } catch (e) { console.warn('Could not load Fields:', e); }
+
+        // Load Samples
+        try {
+          const samplesRes = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: CONFIG.SHEET_ID, range: 'Samples!A1:ZZ50000'
+          });
+          if (samplesRes.result.values && samplesRes.result.values.length > 1) {
+            const headers = samplesRes.result.values[0];
+            sampleData = samplesRes.result.values.slice(1).map(row => {
+              const sample = {};
+              headers.forEach((h, i) => {
+                if (row[i] !== undefined && row[i] !== '') {
+                  // Try to parse as number for numeric fields
+                  if (['lat', 'lon', 'year', 'pH', 'P', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH'].includes(h)) {
+                    const num = parseFloat(row[i]);
+                    sample[h] = isNaN(num) ? row[i] : num;
+                  } else if (h === 'yieldCorrelations' && row[i]) {
+                    try { sample[h] = JSON.parse(row[i]); } catch (e) { sample[h] = {}; }
+                  } else {
+                    sample[h] = row[i];
+                  }
+                }
+              });
+              return sample;
+            }).filter(s => s.lat && s.lon);
+            loadedSamples = sampleData.length;
+          }
+        } catch (e) { console.warn('Could not load Samples:', e); }
+
+        // Save to local storage/IndexedDB
+        await saveLocalData();
+        await saveToIndexedDB();
+
+        // Refresh UI
+        updateSummary();
+        refreshFieldTable();
+        populateBoundaryClientFarmSelectors();
+
+        showStatus(`✓ Loaded from Sheets: ${loadedClients} clients, ${loadedFarms} farms, ${loadedFields} fields, ${loadedSamples} samples`, true);
+      } catch (e) {
+        showStatus('Load error: ' + e.message, false);
+        console.error(e);
+      }
     }
 
     async function clearSamples() {

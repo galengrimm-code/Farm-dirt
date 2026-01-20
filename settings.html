@@ -352,8 +352,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.82";
-    const BUILD_DATE = "2026-01-20T08:17:47";
+    const APP_VERSION = "v1.0.83";
+    const BUILD_DATE = "2026-01-20T08:36:02";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -1025,6 +1025,7 @@
 
       saveClientsData();
       saveFarmsData();
+      syncClientsAndFarmsToSheets(); // Auto-sync to Sheets
       closeClientModal();
       loadClientManagement();
     }
@@ -1072,6 +1073,7 @@
       saveClientsData();
       saveFarmsData();
       saveFieldBoundaries();
+      syncClientsAndFarmsToSheets(); // Auto-sync to Sheets
       loadClientManagement();
       showStatus(`Client "${client.name}" deleted`, true);
     }
@@ -1128,6 +1130,94 @@
       },
       onSignInChange(s) {}
     };
+
+    // Auto-sync clients and farms to Google Sheets
+    async function syncClientsAndFarmsToSheets() {
+      if (!SheetsAPI.isSignedIn || !CONFIG.SHEET_ID) return;
+
+      try {
+        // Ensure Clients tab exists
+        try {
+          await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: CONFIG.SHEET_ID, range: 'Clients!A1' });
+        } catch (e) {
+          // Create tab if it doesn't exist
+          try {
+            await gapi.client.sheets.spreadsheets.batchUpdate({
+              spreadsheetId: CONFIG.SHEET_ID,
+              resource: { requests: [{ addSheet: { properties: { title: 'Clients' } } }] }
+            });
+            await gapi.client.sheets.spreadsheets.values.update({
+              spreadsheetId: CONFIG.SHEET_ID, range: 'Clients!A1:D1', valueInputOption: 'RAW',
+              resource: { values: [['id', 'name', 'createdAt', 'updatedAt']] }
+            });
+          } catch (createErr) { console.warn('Could not create Clients tab'); }
+        }
+
+        // Ensure Farms tab exists
+        try {
+          await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: CONFIG.SHEET_ID, range: 'Farms!A1' });
+        } catch (e) {
+          try {
+            await gapi.client.sheets.spreadsheets.batchUpdate({
+              spreadsheetId: CONFIG.SHEET_ID,
+              resource: { requests: [{ addSheet: { properties: { title: 'Farms' } } }] }
+            });
+            await gapi.client.sheets.spreadsheets.values.update({
+              spreadsheetId: CONFIG.SHEET_ID, range: 'Farms!A1:E1', valueInputOption: 'RAW',
+              resource: { values: [['id', 'clientId', 'name', 'createdAt', 'updatedAt']] }
+            });
+          } catch (createErr) { console.warn('Could not create Farms tab'); }
+        }
+
+        // Clear and write clients
+        if (clientsData.length > 0) {
+          // Clear existing data (rows 2+)
+          try {
+            const response = await gapi.client.sheets.spreadsheets.values.get({
+              spreadsheetId: CONFIG.SHEET_ID, range: 'Clients!A:A'
+            });
+            const numRows = response.result.values ? response.result.values.length : 1;
+            if (numRows > 1) {
+              await gapi.client.sheets.spreadsheets.values.clear({
+                spreadsheetId: CONFIG.SHEET_ID, range: `Clients!A2:D${numRows}`
+              });
+            }
+          } catch (e) { }
+
+          // Write clients
+          const clientRows = clientsData.map(c => [c.id, c.name, c.createdAt || '', new Date().toISOString()]);
+          await gapi.client.sheets.spreadsheets.values.append({
+            spreadsheetId: CONFIG.SHEET_ID, range: 'Clients!A:D', valueInputOption: 'RAW',
+            resource: { values: clientRows }
+          });
+        }
+
+        // Clear and write farms
+        if (farmsData.length > 0) {
+          try {
+            const response = await gapi.client.sheets.spreadsheets.values.get({
+              spreadsheetId: CONFIG.SHEET_ID, range: 'Farms!A:A'
+            });
+            const numRows = response.result.values ? response.result.values.length : 1;
+            if (numRows > 1) {
+              await gapi.client.sheets.spreadsheets.values.clear({
+                spreadsheetId: CONFIG.SHEET_ID, range: `Farms!A2:E${numRows}`
+              });
+            }
+          } catch (e) { }
+
+          const farmRows = farmsData.map(f => [f.id, f.clientId, f.name, f.createdAt || '', new Date().toISOString()]);
+          await gapi.client.sheets.spreadsheets.values.append({
+            spreadsheetId: CONFIG.SHEET_ID, range: 'Farms!A:E', valueInputOption: 'RAW',
+            resource: { values: farmRows }
+          });
+        }
+
+        console.log('Synced clients and farms to Sheets');
+      } catch (e) {
+        console.error('Error syncing clients/farms to Sheets:', e);
+      }
+    }
 
     document.addEventListener('DOMContentLoaded', async () => {
       // Run migration first to ensure data structures are up to date
