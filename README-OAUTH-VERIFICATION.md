@@ -12,9 +12,9 @@ This document outlines the steps to complete Google OAuth verification for the S
 - [ ] `google[xyz].html` - Domain verification file (get from Google)
 
 **After pushing to GitHub, verify these URLs work:**
-- https://galengrimm-code.github.io/Soil-analysis-app/privacy-policy.html
-- https://galengrimm-code.github.io/Soil-analysis-app/terms-of-service.html
-- https://galengrimm-code.github.io/Soil-analysis-app/support.html
+- https://farm-dirt.com/privacy-policy.html
+- https://farm-dirt.com/terms-of-service.html
+- https://farm-dirt.com/support.html
 
 ---
 
@@ -38,13 +38,13 @@ This document outlines the steps to complete Google OAuth verification for the S
 
 | Field | Value |
 |-------|-------|
-| Application home page | `https://galengrimm-code.github.io/Soil-analysis-app/` |
-| Application privacy policy | `https://galengrimm-code.github.io/Soil-analysis-app/privacy-policy.html` |
-| Application terms of service | `https://galengrimm-code.github.io/Soil-analysis-app/terms-of-service.html` |
+| Application home page | `https://farm-dirt.com/` |
+| Application privacy policy | `https://farm-dirt.com/privacy-policy.html` |
+| Application terms of service | `https://farm-dirt.com/terms-of-service.html` |
 
 ### 4. Authorized Domains
 
-Add: `galengrimm-code.github.io`
+Add: `farm-dirt.com`
 
 ### 5. Developer Contact Information
 
@@ -67,7 +67,7 @@ Google requires you to verify ownership of your domain.
 
 1. Go to: **APIs & Services → Domain verification**
 2. Click **Add domain**
-3. Enter: `galengrimm-code.github.io`
+3. Enter: `farm-dirt.com`
 4. Choose **HTML file** verification method
 5. Download the verification file Google provides (e.g., `google1234567890abcdef.html`)
 6. Add the file to your project root
@@ -161,7 +161,7 @@ Record a 2-3 minute screencast showing:
 
 **Fix:**
 1. Check that verification file is in repo root
-2. Verify URL is accessible: `https://galengrimm-code.github.io/Soil-analysis-app/google[xyz].html`
+2. Verify URL is accessible: `https://farm-dirt.com/google[xyz].html`
 3. Wait for GitHub Pages deployment (can take a few minutes)
 4. Try verification again
 
@@ -171,7 +171,7 @@ Record a 2-3 minute screencast showing:
 
 ### "Homepage not accessible"
 
-**Fix:** Verify `https://galengrimm-code.github.io/Soil-analysis-app/` loads correctly
+**Fix:** Verify `https://farm-dirt.com/` loads correctly
 
 ---
 

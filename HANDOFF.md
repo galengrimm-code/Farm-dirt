@@ -4,7 +4,7 @@
 
 A web-based precision agriculture application that enables farmers to analyze soil nutrient data, track field performance over time, correlate soil conditions with crop yields, and make data-driven decisions without expensive agricultural consulting services.
 
-**Live URL:** Hosted on GitHub Pages (ngrimm-code.github.io)
+**Live URL:** https://farm-dirt.com
 
 ---
 
