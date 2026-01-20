@@ -356,10 +356,7 @@
     <div class="import-section management">
       <h3>🔄 Data Management</h3>
       <div class="btn-row">
-        <button class="button primary" id="syncBtn">☁️ Sync to Google Sheets</button>
-        <button class="button" id="loadFromSheetsBtn" style="background: #059669; color: white;">📥 Load from Google Sheets</button>
-      </div>
-      <div class="btn-row" style="margin-top: 0.75rem;">
+        <button class="button primary" id="loadFromSheetsBtn" style="background: #059669; color: white;">📥 Load from Google Sheets</button>
         <button class="button" id="reassignBtn" style="background: #3b82f6; color: white;">🔄 Reassign Samples to Boundaries</button>
       </div>
       <div class="btn-row" style="margin-top: 0.75rem;">
@@ -368,7 +365,7 @@
         <button class="button danger" id="clearYieldBtn">🗑️ Clear Yield Data</button>
         <button class="button danger" id="clearAllBtn">🗑️ Clear All</button>
       </div>
-      <small style="display:block; margin-top:0.75rem; color:#64748b;">Data is saved locally and synced to Google Sheets when signed in.</small>
+      <small style="display:block; margin-top:0.75rem; color:#64748b;">Imports auto-sync to Google Sheets when signed in. Use "Load from Sheets" to pull data from another device.</small>
     </div>
 
     <!-- Data Quality / Outlier Removal Section -->
@@ -1123,8 +1120,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.83";
-    const BUILD_DATE = "2026-01-20T08:36:02";
+    const APP_VERSION = "v1.0.84";
+    const BUILD_DATE = "2026-01-20T08:46:03";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -1520,7 +1517,6 @@
       document.getElementById('uploadBoundaryBtn').addEventListener('click', uploadBoundaries);
       document.getElementById('uploadSampleBtn').addEventListener('click', uploadSamples);
       document.getElementById('uploadYieldBtn').addEventListener('click', uploadYield);
-      document.getElementById('syncBtn').addEventListener('click', syncToSheets);
       document.getElementById('loadFromSheetsBtn').addEventListener('click', loadFromSheets);
       document.getElementById('clearSamplesBtn').addEventListener('click', clearSamples);
       document.getElementById('clearBoundariesBtn').addEventListener('click', clearBoundaries);

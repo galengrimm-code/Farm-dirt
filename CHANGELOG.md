@@ -4,6 +4,22 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 
 ---
 
+## [v1.0.71] - January 20, 2026
+
+### Google Sheets Sync Improvements
+- **Auto-sync**: All imports and client/farm changes automatically sync to Google Sheets
+- **Removed manual sync button**: No longer needed since everything auto-syncs
+- **New "Load from Google Sheets" button**: Pull data from Sheets to sync across devices
+- **Safer sync**: Sync now only writes data, never clears existing data from Sheets
+- **Clients/Farms tabs**: Auto-created in Google Sheets when first syncing
+
+### Bug Fixes
+- **Fixed**: Import page syntax error causing data not to load
+- **Fixed**: Data loading on mobile - samples and boundaries now load independently
+- **Fixed**: Removed auto-created "Default Farm" - defaults to "All" until user creates structure
+
+---
+
 ## [v1.0.70] - January 17, 2026
 
 ### Client/Farm Organizational Structure
