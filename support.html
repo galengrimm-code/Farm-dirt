@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Help & Support - Soil Analysis App</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #f1f5f9;
+      color: #1e293b;
+      line-height: 1.6;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+      color: white;
+      padding: 2rem 1rem;
+      text-align: center;
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      opacity: 0.9;
+      font-size: 0.95rem;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+    }
+
+    h2 {
+      color: #1e40af;
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    p {
+      margin-bottom: 0.75rem;
+      color: #475569;
+    }
+
+    a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .faq-item {
+      border-bottom: 1px solid #e2e8f0;
+      padding: 1rem 0;
+    }
+
+    .faq-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .faq-item:first-child {
+      padding-top: 0;
+    }
+
+    .faq-question {
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 0.5rem;
+      font-size: 1rem;
+    }
+
+    .faq-answer {
+      color: #475569;
+      margin: 0;
+    }
+
+    .faq-answer ol, .faq-answer ul {
+      margin: 0.5rem 0 0 1.5rem;
+    }
+
+    .faq-answer li {
+      margin-bottom: 0.25rem;
+    }
+
+    .contact-box {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 8px;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .contact-box h3 {
+      color: #0369a1;
+      margin-bottom: 0.5rem;
+    }
+
+    .contact-box p {
+      margin-bottom: 0.5rem;
+    }
+
+    .contact-box a.email {
+      font-size: 1.1rem;
+      font-weight: 500;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.75rem 1.5rem;
+      background: #3b82f6;
+      color: white;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    .back-link:hover {
+      background: #2563eb;
+      text-decoration: none;
+    }
+
+    .quick-links {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .quick-link {
+      display: block;
+      padding: 1rem;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .quick-link:hover {
+      background: #f0f9ff;
+      border-color: #3b82f6;
+      text-decoration: none;
+    }
+
+    .quick-link span {
+      display: block;
+      font-size: 1.5rem;
+      margin-bottom: 0.25rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: #64748b;
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Help & Support</h1>
+    <p>Soil Analysis App by Precision Farms LLC</p>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <h2>Quick Links</h2>
+      <div class="quick-links">
+        <a href="index.html" class="quick-link">
+          <span>🗺️</span>
+          Map View
+        </a>
+        <a href="import.html" class="quick-link">
+          <span>📁</span>
+          Import Data
+        </a>
+        <a href="analysis.html" class="quick-link">
+          <span>📊</span>
+          Analysis
+        </a>
+        <a href="settings.html" class="quick-link">
+          <span>⚙️</span>
+          Settings
+        </a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Getting Started</h2>
+      <p>New to Soil Analysis App? Here's how to get started:</p>
+      <ol style="margin: 1rem 0 0 1.5rem; color: #475569;">
+        <li><strong>Sign in with Google</strong> - Click "Sign In" on any page to connect your Google account</li>
+        <li><strong>Connect a Google Sheet</strong> - Go to Settings and enter your Sheet ID, or create a new Sheet</li>
+        <li><strong>Import your data</strong> - Use the Import page to upload soil samples, field boundaries, and yield data</li>
+        <li><strong>Explore your fields</strong> - View samples on the map, analyze trends, and correlate with yields</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>Frequently Asked Questions</h2>
+
+      <div class="faq-item">
+        <div class="faq-question">How do I connect my Google Sheet?</div>
+        <p class="faq-answer">
+          Go to the <a href="settings.html">Settings</a> page and scroll to "Google Sheets Connection". Enter the Sheet ID from your Google Sheet URL (the long string of letters and numbers between /d/ and /edit). Click "Test Connection" to verify.
+        </p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">Where is my data stored?</div>
+        <p class="faq-answer">
+          All your data is stored in YOUR Google Sheet - you own and control it completely. The app also caches data locally in your browser for faster loading. We do not store your data on any external servers.
+        </p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">Is my data secure?</div>
+        <p class="faq-answer">
+          Yes. Your data is protected by Google's security. We use Google's official OAuth authentication and never see your password. Since data stays in your Google account, there's no risk of breach from our end.
+        </p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">How do I revoke the app's access to my Google account?</div>
+        <p class="faq-answer">
+          Visit <a href="https://myaccount.google.com/permissions" target="_blank">myaccount.google.com/permissions</a>, find "Soil Analysis App" in the list, and click "Remove Access". Your data in your Google Sheet will remain - only the app's permission to access it is removed.
+        </p>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">What file formats can I import?</div>
+        <p class="faq-answer">
+          The app supports multiple formats:
+        </p>
+        <ul class="faq-answer">
+          <li><strong>Soil Samples:</strong> CSV, Shapefile (.shp), GeoJSON, or ZIP containing shapefiles</li>
+          <li><strong>Field Boundaries:</strong> GeoJSON, Shapefile, or ZIP</li>
+          <li><strong>Yield Data:</strong> Shapefile (compatible with John Deere and Climate FieldView exports)</li>
+        </ul>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">Why aren't my samples showing on the map?</div>
+        <p class="faq-answer">
+          Check these common issues:
+        </p>
+        <ol class="faq-answer">
+          <li>Make sure you've signed in and connected a Google Sheet</li>
+          <li>Verify samples were imported successfully (check count on Import page)</li>
+          <li>Check the Field and Year filters - try "All Fields" and "All Years"</li>
+          <li>Zoom in - samples appear as markers at closer zoom levels</li>
+        </ol>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">How do I delete my data?</div>
+        <p class="faq-answer">
+          You have several options:
+        </p>
+        <ul class="faq-answer">
+          <li><strong>Clear from app:</strong> Use the "Clear" buttons on the Import page</li>
+          <li><strong>Delete Sheet:</strong> Delete the Google Sheet directly in Google Drive</li>
+          <li><strong>Clear local cache:</strong> Clear browser localStorage in your browser settings</li>
+        </ul>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question">How do I report a bug or request a feature?</div>
+        <p class="faq-answer">
+          Email us at <a href="mailto:galen@galengrimm.com">galen@galengrimm.com</a> with a description of the issue or your feature idea. Include screenshots if possible, and let us know which browser you're using.
+        </p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Contact Support</h2>
+      <div class="contact-box">
+        <h3>Need More Help?</h3>
+        <p>We're here to help with questions or issues.</p>
+        <a href="mailto:galen@galengrimm.com" class="email">galen@galengrimm.com</a>
+        <p style="margin-top: 0.5rem; font-size: 0.875rem; color: #64748b;">Typical response time: 1-2 business days</p>
+      </div>
+
+      <div style="margin-top: 1.5rem;">
+        <a href="index.html" class="back-link">Back to Soil Analysis App</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Legal</h2>
+      <p>
+        <a href="privacy-policy.html">Privacy Policy</a> ·
+        <a href="terms-of-service.html">Terms of Service</a>
+      </p>
+    </div>
+  </div>
+
+  <footer>
+    <p>&copy; 2026 Precision Farms LLC. All rights reserved.</p>
+  </footer>
+</body>
+</html>
