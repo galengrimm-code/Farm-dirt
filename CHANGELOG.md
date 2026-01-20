@@ -4,6 +4,25 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 
 ---
 
+## [v1.0.72] - January 20, 2026
+
+### Custom Domain
+- **New domain**: App now available at https://farm-dirt.com
+- **CNAME configured**: GitHub Pages custom domain setup
+
+### Branding
+- **New logo**: Seedling with soil SVG logo (`logo.svg`)
+- **Favicon**: Optimized icon for browser tabs (`favicon.svg`)
+- **All pages updated**: Favicon link added to all HTML pages
+
+### Google OAuth Verification Documents
+- **Privacy Policy**: `privacy-policy.html` - explains data handling and user rights
+- **Terms of Service**: `terms-of-service.html` - usage terms and disclaimers
+- **Support Page**: `support.html` - FAQ and help documentation
+- **Verification guide**: `README-OAUTH-VERIFICATION.md` - step-by-step OAuth setup
+
+---
+
 ## [v1.0.71] - January 20, 2026
 
 ### Google Sheets Sync Improvements
