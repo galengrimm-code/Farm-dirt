@@ -589,8 +589,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.79";
-    const BUILD_DATE = "2026-01-20T07:41:52";
+    const APP_VERSION = "v1.0.80";
+    const BUILD_DATE = "2026-01-20T07:56:50";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -725,38 +725,19 @@
         return false;
       }
 
-      // Create default client/farm if needed
-      const operationName = localStorage.getItem('operationName') || 'My Operation';
-      const existingClients = JSON.parse(localStorage.getItem('clientsData') || '[]');
-      let defaultClient = existingClients.find(c => c.isDefault);
-
-      if (!defaultClient) {
-        defaultClient = { id: generateId('cli'), name: operationName, isDefault: true, createdAt: new Date().toISOString() };
-        existingClients.push(defaultClient);
-        localStorage.setItem('clientsData', JSON.stringify(existingClients));
-      }
-
-      const existingFarms = JSON.parse(localStorage.getItem('farmsData') || '[]');
-      let defaultFarm = existingFarms.find(f => f.clientId === defaultClient.id && f.isDefault);
-
-      if (!defaultFarm) {
-        defaultFarm = { id: generateId('frm'), clientId: defaultClient.id, name: operationName + ' Farm', isDefault: true, createdAt: new Date().toISOString() };
-        existingFarms.push(defaultFarm);
-        localStorage.setItem('farmsData', JSON.stringify(existingFarms));
-      }
-
-      // Migrate boundaries
+      // Migrate boundaries to new format WITHOUT creating default client/farm
+      // Fields will have no farmId until user creates a client/farm structure
       const migratedBoundaries = {};
       Object.entries(boundaries).forEach(([fieldName, fieldData]) => {
         if (Array.isArray(fieldData) || (fieldData && !fieldData.boundary)) {
-          migratedBoundaries[fieldName] = { boundary: Array.isArray(fieldData) ? fieldData : fieldData, farmId: defaultFarm.id, createdAt: new Date().toISOString() };
+          migratedBoundaries[fieldName] = { boundary: Array.isArray(fieldData) ? fieldData : fieldData, farmId: '', createdAt: new Date().toISOString() };
         } else {
           migratedBoundaries[fieldName] = fieldData;
         }
       });
 
       localStorage.setItem('fieldBoundaries', JSON.stringify(migratedBoundaries));
-      localStorage.setItem('activeClientId', defaultClient.id);
+      localStorage.setItem('activeClientId', 'all');
       localStorage.setItem('activeFarmId', 'all');
       localStorage.setItem('dataVersion', '2');
       return true;

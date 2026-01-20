@@ -337,8 +337,8 @@
   
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.79";
-    const BUILD_DATE = "2026-01-20T07:41:52";
+    const APP_VERSION = "v1.0.80";
+    const BUILD_DATE = "2026-01-20T07:56:50";
 
     // ========== CONFIG ==========
     const CONFIG = {
@@ -1027,51 +1027,20 @@
         return false;
       }
 
-      // Create default client from operation name
-      const operationName = localStorage.getItem('operationName') || 'My Operation';
-      const existingClients = JSON.parse(localStorage.getItem('clientsData') || '[]');
-      let defaultClient = existingClients.find(c => c.isDefault);
-
-      if (!defaultClient) {
-        defaultClient = {
-          id: generateId('cli'),
-          name: operationName,
-          isDefault: true,
-          createdAt: new Date().toISOString()
-        };
-        existingClients.push(defaultClient);
-        localStorage.setItem('clientsData', JSON.stringify(existingClients));
-      }
-
-      // Create default farm
-      const existingFarms = JSON.parse(localStorage.getItem('farmsData') || '[]');
-      let defaultFarm = existingFarms.find(f => f.clientId === defaultClient.id && f.isDefault);
-
-      if (!defaultFarm) {
-        defaultFarm = {
-          id: generateId('frm'),
-          clientId: defaultClient.id,
-          name: operationName + ' Farm',
-          isDefault: true,
-          createdAt: new Date().toISOString()
-        };
-        existingFarms.push(defaultFarm);
-        localStorage.setItem('farmsData', JSON.stringify(existingFarms));
-      }
-
-      // Migrate field boundaries
+      // Migrate boundaries to new format WITHOUT creating default client/farm
+      // Fields will have no farmId until user creates a client/farm structure
       const migratedBoundaries = {};
       Object.entries(boundaries).forEach(([fieldName, fieldData]) => {
         if (Array.isArray(fieldData)) {
           migratedBoundaries[fieldName] = {
             boundary: fieldData,
-            farmId: defaultFarm.id,
+            farmId: '',
             createdAt: new Date().toISOString()
           };
         } else if (fieldData && !fieldData.boundary) {
           migratedBoundaries[fieldName] = {
             boundary: fieldData,
-            farmId: defaultFarm.id,
+            farmId: '',
             createdAt: new Date().toISOString()
           };
         } else {
@@ -1080,7 +1049,7 @@
       });
 
       localStorage.setItem('fieldBoundaries', JSON.stringify(migratedBoundaries));
-      localStorage.setItem('activeClientId', defaultClient.id);
+      localStorage.setItem('activeClientId', 'all');
       localStorage.setItem('activeFarmId', 'all');
       localStorage.setItem('dataVersion', '2');
 

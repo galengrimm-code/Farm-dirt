@@ -352,8 +352,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.79";
-    const BUILD_DATE = "2026-01-20T07:41:52";
+    const APP_VERSION = "v1.0.80";
+    const BUILD_DATE = "2026-01-20T07:56:50";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -598,6 +598,31 @@
       loadClientsData();
       loadFarmsData();
 
+      // Clean up any auto-created default clients/farms (we no longer create defaults)
+      const defaultClients = clientsData.filter(c => c.isDefault);
+      const defaultFarms = farmsData.filter(f => f.isDefault);
+      if (defaultClients.length > 0 || defaultFarms.length > 0) {
+        // Remove default farms first
+        defaultFarms.forEach(farm => {
+          const idx = farmsData.findIndex(f => f.id === farm.id);
+          if (idx >= 0) farmsData.splice(idx, 1);
+          // Clear farmId from any fields assigned to this farm
+          Object.values(fieldBoundaries).forEach(field => {
+            if (field.farmId === farm.id) field.farmId = '';
+          });
+        });
+        // Remove default clients
+        defaultClients.forEach(client => {
+          const idx = clientsData.findIndex(c => c.id === client.id);
+          if (idx >= 0) clientsData.splice(idx, 1);
+        });
+        // Save cleaned data
+        saveClientsData();
+        saveFarmsData();
+        saveFieldBoundaries();
+        console.log('[Migration] Removed auto-created default clients/farms');
+      }
+
       // Check if there's any data to migrate
       const hasLegacyBoundaries = Object.keys(fieldBoundaries).some(key => {
         const val = fieldBoundaries[key];
@@ -605,81 +630,49 @@
         return Array.isArray(val) || (val && !val.boundary);
       });
 
-      if (!hasLegacyBoundaries && clientsData.length > 0) {
+      if (!hasLegacyBoundaries) {
         console.log('[Migration] No legacy data found, setting version 2');
         localStorage.setItem('dataVersion', '2');
         return false;
       }
 
-      // Create default client from operation name or default
-      const operationName = localStorage.getItem('operationName') || 'My Operation';
-      let defaultClient = clientsData.find(c => c.isDefault);
-      if (!defaultClient) {
-        defaultClient = {
-          id: generateId('cli'),
-          name: operationName,
-          isDefault: true,
-          createdAt: new Date().toISOString()
-        };
-        clientsData.push(defaultClient);
-        console.log('[Migration] Created default client:', defaultClient.name);
-      }
-
-      // Create default farm under the default client
-      let defaultFarm = farmsData.find(f => f.clientId === defaultClient.id && f.isDefault);
-      if (!defaultFarm) {
-        defaultFarm = {
-          id: generateId('frm'),
-          clientId: defaultClient.id,
-          name: operationName + ' Farm',
-          isDefault: true,
-          createdAt: new Date().toISOString()
-        };
-        farmsData.push(defaultFarm);
-        console.log('[Migration] Created default farm:', defaultFarm.name);
-      }
-
-      // Migrate field boundaries to new format
+      // Migrate boundaries to new format WITHOUT creating default client/farm
+      // Fields will have no farmId until user creates a client/farm structure
       const migratedBoundaries = {};
       let migratedCount = 0;
 
       Object.entries(fieldBoundaries).forEach(([fieldName, fieldData]) => {
         if (Array.isArray(fieldData)) {
-          // Legacy format: just the boundary coordinates
           migratedBoundaries[fieldName] = {
             boundary: fieldData,
-            farmId: defaultFarm.id,
+            farmId: '',
             createdAt: new Date().toISOString()
           };
           migratedCount++;
         } else if (fieldData && !fieldData.boundary) {
-          // Some other legacy format
           migratedBoundaries[fieldName] = {
             boundary: fieldData,
-            farmId: defaultFarm.id,
+            farmId: '',
             createdAt: new Date().toISOString()
           };
           migratedCount++;
         } else {
-          // Already in new format
           migratedBoundaries[fieldName] = fieldData;
         }
       });
 
       fieldBoundaries = migratedBoundaries;
 
-      // Set active selection to defaults
-      activeClientId = defaultClient.id;
+      // Set active selection to 'all'
+      activeClientId = 'all';
       activeFarmId = 'all';
 
-      // Save all migrated data
-      saveClientsData();
-      saveFarmsData();
+      // Save migrated data
       saveFieldBoundaries();
       saveActiveSelection();
       localStorage.setItem('dataVersion', '2');
 
-      console.log(`[Migration] Complete. Migrated ${migratedCount} fields to default farm.`);
+      console.log(`[Migration] Complete. Migrated ${migratedCount} fields.`);
       return true;
     }
 
