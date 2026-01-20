@@ -589,8 +589,8 @@
   <script src="https://accounts.google.com/gsi/client"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.80";
-    const BUILD_DATE = "2026-01-20T07:56:50";
+    const APP_VERSION = "v1.0.81";
+    const BUILD_DATE = "2026-01-20T08:07:54";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -926,21 +926,27 @@
         // Check IndexedDB first if flagged
         if (localStorage.getItem('usingIndexedDB') === 'true') {
           const idbData = await loadFromIndexedDB();
-          if (idbData && idbData.samples && idbData.samples.length > 0) {
-            sampleData = idbData.samples;
-            yieldData = idbData.yield || [];
-            // Also load boundaries from IndexedDB if available
+          if (idbData) {
+            // Load samples, boundaries, and yield independently
+            if (idbData.samples && idbData.samples.length > 0) {
+              sampleData = idbData.samples;
+            }
             if (idbData.boundaries && Object.keys(idbData.boundaries).length > 0) {
               fieldBoundaries = idbData.boundaries;
             }
-            console.log('Loaded from IndexedDB:', sampleData.length, 'samples,', yieldData.length, 'yield points,', Object.keys(fieldBoundaries).length, 'fields');
+            if (idbData.yield && idbData.yield.length > 0) {
+              yieldData = idbData.yield;
+            }
+            console.log('Loaded from IndexedDB:', sampleData.length, 'samples,', Object.keys(fieldBoundaries).length, 'fields,', yieldData.length, 'yield points');
           }
         } else {
           const saved = localStorage.getItem('soilSamples');
           const yieldSaved = localStorage.getItem('yieldData');
+          const boundariesSaved = localStorage.getItem('fieldBoundaries');
           if (saved) sampleData = JSON.parse(saved);
           if (yieldSaved) yieldData = JSON.parse(yieldSaved);
-          console.log('Loaded from localStorage:', sampleData.length, 'samples,', yieldData.length, 'yield points');
+          if (boundariesSaved) fieldBoundaries = JSON.parse(boundariesSaved);
+          console.log('Loaded from localStorage:', sampleData.length, 'samples,', Object.keys(fieldBoundaries).length, 'fields,', yieldData.length, 'yield points');
         }
       } catch (e) { console.error(e); }
       populateSelectors();

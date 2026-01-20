@@ -337,8 +337,8 @@
   
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.80";
-    const BUILD_DATE = "2026-01-20T07:56:50";
+    const APP_VERSION = "v1.0.81";
+    const BUILD_DATE = "2026-01-20T08:07:54";
 
     // ========== CONFIG ==========
     const CONFIG = {
@@ -1847,10 +1847,15 @@
         // Check IndexedDB first if flagged
         if (localStorage.getItem('usingIndexedDB') === 'true') {
           const idbData = await loadFromIndexedDB();
-          if (idbData && idbData.samples.length > 0) {
-            sampleData = idbData.samples;
-            fieldBoundaries = idbData.boundaries;
-            console.log('Loaded from IndexedDB:', sampleData.length, 'samples');
+          if (idbData) {
+            // Load samples and boundaries independently
+            if (idbData.samples && idbData.samples.length > 0) {
+              sampleData = idbData.samples;
+            }
+            if (idbData.boundaries && Object.keys(idbData.boundaries).length > 0) {
+              fieldBoundaries = idbData.boundaries;
+            }
+            console.log('Loaded from IndexedDB:', sampleData.length, 'samples,', Object.keys(fieldBoundaries).length, 'fields');
           }
         } else {
           // Fallback to localStorage

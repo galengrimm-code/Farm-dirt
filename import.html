@@ -1122,8 +1122,8 @@
   <script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.80";
-    const BUILD_DATE = "2026-01-20T07:56:50";
+    const APP_VERSION = "v1.0.81";
+    const BUILD_DATE = "2026-01-20T08:07:54";
 
     const CONFIG = {
       CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
@@ -1676,11 +1676,18 @@
         // Check if we're using IndexedDB
         if (localStorage.getItem('usingIndexedDB') === 'true') {
           const idbData = await loadFromIndexedDB();
-          if (idbData && idbData.samples.length > 0) {
-            sampleData = idbData.samples;
-            fieldBoundaries = idbData.boundaries;
-            yieldData = idbData.yield || [];
-            console.log('Loaded from IndexedDB:', sampleData.length, 'samples,', yieldData.length, 'yield points');
+          if (idbData) {
+            // Load samples, boundaries, and yield independently
+            if (idbData.samples && idbData.samples.length > 0) {
+              sampleData = idbData.samples;
+            }
+            if (idbData.boundaries && Object.keys(idbData.boundaries).length > 0) {
+              fieldBoundaries = idbData.boundaries;
+            }
+            if (idbData.yield && idbData.yield.length > 0) {
+              yieldData = idbData.yield;
+            }
+            console.log('Loaded from IndexedDB:', sampleData.length, 'samples,', Object.keys(fieldBoundaries).length, 'fields,', yieldData.length, 'yield points');
             return;
           }
         }
@@ -4252,15 +4259,31 @@
 
     async function syncToSheets() {
       if (!SheetsAPI.isSignedIn) { showStatus('Please sign in first', false); return; }
+
+      // Safety check: don't sync if no local data (prevents wiping Sheets)
+      if (sampleData.length === 0 && Object.keys(fieldBoundaries).length === 0) {
+        showStatus('No local data to sync. Load data first.', false);
+        return;
+      }
+
       showStatus('Syncing to Google Sheets...', true);
       try {
         await SheetsAPI.initializeSheets();
 
-        // Clear existing data first, then write fresh (prevents duplicates)
-        try { await clearSheetsData('Clients'); } catch (e) { console.warn('Could not clear Clients tab'); }
-        try { await clearSheetsData('Farms'); } catch (e) { console.warn('Could not clear Farms tab'); }
-        await clearSheetsData('Fields');
-        await clearSheetsData('Samples');
+        // Only clear tabs that have local data to replace them
+        // This prevents accidentally wiping Sheets when local data fails to load
+        if (clientsData.length > 0) {
+          try { await clearSheetsData('Clients'); } catch (e) { console.warn('Could not clear Clients tab'); }
+        }
+        if (farmsData.length > 0) {
+          try { await clearSheetsData('Farms'); } catch (e) { console.warn('Could not clear Farms tab'); }
+        }
+        if (Object.keys(fieldBoundaries).length > 0) {
+          await clearSheetsData('Fields');
+        }
+        if (sampleData.length > 0) {
+          await clearSheetsData('Samples');
+        }
 
         // Write clients
         if (clientsData.length > 0) {
