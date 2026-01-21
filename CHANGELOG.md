@@ -4,6 +4,31 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 
 ---
 
+## [v1.0.73] - January 21, 2026
+
+### Dynamic Zoom-Based Color Scaling
+- **New**: Field colors now based on only VISIBLE fields on screen (not all fields)
+- **Dynamic legend**: Shows current visible range (e.g., "18 - 45 ppm")
+- **Auto-updates on pan/zoom**: Color scale recalculates as you move the map
+- **Better detail**: See subtle differences when zoomed into areas with similar values
+- **Debounced updates**: 150ms delay prevents excessive recalculations
+
+### Google Sheet URL Support
+- **Accept full URLs**: Paste entire Google Sheet URL instead of just the ID
+- **Auto-extraction**: Sheet ID automatically extracted from URL
+- **Backwards compatible**: Still accepts just the ID if preferred
+- **Shows confirmation**: "Sheet ID detected: 1ABC..." after parsing
+
+### Bug Fixes
+- **Fixed**: Sheet ID extraction - was using full URL instead of extracted ID
+- **Fixed**: CONFIG.SHEET_ID getter now extracts ID from stored URLs
+
+### UI Improvements
+- **Footer links**: Added Privacy Policy and Terms of Service links to all pages
+- **Google verification**: Added Search Console verification file
+
+---
+
 ## [v1.0.72] - January 20, 2026
 
 ### Custom Domain
