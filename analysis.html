@@ -588,25 +588,19 @@
 
   <script src="https://apis.google.com/js/api.js"></script>
   <script src="https://accounts.google.com/gsi/client"></script>
+  <script src="js/core/data.js"></script>
+  <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.100";
-    const BUILD_DATE = "2026-01-21T12:56:24";
+    const APP_VERSION = "v1.0.101";
+    const BUILD_DATE = "2026-01-21T12:58:51";
 
+    // Reference shared data config with analysis-specific additions
     const CONFIG = {
-      CLIENT_ID: '714780458094-9rde31taeottmavhl5t0uo8b9kfpergc.apps.googleusercontent.com',
-      API_KEY: 'AIzaSyCOSDbrAlc3ct2-lRvJv1y7V0nV7haWc9E',
-      get SHEET_ID() {
-        const stored = localStorage.getItem('googleSheetId');
-        if (!stored) return null;
-        // Extract ID from URL if it's a full URL
-        if (stored.includes('docs.google.com') || stored.includes('/d/')) {
-          const match = stored.match(/\/d\/([a-zA-Z0-9-_]+)/);
-          if (match) return match[1];
-        }
-        return stored;
-      },
-      
+      get CLIENT_ID() { return DataCore.config.CLIENT_ID; },
+      get API_KEY() { return DataCore.config.API_KEY; },
+      get SHEET_ID() { return DataCore.config.SHEET_ID; },
+
       NUTRIENTS: ['pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH', 'Na', 'Ca', 'Mg', 'NO3', 'NH4', 'Soluble_Salts', 'EC'],
       
       NUTRIENT_NAMES: {
@@ -638,18 +632,12 @@
       }
     };
 
-    // Get decimal places for an attribute (checks user settings, then CONFIG defaults)
+    // Use shared getDecimals and formatValue from Utils
     function getDecimals(attr) {
-      const customDecimals = JSON.parse(localStorage.getItem('decimalPlaces') || '{}');
-      if (customDecimals[attr] !== undefined) return customDecimals[attr];
-      if (CONFIG.DECIMAL_PLACES[attr] !== undefined) return CONFIG.DECIMAL_PLACES[attr];
-      return 1;
+      return window.Utils.getDecimals(attr, CONFIG.DECIMAL_PLACES);
     }
-
-    // Format a value using the configured decimal places for an attribute
     function formatValue(value, attr) {
-      if (value === null || value === undefined || isNaN(value)) return '-';
-      return Number(value).toFixed(getDecimals(attr));
+      return window.Utils.formatValue(value, attr, CONFIG.DECIMAL_PLACES);
     }
 
     // Get visible nutrients based on settings
@@ -679,102 +667,33 @@
     let activeClientId = 'all';
     let activeFarmId = 'all';
 
-    // Generate unique IDs
-    function generateId(prefix) {
-      return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    }
+    // Use shared functions from DataCore
+    const generateId = DataCore.generateId;
+    const migrateDataIfNeeded = DataCore.migrateDataIfNeeded;
 
-    // Load clients from localStorage
     function loadClientsData() {
-      try {
-        const saved = localStorage.getItem('clientsData');
-        clientsData = saved ? JSON.parse(saved) : [];
-      } catch (e) { clientsData = []; }
+      clientsData = DataCore.loadClientsData();
       return clientsData;
     }
 
-    // Load farms from localStorage
     function loadFarmsData() {
-      try {
-        const saved = localStorage.getItem('farmsData');
-        farmsData = saved ? JSON.parse(saved) : [];
-      } catch (e) { farmsData = []; }
+      farmsData = DataCore.loadFarmsData();
       return farmsData;
     }
 
-    // Load field boundaries from localStorage
     function loadFieldBoundaries() {
-      try {
-        const saved = localStorage.getItem('fieldBoundaries');
-        fieldBoundaries = saved ? JSON.parse(saved) : {};
-      } catch (e) { fieldBoundaries = {}; }
+      fieldBoundaries = DataCore.loadFieldBoundaries();
       return fieldBoundaries;
     }
 
-    // Load active selection from localStorage
     function loadActiveSelection() {
-      activeClientId = localStorage.getItem('activeClientId') || 'all';
-      activeFarmId = localStorage.getItem('activeFarmId') || 'all';
+      const selection = DataCore.loadActiveSelection();
+      activeClientId = selection.clientId;
+      activeFarmId = selection.farmId;
     }
 
-    // Migration: Convert legacy fieldBoundaries format
-    function migrateDataIfNeeded() {
-      const dataVersion = localStorage.getItem('dataVersion');
-      if (dataVersion === '2') return false;
-
-      const saved = localStorage.getItem('fieldBoundaries');
-      const boundaries = saved ? JSON.parse(saved) : {};
-
-      const hasLegacyBoundaries = Object.keys(boundaries).some(key => {
-        const val = boundaries[key];
-        return Array.isArray(val) || (val && !val.boundary);
-      });
-
-      if (!hasLegacyBoundaries) {
-        localStorage.setItem('dataVersion', '2');
-        return false;
-      }
-
-      // Migrate boundaries to new format WITHOUT creating default client/farm
-      // Fields will have no farmId until user creates a client/farm structure
-      const migratedBoundaries = {};
-      Object.entries(boundaries).forEach(([fieldName, fieldData]) => {
-        if (Array.isArray(fieldData) || (fieldData && !fieldData.boundary)) {
-          migratedBoundaries[fieldName] = { boundary: Array.isArray(fieldData) ? fieldData : fieldData, farmId: '', createdAt: new Date().toISOString() };
-        } else {
-          migratedBoundaries[fieldName] = fieldData;
-        }
-      });
-
-      localStorage.setItem('fieldBoundaries', JSON.stringify(migratedBoundaries));
-      localStorage.setItem('activeClientId', 'all');
-      localStorage.setItem('activeFarmId', 'all');
-      localStorage.setItem('dataVersion', '2');
-      return true;
-    }
-
-    // Get fields filtered by active client/farm selection
     function getActiveFields() {
-      const allFieldNames = Object.keys(fieldBoundaries);
-
-      if (activeClientId === 'all' && activeFarmId === 'all') return allFieldNames;
-
-      if (activeFarmId !== 'all') {
-        return allFieldNames.filter(fieldName => {
-          const field = fieldBoundaries[fieldName];
-          return field && field.farmId === activeFarmId;
-        });
-      }
-
-      if (activeClientId !== 'all') {
-        const clientFarmIds = farmsData.filter(f => f.clientId === activeClientId).map(f => f.id);
-        return allFieldNames.filter(fieldName => {
-          const field = fieldBoundaries[fieldName];
-          return field && clientFarmIds.includes(field.farmId);
-        });
-      }
-
-      return allFieldNames;
+      return DataCore.getActiveFields(fieldBoundaries, farmsData, activeClientId, activeFarmId);
     }
 
     // Update active operation indicator
@@ -799,53 +718,8 @@
       indicator.style.display = 'block';
     }
 
-    const SheetsAPI = {
-      isSignedIn: false,
-      async init() {
-        return new Promise((resolve, reject) => {
-          gapi.load('client', async () => {
-            try {
-              await gapi.client.init({ apiKey: CONFIG.API_KEY, discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'] });
-              tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CONFIG.CLIENT_ID,
-                scope: 'https://www.googleapis.com/auth/spreadsheets',
-                callback: (response) => {
-                  if (response.error) return;
-                  accessToken = response.access_token;
-                  tokenExpiry = Date.now() + (response.expires_in * 1000) - 60000;
-                  localStorage.setItem('googleAccessToken', accessToken);
-                  localStorage.setItem('googleTokenExpiry', tokenExpiry.toString());
-                  gapi.client.setToken({ access_token: accessToken });
-                  this.isSignedIn = true;
-                  this.onSignInChange(true);
-                },
-              });
-              const savedToken = localStorage.getItem('googleAccessToken');
-              const savedExpiry = localStorage.getItem('googleTokenExpiry');
-              if (savedToken && savedExpiry && Date.now() < parseInt(savedExpiry)) {
-                accessToken = savedToken;
-                tokenExpiry = parseInt(savedExpiry);
-                gapi.client.setToken({ access_token: accessToken });
-                this.isSignedIn = true;
-                this.onSignInChange(true);
-              }
-              resolve(true);
-            } catch (e) { reject(e); }
-          });
-        });
-      },
-      async signIn() { tokenClient.requestAccessToken({ prompt: 'consent' }); },
-      async signOut() {
-        if (accessToken) google.accounts.oauth2.revoke(accessToken);
-        accessToken = null;
-        tokenExpiry = null;
-        localStorage.removeItem('googleAccessToken');
-        localStorage.removeItem('googleTokenExpiry');
-        this.isSignedIn = false;
-        this.onSignInChange(false);
-      },
-      onSignInChange(s) {}
-    };
+    // Use shared SheetsAPI from DataCore
+    const SheetsAPI = DataCore.SheetsAPI;
 
     document.addEventListener('DOMContentLoaded', async () => {
       // Run migration first to ensure data structures are up to date
@@ -871,24 +745,8 @@
       else { userInfo.textContent = ''; authBtn.textContent = 'Sign In to Edit'; authBtn.classList.remove('signed-in'); }
     }
 
-    // IndexedDB for large datasets
-    const DB_NAME = 'SoilAppDB';
-    const DB_VERSION = 2; // v2: Added yield object store
-
-    function openDB() {
-      return new Promise((resolve, reject) => {
-        if (!window.indexedDB) { reject(new Error('IndexedDB not supported')); return; }
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
-        request.onupgradeneeded = (e) => {
-          const db = e.target.result;
-          if (!db.objectStoreNames.contains('samples')) db.createObjectStore('samples', { keyPath: 'id' });
-          if (!db.objectStoreNames.contains('boundaries')) db.createObjectStore('boundaries', { keyPath: 'id' });
-          if (!db.objectStoreNames.contains('yield')) db.createObjectStore('yield', { keyPath: 'id' });
-        };
-      });
-    }
+    // IndexedDB - use shared openDB from DataCore
+    const openDB = DataCore.openDB;
 
     async function loadFromIndexedDB() {
       try {
