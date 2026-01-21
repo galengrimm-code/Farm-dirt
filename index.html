@@ -211,6 +211,7 @@
       <span class="legend-label">Legend:</span>
       <div style="width: 100px; height: 16px; background: linear-gradient(to right, #dc2626, #f97316, #eab308, #84cc16, #16a34a); border-radius: 8px; border: 1px solid #cbd5e1;"></div>
       <span id="legendText">Low → High</span>
+      <span id="legendRange" style="color: #475569; font-weight: 500; margin-left: 0.5rem;"></span>
       <span style="margin-left: auto; color: #64748b; font-size: 0.75rem;" id="lastUpdated"></span>
     </div>
 
@@ -339,8 +340,8 @@
   
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.92";
-    const BUILD_DATE = "2026-01-20T13:26:48";
+    const APP_VERSION = "v1.0.93";
+    const BUILD_DATE = "2026-01-21T10:43:17";
 
     // ========== CONFIG ==========
     const CONFIG = {
@@ -1387,6 +1388,20 @@
       map.on('zoom', function() {
         updateZoomIndicator();
       });
+
+      // Update field colors when panning (debounced to avoid too many updates)
+      let moveEndTimeout;
+      map.on('moveend', function() {
+        clearTimeout(moveEndTimeout);
+        moveEndTimeout = setTimeout(function() {
+          // Only update if we're in field shading mode (zoomed out with all fields)
+          const zoomLevel = map.getZoom();
+          const isZoomedOut = zoomLevel < ZOOM_THRESHOLD && selectedField === 'all';
+          if (isZoomedOut && !compareMode) {
+            updateVisibleFieldColors();
+          }
+        }, 150); // 150ms debounce
+      });
       
       // Add "Center on Me" button for mobile
       const centerControl = L.control({ position: 'topleft' });
@@ -2184,6 +2199,32 @@
       });
     }
     
+    // Helper: check if a field is visible in the current map bounds
+    function isFieldVisible(fieldName) {
+      const polys = getFieldBoundaryCoords(fieldName);
+      if (!polys) return false;
+      const mapBounds = map.getBounds();
+      const arr = Array.isArray(polys[0]?.[0]) ? polys : [polys];
+      // Check if any polygon of the field intersects with map bounds
+      for (const coords of arr) {
+        for (const [lat, lon] of coords) {
+          if (mapBounds.contains([lat, lon])) return true;
+        }
+      }
+      return false;
+    }
+
+    // Update legend with visible range
+    function updateLegendRange(minVal, maxVal, unit) {
+      const legendRange = document.getElementById('legendRange');
+      if (legendRange && minVal !== null && maxVal !== null) {
+        const formatVal = (v) => Number.isInteger(v) ? v : v.toFixed(1);
+        legendRange.textContent = `(${formatVal(minVal)} - ${formatVal(maxVal)}${unit ? ' ' + unit : ''})`;
+      } else if (legendRange) {
+        legendRange.textContent = '';
+      }
+    }
+
     function drawFieldShading() {
       const settings = Utils.loadSettings();
       const bufferPct = settings.bufferPercent || 25;
@@ -2248,6 +2289,20 @@
         fieldColors[fieldName + '_nodata'] = true;
       });
 
+      // DYNAMIC ZOOM-BASED COLOR SCALING
+      // Filter to only visible fields for color scale calculation
+      const visibleFieldNames = Object.keys(fieldAverages).filter(fieldName => isFieldVisible(fieldName));
+      const visibleFieldAvgs = visibleFieldNames.map(fn => fieldAverages[fn].avg);
+
+      // Use visible fields for color scale, fallback to all if none visible
+      const colorScaleAvgs = visibleFieldAvgs.length > 0 ? visibleFieldAvgs : allFieldAvgs;
+
+      console.log('Dynamic color scaling:', {
+        totalFields: Object.keys(fieldAverages).length,
+        visibleFields: visibleFieldNames.length,
+        visibleAvgs: visibleFieldAvgs.slice(0, 5)
+      });
+
       // Calculate colors based on field averages using relative coloring
       // This ensures fields are colored relative to each other, not just absolute thresholds
       const isLowerBetter = CONFIG.LOWER_IS_BETTER.includes(selectedAttribute);
@@ -2308,15 +2363,22 @@
         });
 
         console.log('Field color distribution:', colorCounts, 'Total fields colored:', Object.keys(fieldAverages).length);
-      } else if (allFieldAvgs.length > 1) {
+        // Update legend for threshold-based coloring (no dynamic range)
+        updateLegendRange(null, null, null);
+      } else if (colorScaleAvgs.length > 1) {
         // Fallback: relative coloring for attributes without defined thresholds
-        const filteredAvgs = removeOutliers(allFieldAvgs);
+        // Use visible fields for color scale (dynamic zoom-based scaling)
+        const filteredAvgs = removeOutliers(colorScaleAvgs);
         const sortedAvgs = [...filteredAvgs].sort((a, b) => a - b);
         const minAvg = sortedAvgs[0];
         const maxAvg = sortedAvgs[sortedAvgs.length - 1];
         const range = maxAvg - minAvg;
 
-        console.log('Using relative color gradient:', { minAvg, maxAvg, range, isLowerBetter, originalCount: allFieldAvgs.length, filteredCount: filteredAvgs.length });
+        // Update legend with visible range
+        const unit = CONFIG.NUTRIENT_UNITS[selectedAttribute] || '';
+        updateLegendRange(minAvg, maxAvg, unit);
+
+        console.log('Using relative color gradient (visible fields):', { minAvg, maxAvg, range, isLowerBetter, visibleCount: colorScaleAvgs.length, filteredCount: filteredAvgs.length });
 
         Object.entries(fieldAverages).forEach(([fieldName, stats]) => {
           let color;
@@ -2350,13 +2412,18 @@
         });
 
         console.log('Field color distribution:', colorCounts, 'Total fields colored:', Object.keys(fieldAverages).length);
-      } else if (allFieldAvgs.length === 1) {
+      } else if (colorScaleAvgs.length === 1) {
         // Single field with data - use threshold-based coloring
+        const singleAvg = colorScaleAvgs[0];
+        updateLegendRange(singleAvg, singleAvg, CONFIG.NUTRIENT_UNITS[selectedAttribute] || '');
         Object.entries(fieldAverages).forEach(([fieldName, stats]) => {
           const color = Utils.getColor(stats.avg, selectedAttribute, settings, bufferPct, allFieldAvgs);
           fieldColors[fieldName] = color;
           fieldColors[fieldName + '_stats'] = stats;
         });
+      } else {
+        // No visible fields with data - clear legend range
+        updateLegendRange(null, null, null);
       }
       // If allFieldAvgs.length === 0, all fields are grey (no data)
 
@@ -2380,7 +2447,16 @@
       // Draw boundaries with shading
       drawBoundaries(true, fieldColors);
     }
-    
+
+    // Update field colors based on visible fields (called on map pan)
+    function updateVisibleFieldColors() {
+      // Re-render field shading with updated visible bounds
+      // This recalculates colors based on currently visible fields
+      currentLayers.forEach(l => map.removeLayer(l));
+      currentLayers = [];
+      drawFieldShading();
+    }
+
     function drawSampleMarkers() {
       const settings = Utils.loadSettings();
 
