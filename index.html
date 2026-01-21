@@ -340,8 +340,8 @@
   
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.94";
-    const BUILD_DATE = "2026-01-21T10:45:27";
+    const APP_VERSION = "v1.0.95";
+    const BUILD_DATE = "2026-01-21T10:51:12";
 
     // ========== CONFIG ==========
     const CONFIG = {
@@ -1397,7 +1397,9 @@
           // Only update if we're in field shading mode (zoomed out with all fields)
           const zoomLevel = map.getZoom();
           const isZoomedOut = zoomLevel < ZOOM_THRESHOLD && selectedField === 'all';
-          if (isZoomedOut && !compareMode) {
+          console.log('Map moveend:', { zoomLevel, ZOOM_THRESHOLD, isZoomedOut, selectedField, compareMode, selectedAttribute });
+          if (isZoomedOut && !compareMode && selectedAttribute !== 'sampleId') {
+            console.log('Updating visible field colors...');
             updateVisibleFieldColors();
           }
         }, 150); // 150ms debounce
@@ -2363,8 +2365,15 @@
         });
 
         console.log('Field color distribution:', colorCounts, 'Total fields colored:', Object.keys(fieldAverages).length);
-        // Update legend for threshold-based coloring (no dynamic range)
-        updateLegendRange(null, null, null);
+
+        // Show visible range in legend (even for threshold-based coloring)
+        if (visibleFieldAvgs.length > 0) {
+          const sortedVisible = [...visibleFieldAvgs].sort((a, b) => a - b);
+          const unit = CONFIG.NUTRIENT_UNITS[selectedAttribute] || '';
+          updateLegendRange(sortedVisible[0], sortedVisible[sortedVisible.length - 1], unit);
+        } else {
+          updateLegendRange(null, null, null);
+        }
       } else if (colorScaleAvgs.length > 1) {
         // Fallback: relative coloring for attributes without defined thresholds
         // Use visible fields for color scale (dynamic zoom-based scaling)
