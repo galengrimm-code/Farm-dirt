@@ -342,8 +342,8 @@
 
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.104";
-    const BUILD_DATE = "2026-01-21T16:49:02";
+    const APP_VERSION = "v1.0.105";
+    const BUILD_DATE = "2026-01-21T16:56:37";
 
     // ========== CONFIG ==========
     // Reference shared data config and add app-specific config
@@ -544,10 +544,7 @@
     let activeClientId = 'all';
     let activeFarmId = 'all';
 
-    // Use shared functions from DataCore, wrapping to update local variables
-    const generateId = DataCore.generateId;
-    const migrateDataIfNeeded = DataCore.migrateDataIfNeeded;
-
+    // Use shared functions from DataCore
     function loadClientsData() {
       clientsData = DataCore.loadClientsData();
       return clientsData;
@@ -737,7 +734,7 @@
     // ========== INIT ==========
     document.addEventListener('DOMContentLoaded', async () => {
       // Run migration first to ensure data structures are up to date
-      migrateDataIfNeeded();
+      DataCore.migrateDataIfNeeded();
       loadClientsData();
       loadFarmsData();
       loadActiveSelection();

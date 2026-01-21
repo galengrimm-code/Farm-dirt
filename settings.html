@@ -356,8 +356,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.104";
-    const BUILD_DATE = "2026-01-21T16:49:02";
+    const APP_VERSION = "v1.0.105";
+    const BUILD_DATE = "2026-01-21T16:56:37";
 
     // Reference shared data config
     const CONFIG = {
@@ -464,7 +464,6 @@
     let activeFarmId = 'all';
 
     // Use shared functions from DataCore
-    const generateId = DataCore.generateId;
     const openDB = DataCore.openDB;
 
     function loadClientsData() {
@@ -886,7 +885,7 @@
       }
 
       modalFarms.push({
-        id: generateId('frm'),
+        id: DataCore.generateId('frm'),
         name: name,
         isNew: true
       });
@@ -947,7 +946,7 @@
         showStatus(`Client "${name}" updated`, true);
       } else {
         // Create new client
-        const newClientId = generateId('cli');
+        const newClientId = DataCore.generateId('cli');
         clientsData.push({
           id: newClientId,
           name: name,

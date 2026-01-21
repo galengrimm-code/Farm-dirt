@@ -1123,8 +1123,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.104";
-    const BUILD_DATE = "2026-01-21T16:49:02";
+    const APP_VERSION = "v1.0.105";
+    const BUILD_DATE = "2026-01-21T16:56:37";
 
     // Reference shared data config with import-specific additions
     const CONFIG = {
@@ -1238,10 +1238,6 @@
     let activeClientId = 'all';
     let activeFarmId = 'all';
 
-    // Use shared functions from DataCore
-    const generateId = DataCore.generateId;
-    const migrateDataIfNeeded = DataCore.migrateDataIfNeeded;
-
     function loadClientsData() {
       clientsData = DataCore.loadClientsData();
       return clientsData;
@@ -1326,8 +1322,8 @@
       const name = prompt('Enter new client name:');
       if (!name || !name.trim()) return;
 
-      const newClientId = generateId('cli');
-      const newFarmId = generateId('frm');
+      const newClientId = DataCore.generateId('cli');
+      const newFarmId = DataCore.generateId('frm');
 
       clientsData.push({
         id: newClientId,
@@ -1367,7 +1363,7 @@
       const name = prompt('Enter new farm name:');
       if (!name || !name.trim()) return;
 
-      const newFarmId = generateId('frm');
+      const newFarmId = DataCore.generateId('frm');
       farmsData.push({
         id: newFarmId,
         clientId: clientId,
@@ -1385,7 +1381,7 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
       // Run migration first
-      migrateDataIfNeeded();
+      DataCore.migrateDataIfNeeded();
       loadClientsData();
       loadFarmsData();
       loadActiveSelection();

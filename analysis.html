@@ -592,8 +592,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.104";
-    const BUILD_DATE = "2026-01-21T16:49:02";
+    const APP_VERSION = "v1.0.105";
+    const BUILD_DATE = "2026-01-21T16:56:37";
 
     // Reference shared data config with analysis-specific additions
     const CONFIG = {
@@ -667,9 +667,6 @@
     let activeFarmId = 'all';
 
     // Use shared functions from DataCore
-    const generateId = DataCore.generateId;
-    const migrateDataIfNeeded = DataCore.migrateDataIfNeeded;
-
     function loadClientsData() {
       clientsData = DataCore.loadClientsData();
       return clientsData;
@@ -722,7 +719,7 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
       // Run migration first to ensure data structures are up to date
-      migrateDataIfNeeded();
+      DataCore.migrateDataIfNeeded();
       loadClientsData();
       loadFarmsData();
       loadFieldBoundaries();
