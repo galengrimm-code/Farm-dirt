@@ -562,6 +562,27 @@
     let compareMode = false;
     let fieldModeActive = false;
 
+    // ========== CACHED STABILITY DATA ==========
+    // Calculated once when data loads, not on every render
+    let cachedStabilityData = null;
+
+    function refreshStabilityCache() {
+      if (sampleData && sampleData.length > 0) {
+        console.log('Refreshing stability cache for', sampleData.length, 'samples');
+        cachedStabilityData = Utils.calculateStabilityData(sampleData);
+        console.log('Stability cache updated:', Object.keys(cachedStabilityData).length, 'locations');
+      } else {
+        cachedStabilityData = {};
+      }
+    }
+
+    function getStabilityData() {
+      if (cachedStabilityData === null) {
+        refreshStabilityCache();
+      }
+      return cachedStabilityData;
+    }
+
     // ========== CLIENT/FARM DATA ==========
     let clientsData = [];
     let farmsData = [];
@@ -718,6 +739,7 @@
       // Update UI dropdowns
       updateFieldSelector();
       updateYearSelector();
+      refreshStabilityCache(); // Pre-calculate stability data
       updateMap();
       zoomToData();
 
@@ -858,10 +880,21 @@
       satellite.addTo(map); // Default to satellite
       L.control.layers({ "Street": street, "Satellite": satellite }).addTo(map);
       
+      // Debounced map update to avoid excessive recalculations during pan/zoom
+      let mapUpdateTimeout;
+      const DEBOUNCE_DELAY = 250; // ms to wait after pan/zoom stops
+
+      function debouncedMapUpdate() {
+        clearTimeout(mapUpdateTimeout);
+        mapUpdateTimeout = setTimeout(function() {
+          updateMap();
+        }, DEBOUNCE_DELAY);
+      }
+
       // Listen for zoom changes to switch between field view and sample view
       map.on('zoomend', function() {
         updateZoomIndicator();
-        updateMap();
+        debouncedMapUpdate();
       });
 
       // Also update on zoom start for smoother feel
@@ -869,20 +902,14 @@
         updateZoomIndicator();
       });
 
-      // Update field colors when panning (debounced to avoid too many updates)
-      let moveEndTimeout;
+      // Update on pan end (debounced)
       map.on('moveend', function() {
-        clearTimeout(moveEndTimeout);
-        moveEndTimeout = setTimeout(function() {
-          // Only update if we're in field shading mode (zoomed out with all fields)
-          const zoomLevel = map.getZoom();
-          const isZoomedOut = zoomLevel < ZOOM_THRESHOLD && selectedField === 'all';
-          console.log('Map moveend:', { zoomLevel, ZOOM_THRESHOLD, isZoomedOut, selectedField, compareMode, selectedAttribute });
-          if (isZoomedOut && !compareMode && selectedAttribute !== 'sampleId') {
-            console.log('Updating visible field colors...');
-            updateVisibleFieldColors();
-          }
-        }, 150); // 150ms debounce
+        // Only update visible field colors when zoomed out (field shading mode)
+        const zoomLevel = map.getZoom();
+        const isZoomedOut = zoomLevel < ZOOM_THRESHOLD && selectedField === 'all';
+        if (isZoomedOut && !compareMode && selectedAttribute !== 'sampleId') {
+          debouncedMapUpdate();
+        }
       });
       
       // Add "Center on Me" button for mobile
@@ -1233,6 +1260,7 @@
         settings = await SheetsAPI.getSettings();
         updateFieldSelector();
         updateYearSelector();
+        refreshStabilityCache(); // Pre-calculate stability data
         updateMap();
         saveLocalData();
         Utils.showStatus(`Loaded ${sampleData.length} samples, ${Object.keys(fieldBoundaries).length} fields`, true);
@@ -1282,6 +1310,7 @@
         settings = await SheetsAPI.getSettings();
         updateFieldSelector();
         updateYearSelector();
+        refreshStabilityCache(); // Pre-calculate stability data
         updateMap();
         saveLocalData();
         Utils.showStatus(`✓ Loaded ${sampleData.length} samples, ${Object.keys(fieldBoundaries).length} fields`, true);
@@ -1395,6 +1424,7 @@
         }
         updateFieldSelector();
         updateYearSelector();
+        refreshStabilityCache(); // Pre-calculate stability data
         updateMap();
         if (sampleData.length > 0) Utils.showStatus(`Loaded ${sampleData.length} samples`, true);
       } catch (e) { console.error(e); }
@@ -1454,6 +1484,7 @@
 
         updateFieldSelector();
         updateYearSelector();
+        refreshStabilityCache(); // Pre-calculate stability data
         updateMap();
         Utils.showStatus(`Loaded ${sampleData.length} samples from backup`, true);
         return true;
@@ -1943,8 +1974,42 @@
         console.log('Years in filtered samples:', years);
       }
 
-      // Calculate stability data for all samples (for high variability flags)
-      const stabilityData = Utils.calculateStabilityData(sampleData);
+      // Use cached stability data (for high variability flags)
+      const stabilityData = getStabilityData();
+
+      // Build spatial index for stability data to speed up lookups
+      const CELL_SIZE = 0.0003; // ~100ft grid cells
+      const stabilityIndex = new Map();
+      for (const [hash, data] of Object.entries(stabilityData)) {
+        const gridLat = Math.floor(data.lat / CELL_SIZE);
+        const gridLon = Math.floor(data.lon / CELL_SIZE);
+        const gridKey = `${gridLat}_${gridLon}`;
+        if (!stabilityIndex.has(gridKey)) {
+          stabilityIndex.set(gridKey, []);
+        }
+        stabilityIndex.get(gridKey).push({ hash, data });
+      }
+
+      // Helper to find stability info using spatial index
+      function findStabilityInfo(lat, lon) {
+        const gridLat = Math.floor(lat / CELL_SIZE);
+        const gridLon = Math.floor(lon / CELL_SIZE);
+        // Check 3x3 grid of cells
+        for (let dLat = -1; dLat <= 1; dLat++) {
+          for (let dLon = -1; dLon <= 1; dLon++) {
+            const cellKey = `${gridLat + dLat}_${gridLon + dLon}`;
+            const cellData = stabilityIndex.get(cellKey);
+            if (!cellData) continue;
+            for (const { hash, data } of cellData) {
+              const dist = Utils.getDistanceFeet(lat, lon, data.lat, data.lon);
+              if (dist < 50) {
+                return { hash, data };
+              }
+            }
+          }
+        }
+        return null;
+      }
 
       // Get all VALID values for median-based coloring and stats (filters out 0s for nutrients where 0 = no data)
       const allValues = filtered
@@ -1957,7 +2022,7 @@
       // Track which stability locations we've matched samples to (for popup binding)
       const sampleToStability = new Map();
 
-      // Render point markers (without warning badges - those are added separately per location)
+      // Render point markers with integrated warning badges
       filtered.forEach(sample => {
         const rawValue = sample[selectedAttribute];
         const numValue = Utils.getNumericValue(rawValue, selectedAttribute);
@@ -1986,47 +2051,29 @@
           return;
         }
 
-        // Find stability info for this location (for popup)
+        // Find stability info for this location using spatial index (O(1) lookup)
         let stabilityInfo = null;
-        for (const [hash, data] of Object.entries(stabilityData)) {
-          const dist = Utils.getDistanceFeet(sample.lat, sample.lon, data.lat, data.lon);
-          if (dist < 50) {
-            stabilityInfo = data;
-            sampleToStability.set(hash, data);
-            break;
-          }
+        let hasHighVariability = false;
+        const stabilityMatch = findStabilityInfo(sample.lat, sample.lon);
+        if (stabilityMatch) {
+          stabilityInfo = stabilityMatch.data;
+          sampleToStability.set(stabilityMatch.hash, stabilityMatch.data);
+          // Check if high variability for selected attribute
+          const selectedCV = stabilityInfo.cvByNutrient[selectedAttribute];
+          hasHighVariability = selectedCV !== null && selectedCV !== undefined && selectedCV > 30;
         }
 
+        // Build marker HTML with optional warning badge integrated
+        const warningBadge = hasHighVariability
+          ? '<div style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:white;border-radius:50%;width:14px;height:14px;font-size:9px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(0,0,0,0.3);border:1px solid white;">!</div>'
+          : '';
         const icon = L.divIcon({
-          html: `<div class="sample-marker" style="width:${size}px;height:${size}px;background:${color};font-size:${fontSize}px;line-height:${size}px;">${displayVal}</div>`,
+          html: `<div class="sample-marker" style="position:relative;width:${size}px;height:${size}px;background:${color};font-size:${fontSize}px;line-height:${size}px;">${displayVal}${warningBadge}</div>`,
           className: '', iconSize: [size, size], iconAnchor: [size/2, size/2]
         });
         const marker = L.marker([sample.lat, sample.lon], { icon }).addTo(map);
         marker.bindPopup(buildSamplePopup(sample, stabilityInfo));
         currentLayers.push(marker);
-      });
-
-      // Add ONE warning icon per volatile location (not per sample)
-      Object.entries(stabilityData).forEach(([hash, data]) => {
-        // Only show for locations in active fields
-        if (selectedField !== 'all' && data.field !== selectedField) return;
-        if (!getActiveFields().includes(data.field)) return;
-
-        // Check if this location has high CV for selected attribute
-        const selectedCV = data.cvByNutrient[selectedAttribute];
-        const hasHighVariability = selectedCV !== null && selectedCV !== undefined && selectedCV > 30;
-
-        if (hasHighVariability) {
-          // Create a single warning marker for this location
-          const warningIcon = L.divIcon({
-            html: `<div style="background:#ef4444;color:white;border-radius:50%;width:18px;height:18px;font-size:11px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 4px rgba(0,0,0,0.4);border:2px solid white;">⚠</div>`,
-            className: '',
-            iconSize: [18, 18],
-            iconAnchor: [-8, 24] // Offset to top-right of sample markers
-          });
-          const warningMarker = L.marker([data.lat, data.lon], { icon: warningIcon, interactive: false }).addTo(map);
-          currentLayers.push(warningMarker);
-        }
       });
     }
 
@@ -2087,15 +2134,14 @@
       const baseNutrient = getBaseNutrient(selectedAttribute);
       const activeFields = getActiveFields();
 
-      // Filter samples by active fields and selected field
-      let filteredSamples = sampleData.filter(s => {
-        if (!activeFields.includes(s.field)) return false;
-        if (selectedField !== 'all' && s.field !== selectedField) return false;
-        return true;
-      });
-
-      // Calculate stability data
-      const stabilityData = Utils.calculateStabilityData(filteredSamples);
+      // Use cached stability data, filtered by active fields
+      const allStabilityData = getStabilityData();
+      const stabilityData = {};
+      for (const [hash, data] of Object.entries(allStabilityData)) {
+        if (!activeFields.includes(data.field)) continue;
+        if (selectedField !== 'all' && data.field !== selectedField) continue;
+        stabilityData[hash] = data;
+      }
 
       // Collect all CV values for stats
       const allCVs = [];
@@ -2199,21 +2245,16 @@
       const baseNutrient = getBaseNutrient(selectedAttribute);
       const activeFields = getActiveFields();
 
-      // Calculate average CV for each field
+      // Use cached stability data, grouped by field
+      const allStabilityData = getStabilityData();
       const fieldCVs = {};
       const allCVs = [];
 
+      // Group stability locations by field and calculate average CV
       activeFields.forEach(fieldName => {
-        // Get samples for this field
-        const fieldSamples = sampleData.filter(s => s.field === fieldName);
-        if (fieldSamples.length < 2) return; // Need multiple samples for CV
-
-        // Calculate stability data for this field's samples
-        const stabilityData = Utils.calculateStabilityData(fieldSamples);
-
-        // Get all CV values for the base nutrient across all locations in this field
         const fieldLocationCVs = [];
-        Object.values(stabilityData).forEach(data => {
+        Object.values(allStabilityData).forEach(data => {
+          if (data.field !== fieldName) return;
           const cv = data.cvByNutrient[baseNutrient];
           if (cv !== null && cv !== undefined) {
             fieldLocationCVs.push(cv);

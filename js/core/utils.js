@@ -323,29 +323,69 @@ function calculateCV(values) {
 }
 
 // Group samples by location and calculate CV for each nutrient
+// Optimized with spatial hashing for O(n) instead of O(n²) performance
 function calculateStabilityData(samples, proximityFeet = 50) {
   if (!samples || samples.length === 0) return {};
 
   const locationGroups = {};
   const nutrients = ['pH', 'P', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S'];
 
-  // Group samples by location
+  // Spatial index: grid cells ~100ft to ensure we can find 50ft neighbors
+  // 100ft ≈ 0.0003 degrees latitude (varies slightly with longitude)
+  const CELL_SIZE = 0.0003;
+  const spatialIndex = new Map(); // Map<gridKey, Set<locationHash>>
+
+  function getGridKey(lat, lon) {
+    const gridLat = Math.floor(lat / CELL_SIZE);
+    const gridLon = Math.floor(lon / CELL_SIZE);
+    return `${gridLat}_${gridLon}`;
+  }
+
+  function getNearbyCells(lat, lon) {
+    const gridLat = Math.floor(lat / CELL_SIZE);
+    const gridLon = Math.floor(lon / CELL_SIZE);
+    const cells = [];
+    // Check 3x3 grid of cells
+    for (let dLat = -1; dLat <= 1; dLat++) {
+      for (let dLon = -1; dLon <= 1; dLon++) {
+        cells.push(`${gridLat + dLat}_${gridLon + dLon}`);
+      }
+    }
+    return cells;
+  }
+
+  // Group samples by location using spatial index
   samples.forEach(sample => {
     if (!sample.lat || !sample.lon) return;
 
-    // Find existing group within proximity
+    // Find existing group within proximity using spatial index
     let foundGroup = null;
-    for (const [hash, group] of Object.entries(locationGroups)) {
-      const dist = getDistanceFeet(sample.lat, sample.lon, group.lat, group.lon);
-      if (dist < proximityFeet) {
-        foundGroup = hash;
-        break;
+    const nearbyCells = getNearbyCells(sample.lat, sample.lon);
+
+    for (const cellKey of nearbyCells) {
+      const cellGroups = spatialIndex.get(cellKey);
+      if (!cellGroups) continue;
+
+      for (const hash of cellGroups) {
+        const group = locationGroups[hash];
+        const dist = getDistanceFeet(sample.lat, sample.lon, group.lat, group.lon);
+        if (dist < proximityFeet) {
+          foundGroup = hash;
+          break;
+        }
       }
+      if (foundGroup) break;
     }
 
     const hash = foundGroup || getLocationHash(sample.lat, sample.lon);
     if (!locationGroups[hash]) {
       locationGroups[hash] = { lat: sample.lat, lon: sample.lon, field: sample.field, samples: [] };
+      // Add to spatial index
+      const gridKey = getGridKey(sample.lat, sample.lon);
+      if (!spatialIndex.has(gridKey)) {
+        spatialIndex.set(gridKey, new Set());
+      }
+      spatialIndex.get(gridKey).add(hash);
     }
     locationGroups[hash].samples.push(sample);
   });
