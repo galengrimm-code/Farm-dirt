@@ -342,8 +342,8 @@
 
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.128";
-    const BUILD_DATE = "2026-01-22T11:42:34";
+    const APP_VERSION = "v1.0.129";
+    const BUILD_DATE = "2026-01-22T12:00:28";
 
     // ========== CONFIG ==========
     // Reference shared data config and add app-specific config
@@ -1159,7 +1159,9 @@
       statsTitle.textContent = attrName;
 
       // Update note based on mode
-      if (mode === 'field') {
+      if (mode === 'stability') {
+        statsNote.textContent = 'CV% (lower = more stable)';
+      } else if (mode === 'field') {
         statsNote.textContent = 'Based on field averages';
       } else {
         statsNote.textContent = 'Based on sample points';
@@ -1180,6 +1182,15 @@
       statsAvg.textContent = avg.toFixed(decimals) + (unit ? ' ' + unit : '');
       statsHigh.textContent = high.toFixed(decimals) + (unit ? ' ' + unit : '');
       statsLow.textContent = low.toFixed(decimals) + (unit ? ' ' + unit : '');
+
+      // For stability mode, flip colors (low is good/green, high is bad/red)
+      if (mode === 'stability') {
+        statsHigh.style.color = '#ef4444'; // red for high (bad)
+        statsLow.style.color = '#22c55e';  // green for low (good)
+      } else {
+        statsHigh.style.color = '#22c55e'; // green for high (default)
+        statsLow.style.color = '#ef4444';  // red for low (default)
+      }
     }
 
     async function handleAuth() {
