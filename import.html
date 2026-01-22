@@ -359,7 +359,6 @@
       <div class="btn-row">
         <button class="button primary" id="loadFromSheetsBtn" style="background: #059669; color: white;">📥 Load from Google Sheets</button>
         <button class="button" id="reassignBtn" style="background: #3b82f6; color: white;">🔄 Reassign Samples to Boundaries</button>
-        <button class="button" id="recalcPZnBtn" style="background: #8b5cf6; color: white;">🧮 Calculate P:Zn Ratios</button>
       </div>
       <div class="btn-row" style="margin-top: 0.75rem;">
         <button class="button danger" id="clearSamplesBtn">🗑️ Clear Samples</button>
@@ -1124,8 +1123,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.116";
-    const BUILD_DATE = "2026-01-22T08:00:20";
+    const APP_VERSION = "v1.0.117";
+    const BUILD_DATE = "2026-01-22T08:14:32";
 
     // Reference shared data config with import-specific additions
     const CONFIG = {
@@ -1398,7 +1397,6 @@
       document.getElementById('clearYieldBtn').addEventListener('click', clearYieldData);
       document.getElementById('clearAllBtn').addEventListener('click', clearAllData);
       document.getElementById('reassignBtn').addEventListener('click', reassignSamplesToBoundaries);
-      document.getElementById('recalcPZnBtn').addEventListener('click', recalculatePZnRatios);
       document.getElementById('exportCSVBtn').addEventListener('click', exportToCSV);
       document.getElementById('exportPDFBtn').addEventListener('click', exportToPDF);
       document.getElementById('exportJSONBtn').addEventListener('click', exportToJSON);
@@ -2386,36 +2384,6 @@
         }
       } else {
         showStatus('All samples already assigned to correct boundaries', true);
-      }
-    }
-
-    // Recalculate P:Zn ratios for all existing samples
-    async function recalculatePZnRatios() {
-      if (sampleData.length === 0) {
-        showStatus('No samples loaded. Import samples first.', false);
-        return;
-      }
-
-      let updated = 0, skipped = 0;
-      sampleData.forEach(sample => {
-        if (sample.P !== undefined && sample.Zn !== undefined && sample.Zn > 0) {
-          sample.P_Zn_Ratio = sample.P / sample.Zn;
-          updated++;
-        } else {
-          skipped++;
-        }
-      });
-
-      if (updated > 0) {
-        await afterImportSuccess();
-        showStatus(`✓ Calculated P:Zn Ratio for ${updated} samples` + (skipped > 0 ? ` (${skipped} skipped - missing P or Zn)` : ''), true);
-
-        // Sync to Google Sheets if signed in
-        if (SheetsAPI.isSignedIn) {
-          syncToSheets();
-        }
-      } else {
-        showStatus('No samples have both P and Zn values', false);
       }
     }
 
