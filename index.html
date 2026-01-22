@@ -342,8 +342,8 @@
 
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.123";
-    const BUILD_DATE = "2026-01-22T08:58:29";
+    const APP_VERSION = "v1.0.124";
+    const BUILD_DATE = "2026-01-22T09:03:17";
 
     // ========== CONFIG ==========
     // Reference shared data config and add app-specific config
@@ -1710,6 +1710,13 @@
         let fieldSamples = sampleData.filter(s => s.field === fieldName);
         if (selectedYear !== 'all') {
           fieldSamples = fieldSamples.filter(s => String(s.year) === String(selectedYear));
+        } else {
+          // "All" selected - use only the most recent year for this field
+          const years = [...new Set(fieldSamples.map(s => s.year).filter(y => y))].sort((a, b) => b - a);
+          if (years.length > 0) {
+            const mostRecentYear = years[0];
+            fieldSamples = fieldSamples.filter(s => String(s.year) === String(mostRecentYear));
+          }
         }
 
         // Robust value extraction - handle strings, empty values, zeros for no-data attributes
