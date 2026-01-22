@@ -4142,12 +4142,25 @@
       try {
         await SheetsAPI.initializeSheets();
 
-        // NEVER clear data from Sheets - only append
-        // This prevents data loss if local data fails to load properly
-        // Users can manually clean up duplicates in Sheets if needed
+        // Clear existing data before sync to prevent duplicates
+        // Only clear if we have data to replace it with (safety check is at line 4136)
+        async function clearSheetData(sheetName, startRow = 2) {
+          try {
+            const response = await gapi.client.sheets.spreadsheets.values.get({
+              spreadsheetId: CONFIG.SHEET_ID, range: `${sheetName}!A:A`
+            });
+            const numRows = response.result.values ? response.result.values.length : 1;
+            if (numRows > startRow - 1) {
+              await gapi.client.sheets.spreadsheets.values.clear({
+                spreadsheetId: CONFIG.SHEET_ID, range: `${sheetName}!A${startRow}:ZZ${numRows + 100}`
+              });
+            }
+          } catch (e) { /* Sheet may not exist yet */ }
+        }
 
-        // Write clients
+        // Write clients (clear first to prevent duplicates)
         if (clientsData.length > 0) {
+          await clearSheetData('Clients', 2);
           const clientRows = clientsData.map(c => [
             c.id,
             c.name,
@@ -4164,8 +4177,9 @@
           } catch (e) { console.warn('Could not sync Clients - tab may not exist'); }
         }
 
-        // Write farms
+        // Write farms (clear first to prevent duplicates)
         if (farmsData.length > 0) {
+          await clearSheetData('Farms', 2);
           const farmRows = farmsData.map(f => [
             f.id,
             f.clientId,
@@ -4183,8 +4197,9 @@
           } catch (e) { console.warn('Could not sync Farms - tab may not exist'); }
         }
 
-        // Write fields (now includes farmId)
+        // Write fields (clear first to prevent duplicates)
         if (Object.keys(fieldBoundaries).length > 0) {
+          await clearSheetData('Fields', 2);
           const fieldRows = Object.entries(fieldBoundaries).map(([name, fieldData]) => {
             // Handle both legacy format (array) and new format (object with boundary)
             const boundary = fieldData.boundary || fieldData;
@@ -4207,8 +4222,9 @@
           });
         }
 
-        // Write samples
+        // Write samples (clear first to prevent duplicates)
         if (sampleData.length > 0) {
+          await clearSheetData('Samples', 2); // Clear data rows, keep header
           const headerRes = await gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: CONFIG.SHEET_ID,
             range: 'Samples!A1:ZZ1'
