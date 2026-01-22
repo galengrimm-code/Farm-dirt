@@ -1123,8 +1123,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.118";
-    const BUILD_DATE = "2026-01-22T08:31:00";
+    const APP_VERSION = "v1.0.119";
+    const BUILD_DATE = "2026-01-22T08:35:31";
 
     // Reference shared data config with import-specific additions
     const CONFIG = {
@@ -2253,8 +2253,16 @@
         }
       }
 
-      // Calculate P:Zn Ratio if both P and Zn are available
-      if (sample.P !== undefined && sample.Zn !== undefined && sample.Zn > 0) {
+      // Ensure P and Zn are numbers (they might be strings from import)
+      if (sample.P !== undefined && sample.P !== '') {
+        sample.P = parseFloat(sample.P);
+      }
+      if (sample.Zn !== undefined && sample.Zn !== '') {
+        sample.Zn = parseFloat(sample.Zn);
+      }
+
+      // Calculate P:Zn Ratio if both P and Zn are valid numbers
+      if (!isNaN(sample.P) && !isNaN(sample.Zn) && sample.Zn > 0) {
         sample.P_Zn_Ratio = sample.P / sample.Zn;
       }
 
