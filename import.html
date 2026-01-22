@@ -1123,8 +1123,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.121";
-    const BUILD_DATE = "2026-01-22T08:51:04";
+    const APP_VERSION = "v1.0.122";
+    const BUILD_DATE = "2026-01-22T08:54:14";
 
     // Reference shared data config with import-specific additions
     const CONFIG = {
@@ -1744,7 +1744,15 @@
       document.getElementById('sampleCount').textContent = sampleData.length;
       const uniqueYears = [...new Set(sampleData.map(s => s.year).filter(y => y))].sort((a, b) => a - b);
       document.getElementById('yearCount').textContent = uniqueYears.length;
-      document.getElementById('yearList').textContent = uniqueYears.join(', ');
+      // Show sample count per year
+      const yearCounts = {};
+      sampleData.forEach(s => {
+        if (s.year) {
+          yearCounts[s.year] = (yearCounts[s.year] || 0) + 1;
+        }
+      });
+      const yearBreakdown = uniqueYears.map(y => `${y}: ${yearCounts[y]}`).join(', ');
+      document.getElementById('yearList').textContent = yearBreakdown;
       // Count samples with yield correlations and build organized field list
       const samplesWithYield = sampleData.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0);
       document.getElementById('yieldCount').textContent = samplesWithYield.length;
