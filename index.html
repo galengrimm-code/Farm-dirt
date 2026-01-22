@@ -342,8 +342,8 @@
 
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.112";
-    const BUILD_DATE = "2026-01-22T07:44:39";
+    const APP_VERSION = "v1.0.113";
+    const BUILD_DATE = "2026-01-22T07:45:41";
 
     // ========== CONFIG ==========
     // Reference shared data config and add app-specific config
@@ -1950,19 +1950,21 @@
           return;
         }
 
-        // Check for high variability at this location
+        // Check for high variability at this location FOR THE SELECTED ATTRIBUTE ONLY
         let hasHighVariability = false;
         let stabilityInfo = null;
         for (const [hash, data] of Object.entries(stabilityData)) {
           const dist = Utils.getDistanceFeet(sample.lat, sample.lon, data.lat, data.lon);
           if (dist < 50) {
             stabilityInfo = data;
-            hasHighVariability = data.hasHighVariability;
+            // Only flag if the SELECTED attribute has high CV (>30%)
+            const selectedCV = data.cvByNutrient[selectedAttribute];
+            hasHighVariability = selectedCV !== null && selectedCV !== undefined && selectedCV > 30;
             break;
           }
         }
 
-        // Add warning badge for high variability
+        // Add warning badge for high variability on selected attribute
         const warningBadge = hasHighVariability
           ? '<span style="position:absolute;top:-6px;right:-6px;background:#ef4444;color:white;border-radius:50%;width:16px;height:16px;font-size:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.3);">⚠</span>'
           : '';
@@ -1988,18 +1990,24 @@
       if (sample.depth) html += `<br><strong>Depth:</strong> ${sample.depth}"`;
       html += `</div>`;
 
-      // Show high variability warning if applicable
-      if (stabilityInfo && stabilityInfo.hasHighVariability) {
-        const volatileList = stabilityInfo.highVariabilityNutrients
-          .map(n => `${CONFIG.NUTRIENT_NAMES?.[n.attr] || n.attr} (${n.cv.toFixed(0)}%)`)
-          .join(', ');
-        html += `<div style="margin-bottom: 8px; padding: 6px 8px; background: #fef2f2; border-left: 3px solid #ef4444; border-radius: 0 4px 4px 0; font-size: 11px; color: #991b1b;">`;
-        html += `<strong>⚠️ High Variability:</strong> ${volatileList}`;
-        html += `</div>`;
-      } else if (stabilityInfo && stabilityInfo.yearCount > 1) {
-        html += `<div style="margin-bottom: 8px; padding: 6px 8px; background: #f0fdf4; border-left: 3px solid #22c55e; border-radius: 0 4px 4px 0; font-size: 11px; color: #166534;">`;
-        html += `✓ Stable location (${stabilityInfo.yearCount} years of data)`;
-        html += `</div>`;
+      // Show stability info for selected attribute
+      if (stabilityInfo && stabilityInfo.yearCount > 1) {
+        const selectedCV = stabilityInfo.cvByNutrient[selectedAttribute];
+        const attrName = CONFIG.NUTRIENT_NAMES?.[selectedAttribute] || selectedAttribute;
+
+        if (selectedCV !== null && selectedCV !== undefined && selectedCV > 30) {
+          // High variability for selected attribute
+          html += `<div style="margin-bottom: 8px; padding: 6px 8px; background: #fef2f2; border-left: 3px solid #ef4444; border-radius: 0 4px 4px 0; font-size: 11px; color: #991b1b;">`;
+          html += `<strong>⚠️ High ${attrName} Variability:</strong> CV ${selectedCV.toFixed(0)}%`;
+          html += `<div style="font-size: 10px; margin-top: 2px;">Values vary significantly at this location</div>`;
+          html += `</div>`;
+        } else if (selectedCV !== null && selectedCV !== undefined) {
+          // Stable for selected attribute
+          const label = selectedCV < 15 ? 'Stable' : 'Moderate';
+          html += `<div style="margin-bottom: 8px; padding: 6px 8px; background: #f0fdf4; border-left: 3px solid #22c55e; border-radius: 0 4px 4px 0; font-size: 11px; color: #166534;">`;
+          html += `✓ ${label} ${attrName} (CV: ${selectedCV.toFixed(0)}%, ${stabilityInfo.yearCount} years)`;
+          html += `</div>`;
+        }
       }
 
       html += `<table style="width: 100%; font-size: 12px; border-collapse: collapse;">`;
