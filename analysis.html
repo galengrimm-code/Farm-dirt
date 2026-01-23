@@ -593,8 +593,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.153";
-    const BUILD_DATE = "2026-01-23T10:59:30";
+    const APP_VERSION = "v1.0.154";
+    const BUILD_DATE = "2026-01-23T11:10:04";
 
     // Reference shared data config with analysis-specific additions
     const CONFIG = {
@@ -5047,21 +5047,115 @@
         .no-break { page-break-inside: avoid; break-inside: avoid; }
 
         @media print {
-          body { padding: 10px; }
+          @page {
+            size: letter portrait;
+            margin: 0.5in;
+          }
 
-          /* Prevent breaking inside content cards and containers */
-          .trend-card, .nutrient-card, .card, table, .summary,
+          body {
+            padding: 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          /* ===== TREND CARDS - FIELD TRENDS REPORT ===== */
+
+          /* Card container - keep card + all insights together */
+          .trend-card {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            max-height: 680px !important;
+            overflow: hidden !important;
+            margin-bottom: 15px !important;
+            padding: 15px !important;
+          }
+
+          /* Compact the graph for print */
+          .trend-graph {
+            padding: 5px !important;
+          }
+          .trend-graph svg {
+            min-height: 120px !important;
+            max-height: 150px !important;
+            width: 100% !important;
+          }
+          .trend-graph.large svg,
+          .trend-graph.xlarge svg {
+            min-height: 140px !important;
+            max-height: 170px !important;
+          }
+
+          /* Compact header */
+          .trend-header {
+            margin-bottom: 10px !important;
+            padding-bottom: 8px !important;
+          }
+          .trend-title {
+            font-size: 14px !important;
+          }
+          .trend-pct {
+            font-size: 16px !important;
+          }
+          .trend-sub {
+            font-size: 9px !important;
+          }
+
+          /* Compact data rows */
+          .trend-row {
+            padding: 4px 8px !important;
+            font-size: 10px !important;
+            min-width: 100px !important;
+          }
+
+          /* Insight boxes inside cards - keep together, compact */
+          .trend-card > div[style*="background: #f8fafc"],
+          .trend-card > div[style*="background: #fef3c7"],
+          .trend-card > div[style*="background: #dcfce7"],
+          .trend-card > div[style*="background: #fef2f2"],
+          .trend-card > div[style*="background: #fffbeb"],
+          .trend-card > div[style*="background: linear-gradient"] {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            margin: 8px 0 !important;
+            padding: 8px !important;
+            font-size: 10px !important;
+            line-height: 1.3 !important;
+          }
+
+          /* Recommendation lists compact */
+          .trend-card ul {
+            margin: 5px 0 !important;
+            padding-left: 15px !important;
+          }
+          .trend-card li {
+            font-size: 9px !important;
+            margin-bottom: 3px !important;
+            line-height: 1.2 !important;
+          }
+
+          /* ===== NUTRIENT CARDS - YEAR COMPARISON ===== */
+          .nutrient-card {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            padding: 10px !important;
+            margin-bottom: 10px !important;
+          }
+
+          /* ===== GENERAL PRINT RULES ===== */
+
+          /* Prevent breaking inside content containers */
+          .card, table, .summary,
           .model-summary, .key-findings, .data-table, .zone-summary,
           .chart-container, .interpretation-section, .findings-grid,
           .coef-table, .scatter-container, .threshold-box {
-            page-break-inside: avoid;
-            break-inside: avoid;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
 
           /* Keep headers with their following content */
           h1, h2, h3, h4 {
-            page-break-after: avoid;
-            break-after: avoid;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
           }
 
           /* Force page breaks BEFORE major sections */
@@ -5082,37 +5176,36 @@
 
           /* Tables - keep rows together */
           tr {
-            page-break-inside: avoid;
-            break-inside: avoid;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
-
-          /* Keep table header visible if table spans pages */
           thead {
             display: table-header-group;
           }
 
-          /* Ensure graphs and charts print properly */
-          .trend-graph { width: 100%; }
-          .trend-graph svg { min-height: 220px; width: 100%; }
-
-          /* Charts and visualizations - don't cut */
+          /* Charts and visualizations */
           svg, canvas, .chart, .bar-chart {
-            page-break-inside: avoid;
-            break-inside: avoid;
-            max-height: 400px;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            max-height: 300px !important;
+          }
+          canvas {
+            max-width: 100% !important;
           }
 
-          /* Scatter plot and analysis boxes */
-          canvas { page-break-inside: avoid; break-inside: avoid; }
-          #thresholdAnalysis { page-break-inside: avoid; break-inside: avoid; }
+          /* MVR and Spatial specific */
+          .significance-chart, .mvr-coefficients,
+          .zone-card, .change-grid {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
 
-          /* MVR specific elements */
-          .significance-chart { page-break-inside: avoid; break-inside: avoid; }
-          .mvr-coefficients { page-break-inside: avoid; break-inside: avoid; }
-
-          /* Spatial Change elements */
-          .zone-card { page-break-inside: avoid; break-inside: avoid; }
-          .change-grid { page-break-inside: avoid; break-inside: avoid; }
+          /* Operation summary header - don't break */
+          div[style*="background: linear-gradient(135deg, #eff6ff"] {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            page-break-after: avoid !important;
+          }
         }
       `;
     }
@@ -5126,7 +5219,25 @@
       const comparisonData = document.getElementById('comparisonGrid').innerHTML;
 
       const printWindow = window.open('', '_blank');
-      printWindow.document.write(`<!DOCTYPE html><html><head><title>${operationName} - Year Comparison</title><style>${getReportStyles()}</style></head><body>
+      printWindow.document.write(`<!DOCTYPE html><html><head><title>${operationName} - Year Comparison</title><style>${getReportStyles()}
+        /* Print-optimized grid for Year Comparison */
+        .comparison-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 10px;
+        }
+        @media print {
+          .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+          }
+          .comparison-grid > .nutrient-card {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+        }
+      </style></head><body>
         <h1>${operationName} - Year-Over-Year Comparison</h1>
         <p>Generated: ${new Date().toLocaleString()}</p>
         <div class="summary">
@@ -5135,7 +5246,7 @@
           <div class="summary-box"><div class="number">${selectedComparisonFields.size}</div><div class="label">Fields Compared</div></div>
         </div>
         <h2>Nutrient Changes</h2>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px;">${comparisonData}</div>
+        <div class="comparison-grid">${comparisonData}</div>
         <div class="footer">Soil Sample Analysis App</div>
       </body></html>`);
       printWindow.document.close();
@@ -5148,13 +5259,30 @@
 
       const operationName = localStorage.getItem('operationName') || 'Soil Analysis';
       const trendData = document.getElementById('historyContent').innerHTML;
+      const fieldLabel = field === '__all__' ? 'All Fields' : field;
 
       const printWindow = window.open('', '_blank');
-      printWindow.document.write(`<!DOCTYPE html><html><head><title>${operationName} - Field Trends</title><style>${getReportStyles()}</style></head><body>
-        <h1>${operationName} - Field Trends: ${field}</h1>
+      printWindow.document.write(`<!DOCTYPE html><html><head><title>${operationName} - Field Trends</title><style>${getReportStyles()}
+        /* Print-optimized layout for Field Trends */
+        .trends-container {
+          display: flex;
+          flex-direction: column;
+          gap: 15px;
+        }
+        @media print {
+          .trends-container {
+            display: block;
+          }
+          .trends-container > .trend-card {
+            width: 100% !important;
+            margin-bottom: 15px !important;
+          }
+        }
+      </style></head><body>
+        <h1>${operationName} - Field Trends: ${fieldLabel}</h1>
         <p>Generated: ${new Date().toLocaleString()}</p>
         <h2>Historical Nutrient Trends</h2>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px;">${trendData}</div>
+        <div class="trends-container">${trendData}</div>
         <div class="footer">Soil Sample Analysis App</div>
       </body></html>`);
       printWindow.document.close();
