@@ -297,7 +297,7 @@
           <span class="name">pH</span>
           <div class="inputs">
             <span style="color:#dc2626;">Crit:</span><input type="number" id="pH_critical" step="0.1" value="5.5">
-            <span style="color:#16a34a;">Opt:</span><input type="number" id="pH_min" step="0.1" value="6.0"><span>to</span><input type="number" id="pH_max" step="0.1" value="7.0">
+            <span style="color:#16a34a;">Opt:</span><input type="number" id="pH_min" step="0.1" value="6.3"><span>to</span><input type="number" id="pH_max" step="0.1" value="7.0">
           </div>
         </div>
       </div>
@@ -412,8 +412,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.148";
-    const BUILD_DATE = "2026-01-23T10:19:28";
+    const APP_VERSION = "v1.0.149";
+    const BUILD_DATE = "2026-01-23T10:25:19";
 
     // Reference shared data config
     const CONFIG = {
@@ -426,7 +426,7 @@
       pH_critical: 5.5, P_critical: 15, K_critical: 120, OM_critical: 2.0, S_critical: 8,
       Ca_sat_critical: 55, Mg_sat_critical: 8, K_sat_critical: 2.0,
       // Optimal thresholds (ideal is calculated as midpoint)
-      pH_min: 6.0, pH_max: 7.0, P_min: 25, P_max: 50, K_min: 150, K_max: 250, OM_min: 3.0, OM_max: 5.0, S_min: 12, S_max: 30,
+      pH_min: 6.3, pH_max: 7.0, P_min: 25, P_max: 50, K_min: 150, K_max: 250, OM_min: 3.0, OM_max: 5.0, S_min: 12, S_max: 30,
       Ca_sat_min: 65, Ca_sat_max: 75, Mg_sat_min: 10, Mg_sat_max: 15, K_sat_min: 3.0, K_sat_max: 5.0, H_sat_max: 5.0,
       bufferPercent: 25
     };
