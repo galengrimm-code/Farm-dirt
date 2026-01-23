@@ -4,6 +4,42 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 
 ---
 
+## [v1.0.74] - January 23, 2026
+
+### Field Trends - Nutrient Insights
+
+- **P:Zn Ratio Insights**: 5-case tiered recommendations based on ratio level AND zinc sufficiency
+  - Shows current P, Zn, and ratio values with actionable guidance
+  - "Why ratios matter" tooltip explaining agronomic context
+  - Added to both single field and operation-wide views
+
+- **Organic Matter Tips**: Actionable improvement tips when OM is below threshold
+  - Triggers when OM < 2.0% (critical) or below optimal with flat/declining trend
+  - 4 specific tips: cover crops, reduced tillage, compost/manure, crop residue
+  - Always visible (not collapsible) for immediate visibility
+
+- **Zinc Improvement Insights**: Comprehensive 3-tier guidance system
+  - Low (<50% target), Marginal (50-100%), Adequate (≥100%)
+  - Dynamic Zn target based on P level: `max(1.5 ppm, P/10)` to maintain 10:1 ratio
+  - Shows calculated target with explanation when elevated due to high P
+  - P:Zn ratio used as context, not primary trigger
+
+### Methodology Page
+
+- **New page**: `methodology.html` documenting all calculations used in the app
+- **8 sections**: Stability Scores, Trend Analysis, Nutrient Ratios, Thresholds, Averages, Yield Correlation, Spatial Analysis, Color Scaling
+- **Formulas**: Code-style boxes with exact formulas (CV, linear regression, Pearson r, etc.)
+- **Agronomic context**: "Why it matters" notes explaining the science
+- **Navigation**: Jump links and collapsible sections
+- **Footer links**: Added "How We Calculate" link to all page footers
+- **Settings card**: Prominent link card added to Settings page
+
+### Settings
+
+- **pH default change**: Updated optimal range from 6.0-7.0 to 6.3-7.0
+
+---
+
 ## [v1.0.73] - January 21, 2026
 
 ### Dynamic Zoom-Based Color Scaling
@@ -384,6 +420,8 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| v1.0.74 | Jan 23, 2026 | Field Trends insights (P:Zn, OM, Zn), Methodology page, pH default |
+| v1.0.73 | Jan 21, 2026 | Dynamic zoom-based color scaling, Google Sheet URL support |
 | v1.0.1 | Jan 14, 2026 | Version tracking, scatter plot improvements, IndexedDB storage |
 | v0.13 | Jan 13, 2026 | Field Trends redesign, backup system, yield correlation fixes |
 | v0.12 | Jan 13, 2026 | Import improvements, bug fixes |
