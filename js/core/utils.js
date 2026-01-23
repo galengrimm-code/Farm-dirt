@@ -428,28 +428,110 @@ function calculateStabilityData(samples, proximityFeet = 50) {
   return stabilityData;
 }
 
-// Get stability color based on CV value
-function getStabilityColor(cv) {
-  if (cv === null || cv === undefined) return '#94a3b8'; // grey
-  if (cv < 15) return '#16a34a';  // Green (stable)
-  if (cv < 30) return '#eab308';  // Yellow (moderate)
-  return '#ef4444';                // Red (volatile)
+// Get stability color based on CV value (or SD for pH)
+// attr parameter determines which thresholds to use
+function getStabilityColor(value, attr = null) {
+  if (value === null || value === undefined) return '#94a3b8'; // grey
+
+  // pH uses Standard Deviation thresholds
+  if (attr === 'pH') {
+    if (value < 0.20) return '#16a34a';  // Green (stable)
+    if (value < 0.35) return '#eab308';  // Yellow (moderate)
+    return '#ef4444';                     // Red (volatile)
+  }
+
+  // All other nutrients use CV thresholds
+  if (value < 20) return '#16a34a';  // Green (stable)
+  if (value < 30) return '#eab308';  // Yellow (moderate)
+  return '#ef4444';                   // Red (volatile)
 }
 
-// Get stability label based on CV value
-function getStabilityLabel(cv) {
-  if (cv === null || cv === undefined) return 'Unknown';
-  if (cv < 15) return 'Stable';
-  if (cv < 30) return 'Moderate';
+// Get stability label based on CV value (or SD for pH)
+function getStabilityLabel(value, attr = null) {
+  if (value === null || value === undefined) return 'Unknown';
+
+  // pH uses Standard Deviation thresholds
+  if (attr === 'pH') {
+    if (value < 0.20) return 'Stable';
+    if (value < 0.35) return 'Moderate';
+    return 'Volatile';
+  }
+
+  // All other nutrients use CV thresholds
+  if (value < 20) return 'Stable';
+  if (value < 30) return 'Moderate';
   return 'Volatile';
 }
 
-// Get stability emoji based on CV value
-function getStabilityEmoji(cv) {
-  if (cv === null || cv === undefined) return '';
-  if (cv < 15) return '🟢';
-  if (cv < 30) return '🟡';
+// Get stability emoji based on CV value (or SD for pH)
+function getStabilityEmoji(value, attr = null) {
+  if (value === null || value === undefined) return '';
+
+  // pH uses Standard Deviation thresholds
+  if (attr === 'pH') {
+    if (value < 0.20) return '🟢';
+    if (value < 0.35) return '🟡';
+    return '🔴';
+  }
+
+  // All other nutrients use CV thresholds
+  if (value < 20) return '🟢';
+  if (value < 30) return '🟡';
   return '🔴';
+}
+
+// Calculate Standard Deviation
+function calculateSD(values) {
+  if (!values || values.length < 2) return null;
+  const validValues = values.filter(v => v !== null && v !== undefined && !isNaN(v));
+  if (validValues.length < 2) return null;
+  const mean = validValues.reduce((a, b) => a + b, 0) / validValues.length;
+  const variance = validValues.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / validValues.length;
+  return Math.sqrt(variance);
+}
+
+// Calculate linear regression slope and intercept
+// Returns { slope, intercept, r2 } where slope is change per year
+function calculateLinearRegression(data) {
+  // data should be array of { x: year, y: value }
+  if (!data || data.length < 2) return null;
+
+  const n = data.length;
+  const sumX = data.reduce((sum, d) => sum + d.x, 0);
+  const sumY = data.reduce((sum, d) => sum + d.y, 0);
+  const sumXY = data.reduce((sum, d) => sum + d.x * d.y, 0);
+  const sumX2 = data.reduce((sum, d) => sum + d.x * d.x, 0);
+  const sumY2 = data.reduce((sum, d) => sum + d.y * d.y, 0);
+
+  const denominator = n * sumX2 - sumX * sumX;
+  if (denominator === 0) return null;
+
+  const slope = (n * sumXY - sumX * sumY) / denominator;
+  const intercept = (sumY - slope * sumX) / n;
+
+  // Calculate R² (coefficient of determination)
+  const meanY = sumY / n;
+  const ssTotal = data.reduce((sum, d) => sum + Math.pow(d.y - meanY, 2), 0);
+  const ssResidual = data.reduce((sum, d) => {
+    const predicted = slope * d.x + intercept;
+    return sum + Math.pow(d.y - predicted, 2);
+  }, 0);
+  const r2 = ssTotal > 0 ? 1 - (ssResidual / ssTotal) : 0;
+
+  return { slope, intercept, r2 };
+}
+
+// Determine trend direction based on slope magnitude
+// Returns 'up', 'down', or 'flat'
+function getTrendDirection(slope, currentValue, attr = null) {
+  if (slope === null || slope === undefined) return 'flat';
+
+  // Define minimum meaningful slope as percentage of current value
+  // This prevents tiny absolute changes from being flagged as trends
+  const minMagnitude = attr === 'pH' ? 0.02 : Math.abs(currentValue) * 0.02;
+
+  if (Math.abs(slope) < minMagnitude) return 'flat';
+  return slope > 0 ? 'up' : 'down';
 }
 
 // Calculate field-level stability for a nutrient
@@ -464,17 +546,217 @@ function calculateFieldStability(samples, attr) {
   if (cvValues.length === 0) return null;
 
   const avgCV = cvValues.reduce((a, b) => a + b, 0) / cvValues.length;
-  const stabilityScore = Math.max(0, 100 - avgCV);
+
+  // Use new thresholds: CV < 20% stable, 20-30% moderate, > 30% volatile
+  const label = getStabilityLabel(avgCV, attr);
+  const color = getStabilityColor(avgCV, attr);
+  const emoji = getStabilityEmoji(avgCV, attr);
+
+  // Calculate stability score (inverse of CV, capped at 100)
+  const stabilityScore = Math.max(0, Math.min(100, 100 - avgCV));
 
   return {
     avgCV,
     stabilityScore,
     locationCount: cvValues.length,
-    label: stabilityScore >= 85 ? 'Stable' : (stabilityScore >= 70 ? 'Moderate' : 'Volatile'),
-    color: stabilityScore >= 85 ? '#22c55e' : (stabilityScore >= 70 ? '#eab308' : '#ef4444'),
-    emoji: stabilityScore >= 85 ? '🟢' : (stabilityScore >= 70 ? '🟡' : '🔴')
+    label,
+    color,
+    emoji
   };
 }
+
+// Calculate trend stability from year-over-year data
+// Uses CV for most nutrients, SD for pH
+// yearData should be array of { year, avg } objects
+function calculateTrendStability(yearData, attr) {
+  if (!yearData || yearData.length < 2) return null;
+
+  const values = yearData.map(d => d.avg).filter(v => v !== null && v !== undefined && !isNaN(v));
+  if (values.length < 2) return null;
+
+  let stabilityValue, stabilityMetric;
+
+  if (attr === 'pH') {
+    // Use Standard Deviation for pH
+    stabilityValue = calculateSD(values);
+    stabilityMetric = 'SD';
+  } else {
+    // Use Coefficient of Variation for all other nutrients
+    stabilityValue = calculateCV(values);
+    stabilityMetric = 'CV';
+  }
+
+  if (stabilityValue === null) return null;
+
+  const label = getStabilityLabel(stabilityValue, attr);
+  const color = getStabilityColor(stabilityValue, attr);
+  const emoji = getStabilityEmoji(stabilityValue, attr);
+
+  return {
+    value: stabilityValue,
+    metric: stabilityMetric,
+    label,
+    color,
+    emoji,
+    yearCount: yearData.length
+  };
+}
+
+// Get comprehensive trend insight based on stability and trend direction
+// Returns the full insight object with message, confidence, etc.
+function getTrendInsight(yearData, attr, slope, criticalLevels = {}) {
+  if (!yearData || yearData.length < 2) return null;
+
+  const stability = calculateTrendStability(yearData, attr);
+  if (!stability) return null;
+
+  const lastYear = yearData[yearData.length - 1];
+  const trendDirection = getTrendDirection(slope, lastYear.avg, attr);
+
+  // Determine confidence based on stability + years
+  let confidence;
+  if (stability.label === 'Stable' && yearData.length >= 4 && trendDirection !== 'flat') {
+    confidence = 'High';
+  } else if (stability.label === 'Moderate' || yearData.length === 3) {
+    confidence = 'Medium';
+  } else {
+    confidence = 'Low';
+  }
+
+  // For lower_is_better nutrients, invert the trend interpretation
+  const lowerIsBetter = ['H_Sat', 'Na_Sat', 'Soluble_Salts', 'EC'].includes(attr);
+  const effectiveTrend = lowerIsBetter ?
+    (trendDirection === 'up' ? 'down' : trendDirection === 'down' ? 'up' : 'flat') :
+    trendDirection;
+
+  // Generate insight message based on trend + stability matrix
+  let message, background;
+
+  if (effectiveTrend === 'up') {
+    if (stability.label === 'Stable') {
+      message = '✓ Consistent improvement - management is working';
+      background = '#dcfce7'; // Light green
+    } else if (stability.label === 'Moderate') {
+      message = '↑ Improving with some variability';
+      background = '#fef9c3'; // Light yellow
+    } else {
+      message = '⚠️ Appears improving, but high variability - confirm with consistent resampling';
+      background = '#fef3c7'; // Yellow/amber
+    }
+  } else if (effectiveTrend === 'down') {
+    if (stability.label === 'Stable') {
+      message = '🔴 Consistent decline - action recommended';
+      background = '#fee2e2'; // Light red/pink
+    } else if (stability.label === 'Moderate') {
+      message = '↓ Declining with moderate variability - consider action and confirm next sample';
+      background = '#fed7aa'; // Light orange
+    } else {
+      message = '⚠️ May be declining, but unstable data - resample before major changes';
+      background = '#fef3c7'; // Yellow/amber
+    }
+  } else {
+    // Flat trend
+    if (stability.label === 'Stable') {
+      message = '✓ Holding steady with consistent readings';
+      background = '#dcfce7'; // Light green
+    } else if (stability.label === 'Moderate') {
+      message = '→ Mostly steady with some noise - continue monitoring';
+      background = '#f1f5f9'; // Light gray
+    } else {
+      message = '⚠️ Average stable but wide swings - investigate variability causes';
+      background = '#fef3c7'; // Yellow/amber
+    }
+  }
+
+  // Add preliminary data warning
+  if (yearData.length < 3) {
+    message += '. Trend is preliminary - more data needed';
+  }
+
+  // Calculate years to critical if applicable
+  let yearsToCritical = null;
+  const criticalLevel = criticalLevels[attr];
+  if (criticalLevel !== undefined &&
+      effectiveTrend === 'down' &&
+      stability.label !== 'Volatile' &&
+      yearData.length >= 4 &&
+      Math.abs(slope) > 0.001) {
+
+    const currentLevel = lastYear.avg;
+    if (currentLevel <= criticalLevel) {
+      yearsToCritical = { status: 'below', message: '⚠️ Currently below critical level' };
+    } else {
+      const years = (currentLevel - criticalLevel) / Math.abs(slope);
+      if (years > 15) {
+        yearsToCritical = { status: 'long', message: 'Long-term decline - monitor' };
+      } else if (years > 0) {
+        yearsToCritical = {
+          status: 'projected',
+          years: Math.round(years * 10) / 10,
+          message: `At current rate (${slope > 0 ? '+' : ''}${slope.toFixed(1)} ${attr === 'pH' ? '' : 'ppm'}/yr), will reach critical level (${criticalLevel}${attr === 'pH' ? '' : ' ppm'}) in ~${Math.round(years)} years`
+        };
+      }
+    }
+  }
+
+  // Determine urgency badge
+  const optimalRanges = JSON.parse(localStorage.getItem('thresholds') || '{}');
+  let urgency = 'low';
+  const currentValue = lastYear.avg;
+
+  // Check if below critical
+  if (criticalLevel !== undefined && currentValue < criticalLevel) {
+    if (effectiveTrend === 'down' && stability.label === 'Stable') {
+      urgency = 'high';
+    } else {
+      urgency = 'high-medium';
+    }
+  } else if (criticalLevel !== undefined) {
+    // Check if below optimal (using critical as a proxy if no optimal defined)
+    const optimalMin = optimalRanges[`${attr}_min`] || criticalLevel * 1.5;
+    if (currentValue < optimalMin) {
+      if (effectiveTrend === 'down' && stability.label === 'Stable') {
+        urgency = 'high-medium';
+      } else if (effectiveTrend === 'down' || stability.label !== 'Stable') {
+        urgency = 'medium';
+      }
+    }
+  }
+
+  return {
+    trendDirection: effectiveTrend,
+    stability,
+    confidence,
+    message,
+    background,
+    yearsToCritical,
+    urgency,
+    slope
+  };
+}
+
+// Get urgency badge HTML
+function getUrgencyBadge(urgency) {
+  const badges = {
+    'high': { emoji: '🔴', label: 'HIGH', color: '#dc2626', bg: '#fee2e2' },
+    'high-medium': { emoji: '🟠', label: 'HIGH-MED', color: '#ea580c', bg: '#fed7aa' },
+    'medium': { emoji: '🟡', label: 'MEDIUM', color: '#ca8a04', bg: '#fef9c3' },
+    'low': { emoji: '🟢', label: 'LOW', color: '#16a34a', bg: '#dcfce7' }
+  };
+  return badges[urgency] || badges['low'];
+}
+
+// Default critical levels for nutrients
+const DEFAULT_CRITICAL_LEVELS = {
+  P: 15,
+  K: 120,
+  pH: 5.5,
+  OM: 2.0,
+  Zn: 0.5,
+  S: 8,
+  Ca: 500,
+  Mg: 50
+};
 
 // ========== EXPORT AS GLOBAL ==========
 window.Utils = {
@@ -499,11 +781,20 @@ window.Utils = {
   getLocationHash,
   getDistanceFeet,
   calculateCV,
+  calculateSD,
   calculateStabilityData,
   getStabilityColor,
   getStabilityLabel,
   getStabilityEmoji,
   calculateFieldStability,
+  calculateTrendStability,
+
+  // Trend analysis
+  calculateLinearRegression,
+  getTrendDirection,
+  getTrendInsight,
+  getUrgencyBadge,
+  DEFAULT_CRITICAL_LEVELS,
 
   // Data helpers
   getUniqueYears,
