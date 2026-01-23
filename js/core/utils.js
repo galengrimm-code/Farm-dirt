@@ -738,10 +738,10 @@ function getTrendInsight(yearData, attr, slope, criticalLevels = {}) {
 // Get urgency badge HTML
 function getUrgencyBadge(urgency) {
   const badges = {
-    'high': { emoji: '🔴', label: 'HIGH', color: '#dc2626', bg: '#fee2e2' },
-    'high-medium': { emoji: '🟠', label: 'HIGH-MED', color: '#ea580c', bg: '#fed7aa' },
-    'medium': { emoji: '🟡', label: 'MEDIUM', color: '#ca8a04', bg: '#fef9c3' },
-    'low': { emoji: '🟢', label: 'LOW', color: '#16a34a', bg: '#dcfce7' }
+    'high': { emoji: '🔴', label: 'Action Needed', color: '#dc2626', bg: '#fee2e2' },
+    'high-medium': { emoji: '⚠️', label: 'Attention', color: '#ea580c', bg: '#fed7aa' },
+    'medium': { emoji: '⚠️', label: 'Watch', color: '#ca8a04', bg: '#fef9c3' },
+    'low': { emoji: '✓', label: 'On Track', color: '#16a34a', bg: '#dcfce7' }
   };
   return badges[urgency] || badges['low'];
 }

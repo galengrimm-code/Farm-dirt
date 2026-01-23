@@ -593,8 +593,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.136";
-    const BUILD_DATE = "2026-01-23T07:29:23";
+    const APP_VERSION = "v1.0.137";
+    const BUILD_DATE = "2026-01-23T07:44:49";
 
     // Reference shared data config with analysis-specific additions
     const CONFIG = {
@@ -1388,23 +1388,29 @@
 
             const graph = createDualLineGraph(yearData, color, attr);
 
+            // Skip trend analysis for Buffer_pH (diagnostic measurement, not a nutrient to track)
+            const skipTrendAnalysis = attr === 'Buffer_pH';
+
             // Calculate linear regression for trend slope
             const regressionData = yearData.map(d => ({ x: parseInt(d.year), y: d.avg }));
-            const regression = window.Utils.calculateLinearRegression(regressionData);
+            const regression = !skipTrendAnalysis ? window.Utils.calculateLinearRegression(regressionData) : null;
             const slope = regression ? regression.slope : null;
 
-            // Get comprehensive trend insight
-            const criticalLevels = { ...window.Utils.DEFAULT_CRITICAL_LEVELS };
-            // Override with user settings if available
-            const userThresholds = JSON.parse(localStorage.getItem('thresholds') || '{}');
-            Object.keys(criticalLevels).forEach(key => {
-              if (userThresholds[`${key}_critical`] !== undefined) {
-                criticalLevels[key] = userThresholds[`${key}_critical`];
-              }
-            });
-
-            const trendInsight = yearData.length > 1 ? window.Utils.getTrendInsight(yearData, attr, slope, criticalLevels) : null;
-            const urgencyBadge = trendInsight ? window.Utils.getUrgencyBadge(trendInsight.urgency) : null;
+            // Get comprehensive trend insight (skip for Buffer_pH)
+            let trendInsight = null;
+            let urgencyBadge = null;
+            if (!skipTrendAnalysis && yearData.length > 1) {
+              const criticalLevels = { ...window.Utils.DEFAULT_CRITICAL_LEVELS };
+              // Override with user settings if available
+              const userThresholds = JSON.parse(localStorage.getItem('thresholds') || '{}');
+              Object.keys(criticalLevels).forEach(key => {
+                if (userThresholds[`${key}_critical`] !== undefined) {
+                  criticalLevels[key] = userThresholds[`${key}_critical`];
+                }
+              });
+              trendInsight = window.Utils.getTrendInsight(yearData, attr, slope, criticalLevels);
+              urgencyBadge = trendInsight ? window.Utils.getUrgencyBadge(trendInsight.urgency) : null;
+            }
 
             // Get moisture warnings for P and K
             let moistureWarning = '';
@@ -1496,10 +1502,12 @@
 
             html += `
               <div class="trend-card ${cardClass}">
-                <div class="trend-header" style="position: relative;">
+                <div class="trend-header">
                   <h4 class="trend-title">${name}</h4>
-                  ${urgencyBadge ? `<span style="position: absolute; top: -0.25rem; right: -0.25rem; padding: 0.15rem 0.4rem; background: ${urgencyBadge.bg}; color: ${urgencyBadge.color}; font-size: 0.6rem; font-weight: 700; border-radius: 0.25rem; border: 1px solid ${urgencyBadge.color}40;">${urgencyBadge.emoji} ${urgencyBadge.label}</span>` : ''}
-                  ${yearData.length > 1 ? `<div class="trend-pct" style="color:${color};">${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(1)}%<div class="trend-sub">${first.year} → ${last.year}</div></div>` : ''}
+                  <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    ${urgencyBadge ? `<span style="padding: 0.15rem 0.5rem; background: ${urgencyBadge.bg}; color: ${urgencyBadge.color}; font-size: 0.65rem; font-weight: 600; border-radius: 0.25rem; white-space: nowrap;">${urgencyBadge.emoji} ${urgencyBadge.label}</span>` : ''}
+                    ${yearData.length > 1 ? `<div class="trend-pct" style="color:${color}; text-align: right;">${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(1)}%<div class="trend-sub">${first.year} → ${last.year}</div></div>` : ''}
+                  </div>
                 </div>
                 <div class="trend-content">
                   <div class="trend-values">
@@ -1639,23 +1647,29 @@
 
             const graph = createOperationTrendGraph(yearData, color);
 
+            // Skip trend analysis for Buffer_pH (diagnostic measurement, not a nutrient to track)
+            const skipTrendAnalysis = attr === 'Buffer_pH';
+
             // Calculate linear regression for trend slope
             const regressionData = yearData.map(d => ({ x: parseInt(d.year), y: d.avg }));
-            const regression = window.Utils.calculateLinearRegression(regressionData);
+            const regression = !skipTrendAnalysis ? window.Utils.calculateLinearRegression(regressionData) : null;
             const slope = regression ? regression.slope : null;
 
-            // Get comprehensive trend insight
-            const criticalLevels = { ...window.Utils.DEFAULT_CRITICAL_LEVELS };
-            const userThresholds = JSON.parse(localStorage.getItem('thresholds') || '{}');
-            Object.keys(criticalLevels).forEach(key => {
-              if (userThresholds[`${key}_critical`] !== undefined) {
-                criticalLevels[key] = userThresholds[`${key}_critical`];
-              }
-            });
-
-            const trendInsight = yearData.length > 1 ? window.Utils.getTrendInsight(yearData, attr, slope, criticalLevels) : null;
-            const urgencyBadge = trendInsight ? window.Utils.getUrgencyBadge(trendInsight.urgency) : null;
+            // Get comprehensive trend insight (skip for Buffer_pH)
+            let trendInsight = null;
+            let urgencyBadge = null;
             const unit = CONFIG.NUTRIENT_UNITS[attr] || '';
+            if (!skipTrendAnalysis && yearData.length > 1) {
+              const criticalLevels = { ...window.Utils.DEFAULT_CRITICAL_LEVELS };
+              const userThresholds = JSON.parse(localStorage.getItem('thresholds') || '{}');
+              Object.keys(criticalLevels).forEach(key => {
+                if (userThresholds[`${key}_critical`] !== undefined) {
+                  criticalLevels[key] = userThresholds[`${key}_critical`];
+                }
+              });
+              trendInsight = window.Utils.getTrendInsight(yearData, attr, slope, criticalLevels);
+              urgencyBadge = trendInsight ? window.Utils.getUrgencyBadge(trendInsight.urgency) : null;
+            }
 
             // Get moisture warnings for P and K (operation-wide)
             let moistureWarning = '';
@@ -1735,10 +1749,12 @@
 
             html += `
               <div class="trend-card ${cardClass}">
-                <div class="trend-header" style="position: relative;">
+                <div class="trend-header">
                   <h4 class="trend-title">${name}</h4>
-                  ${urgencyBadge ? `<span style="position: absolute; top: -0.25rem; right: -0.25rem; padding: 0.15rem 0.4rem; background: ${urgencyBadge.bg}; color: ${urgencyBadge.color}; font-size: 0.6rem; font-weight: 700; border-radius: 0.25rem; border: 1px solid ${urgencyBadge.color}40;">${urgencyBadge.emoji} ${urgencyBadge.label}</span>` : ''}
-                  ${yearData.length > 1 ? `<div class="trend-pct" style="color:${color};">${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(1)}%<div class="trend-sub">${first.year} → ${last.year}</div></div>` : ''}
+                  <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    ${urgencyBadge ? `<span style="padding: 0.15rem 0.5rem; background: ${urgencyBadge.bg}; color: ${urgencyBadge.color}; font-size: 0.65rem; font-weight: 600; border-radius: 0.25rem; white-space: nowrap;">${urgencyBadge.emoji} ${urgencyBadge.label}</span>` : ''}
+                    ${yearData.length > 1 ? `<div class="trend-pct" style="color:${color}; text-align: right;">${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(1)}%<div class="trend-sub">${first.year} → ${last.year}</div></div>` : ''}
+                  </div>
                 </div>
                 <div class="trend-content">
                   <div class="trend-values">
