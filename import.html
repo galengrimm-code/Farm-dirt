@@ -189,6 +189,15 @@
           <input type="text" id="sampleDepth" value="6" style="width: 80px; border: 2px solid #22c55e; background: #f0fdf4;">
           <small>inches</small>
         </div>
+        <div class="form-group">
+          <label>Soil Moisture at Collection <span style="font-weight: 400; font-size: 0.75rem; color: #64748b;">(optional)</span></label>
+          <select id="soilMoistureCondition" style="width: 140px; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; background: white;">
+            <option value="">Not recorded</option>
+            <option value="dry">Dry</option>
+            <option value="normal">Normal</option>
+            <option value="wet">Wet</option>
+          </select>
+        </div>
       </div>
 
       <!-- Import Type Selection -->
@@ -1124,8 +1133,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.133";
-    const BUILD_DATE = "2026-01-23T07:17:46";
+    const APP_VERSION = "v1.0.134";
+    const BUILD_DATE = "2026-01-23T07:24:20";
 
     // Reference shared data config with import-specific additions
     const CONFIG = {
@@ -1949,6 +1958,7 @@
       const files = Array.from(document.getElementById('sampleFiles').files);
       const yearInput = document.getElementById('sampleYear').value.trim();
       const depth = document.getElementById('sampleDepth').value.trim() || '6';
+      const moisture = document.getElementById('soilMoistureCondition').value || null;
 
       // Validate required year
       if (!yearInput) { showStatus('Sample Year is required', false); return; }
@@ -1988,15 +1998,16 @@
           // Store parsed data and show mapping modal
           shpYear = year;
           shpDepth = depth;
+          shpMoisture = moisture;
           showShpMappingModal(geojson);
           return; // Modal will call shpImportConfirm() when user confirms
         } else if (csvFile) {
           const text = await csvFile.text();
-          samples = parseCSV(text, year, depth);
+          samples = parseCSV(text, year, depth, moisture);
         } else if (jsonFile) {
           const text = await jsonFile.text();
           const geojson = JSON.parse(text);
-          samples = geojsonToSamples(geojson, year, depth);
+          samples = geojsonToSamples(geojson, year, depth, moisture);
         } else {
           throw new Error('Please select a ZIP, Shapefile (.shp + .dbf), CSV, or GeoJSON');
         }
@@ -2046,7 +2057,7 @@
           await afterImportSuccess();
           showStatus(`✓ Imported ${newSamples.length} samples. Upload boundaries to assign field names.${skipped > 0 ? ` (${skipped} duplicates skipped)` : ''}`, true);
         }
-        document.getElementById('sampleFiles').value = ''; document.getElementById('sampleYear').value = '';
+        document.getElementById('sampleFiles').value = ''; document.getElementById('sampleYear').value = ''; document.getElementById('soilMoistureCondition').value = '';
         // Auto-sync to Google Sheets if signed in
         if (SheetsAPI.isSignedIn) {
           showStatus('Syncing to Google Sheets...', true);
@@ -2280,7 +2291,7 @@
       return sample;
     }
 
-    function geojsonToSamples(geojson, assignedYear, assignedDepth) {
+    function geojsonToSamples(geojson, assignedYear, assignedDepth, assignedMoisture) {
       const samples = [], features = geojson.features || [geojson];
 
       // Get shapefile name for fallback field name (from multi-file zips)
@@ -2298,29 +2309,30 @@
         // Field name will be assigned from boundary matching after import
         // Don't extract from file data - let assignSamplesToFields() handle it
         let fieldName = null;
-        
+
         // Get depth from file or use assigned depth
         const fileDepth = props.Depth || props.depth || props.DEPTH || props.DepthUnits;
-        
-        const sample = { 
-          sampleId: props.ORG_ID || props.SampleID || props.sampleId || props.Sample_ID || props.SAMPLE_ID || props.ID || (idx + 1), 
-          field: fieldName, 
-          lat, 
-          lon, 
+
+        const sample = {
+          sampleId: props.ORG_ID || props.SampleID || props.sampleId || props.Sample_ID || props.SAMPLE_ID || props.ID || (idx + 1),
+          field: fieldName,
+          lat,
+          lon,
           year: assignedYear || parseYear(props.CropYear || props.Year || props.year || props.date),
-          depth: assignedDepth || fileDepth || '6'
+          depth: assignedDepth || fileDepth || '6',
+          soilMoistureCondition: assignedMoisture || null
         };
         Object.entries(props).forEach(([k, v]) => { if (sample[k] === undefined && v !== null) { const n = parseFloat(v); sample[k] = isNaN(n) ? v : n; } });
-        
+
         // Normalize nutrient column names
         normalizeNutrientData(sample);
-        
+
         samples.push(sample);
       });
       return samples;
     }
 
-    function parseCSV(text, assignedYear, assignedDepth) {
+    function parseCSV(text, assignedYear, assignedDepth, assignedMoisture) {
       const lines = text.trim().split('\n'); if (lines.length < 2) return [];
       const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, '')), samples = [];
       for (let i = 1; i < lines.length; i++) {
@@ -2329,6 +2341,7 @@
         sample.lat = sample.lat || sample.Lat || sample.LAT; sample.lon = sample.lon || sample.Lon || sample.LON || sample.lng;
         sample.field = sample.field || sample.Field || 'Unknown'; sample.year = assignedYear || parseYear(sample.year || sample.Year);
         sample.depth = assignedDepth || sample.depth || sample.Depth || '6';
+        sample.soilMoistureCondition = assignedMoisture || null;
         sample.sampleId = sample.sampleId || sample.SampleID || sample.ID || i;
         if (sample.lat && sample.lon) samples.push(sample);
       }
@@ -5211,6 +5224,7 @@
     let shpMappings = {};        // Current attribute mappings
     let shpYear = null;          // Year from form
     let shpDepth = null;         // Depth from form
+    let shpMoisture = null;      // Soil moisture condition from form
 
     // Toggle between shapefile and CSV import options
     function selectImportType(type) {
@@ -6363,6 +6377,7 @@
           lon: coords[0],
           year: sampleYear,
           depth: sampleDepth,
+          soilMoistureCondition: shpMoisture || null,
           sampleId: shpMappings.sampleId ? (props[shpMappings.sampleId] || `S${idx + 1}`) : `S${idx + 1}`,
           field: null // Will be assigned by GPS matching
         };
@@ -6399,6 +6414,7 @@
       // Clear file input
       document.getElementById('sampleFiles').value = '';
       document.getElementById('sampleYear').value = '';
+      document.getElementById('soilMoistureCondition').value = '';
     }
 
     // ============================================
