@@ -4,6 +4,32 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 
 ---
 
+## [v1.0.75] - January 24, 2026
+
+### Organic Matter (OM) Improvements
+
+- **Stricter OM stability thresholds**: CV <10% Stable, 10-20% Moderate, >20% Volatile (vs standard 20/30%)
+- **Dedicated OM card builder**: Replaces generic nutrient card with agronomic-specific recommendations
+- **Three OM levers** mapped to 5-trigger framework:
+  - **Increase carbon inputs**: Cover crops (cereal rye, triticale), extend living roots, maintain residue
+  - **Reduce carbon loss**: Reduce tillage intensity, avoid unnecessary disturbance
+  - **Import carbon**: Manure/compost to lowest OM zones (credit nutrients properly)
+- **OM-specific volatility warning**: "OM is sensitive to sampling depth and lab method; keep depth consistent and use the same lab/method across years."
+- **Multi-year expectation note**: Always shows "OM changes slowly in most corn/soy systems. Treat OM trends as multi-year signals, not year-to-year decisions."
+
+### Sample Site Pin Drop
+
+- **Site ID generated on save**: Shows "(Generated on save)" placeholder until Save button clicked
+- **Client/Farm validation**: Requires selection before saving
+- **Improved field detection**: Added console logging for debugging when field not detected
+
+### Bug Fixes
+
+- **Fixed Google Sheets sync duplication**: Changed from `append` to `update` API calls for Clients, Farms, Fields, and Samples tabs. Prevents duplicate data when sync is called multiple times.
+- **Fixed Field Trends bug**: Renamed duplicate `getNutrientThresholds` function that was causing nutrient cards to crash
+
+---
+
 ## [v1.0.74] - January 23, 2026
 
 ### Field Trends - Nutrient Insights
@@ -425,6 +451,7 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| v1.0.75 | Jan 24, 2026 | OM agronomic recommendations, Sheets sync fix, Sample Site modal |
 | v1.0.74 | Jan 23, 2026 | Field Trends insights (P:Zn, OM, Zn), Methodology page, pH default |
 | v1.0.73 | Jan 21, 2026 | Dynamic zoom-based color scaling, Google Sheet URL support |
 | v1.0.1 | Jan 14, 2026 | Version tracking, scatter plot improvements, IndexedDB storage |
