@@ -1131,44 +1131,38 @@
 
         // Clear and write clients
         if (clientsData.length > 0) {
-          // Clear existing data (rows 2+)
+          // Clear ALL existing data (rows 2+) with a large range to ensure no orphaned data
           try {
-            const response = await gapi.client.sheets.spreadsheets.values.get({
-              spreadsheetId: CONFIG.SHEET_ID, range: 'Clients!A:A'
+            await gapi.client.sheets.spreadsheets.values.clear({
+              spreadsheetId: CONFIG.SHEET_ID, range: 'Clients!A2:D10000'
             });
-            const numRows = response.result.values ? response.result.values.length : 1;
-            if (numRows > 1) {
-              await gapi.client.sheets.spreadsheets.values.clear({
-                spreadsheetId: CONFIG.SHEET_ID, range: `Clients!A2:D${numRows}`
-              });
-            }
-          } catch (e) { }
+          } catch (e) { console.warn('Could not clear Clients:', e); }
 
-          // Write clients
+          // Write clients using UPDATE (not append) to ensure exact placement at row 2
           const clientRows = clientsData.map(c => [c.id, c.name, c.createdAt || '', new Date().toISOString()]);
-          await gapi.client.sheets.spreadsheets.values.append({
-            spreadsheetId: CONFIG.SHEET_ID, range: 'Clients!A:D', valueInputOption: 'RAW',
+          await gapi.client.sheets.spreadsheets.values.update({
+            spreadsheetId: CONFIG.SHEET_ID,
+            range: `Clients!A2:D${1 + clientRows.length}`,
+            valueInputOption: 'RAW',
             resource: { values: clientRows }
           });
         }
 
         // Clear and write farms
         if (farmsData.length > 0) {
+          // Clear ALL existing data (rows 2+) with a large range to ensure no orphaned data
           try {
-            const response = await gapi.client.sheets.spreadsheets.values.get({
-              spreadsheetId: CONFIG.SHEET_ID, range: 'Farms!A:A'
+            await gapi.client.sheets.spreadsheets.values.clear({
+              spreadsheetId: CONFIG.SHEET_ID, range: 'Farms!A2:E10000'
             });
-            const numRows = response.result.values ? response.result.values.length : 1;
-            if (numRows > 1) {
-              await gapi.client.sheets.spreadsheets.values.clear({
-                spreadsheetId: CONFIG.SHEET_ID, range: `Farms!A2:E${numRows}`
-              });
-            }
-          } catch (e) { }
+          } catch (e) { console.warn('Could not clear Farms:', e); }
 
+          // Write farms using UPDATE (not append) to ensure exact placement at row 2
           const farmRows = farmsData.map(f => [f.id, f.clientId, f.name, f.createdAt || '', new Date().toISOString()]);
-          await gapi.client.sheets.spreadsheets.values.append({
-            spreadsheetId: CONFIG.SHEET_ID, range: 'Farms!A:E', valueInputOption: 'RAW',
+          await gapi.client.sheets.spreadsheets.values.update({
+            spreadsheetId: CONFIG.SHEET_ID,
+            range: `Farms!A2:E${1 + farmRows.length}`,
+            valueInputOption: 'RAW',
             resource: { values: farmRows }
           });
         }

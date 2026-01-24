@@ -4157,24 +4157,18 @@
         await SheetsAPI.initializeSheets();
 
         // Clear existing data before sync to prevent duplicates
-        // Only clear if we have data to replace it with (safety check is at line 4136)
-        async function clearSheetData(sheetName, startRow = 2) {
+        // Uses a large range to ensure no orphaned data remains
+        async function clearSheetData(sheetName, startRow = 2, endCol = 'ZZ') {
           try {
-            const response = await gapi.client.sheets.spreadsheets.values.get({
-              spreadsheetId: CONFIG.SHEET_ID, range: `${sheetName}!A:A`
+            await gapi.client.sheets.spreadsheets.values.clear({
+              spreadsheetId: CONFIG.SHEET_ID, range: `${sheetName}!A${startRow}:${endCol}50000`
             });
-            const numRows = response.result.values ? response.result.values.length : 1;
-            if (numRows > startRow - 1) {
-              await gapi.client.sheets.spreadsheets.values.clear({
-                spreadsheetId: CONFIG.SHEET_ID, range: `${sheetName}!A${startRow}:ZZ${numRows + 100}`
-              });
-            }
           } catch (e) { /* Sheet may not exist yet */ }
         }
 
-        // Write clients (clear first to prevent duplicates)
+        // Write clients (clear first, then UPDATE to exact position to prevent duplicates)
         if (clientsData.length > 0) {
-          await clearSheetData('Clients', 2);
+          await clearSheetData('Clients', 2, 'D');
           const clientRows = clientsData.map(c => [
             c.id,
             c.name,
@@ -4182,18 +4176,18 @@
             new Date().toISOString()
           ]);
           try {
-            await gapi.client.sheets.spreadsheets.values.append({
+            await gapi.client.sheets.spreadsheets.values.update({
               spreadsheetId: CONFIG.SHEET_ID,
-              range: 'Clients!A:D',
+              range: `Clients!A2:D${1 + clientRows.length}`,
               valueInputOption: 'RAW',
               resource: { values: clientRows }
             });
           } catch (e) { console.warn('Could not sync Clients - tab may not exist'); }
         }
 
-        // Write farms (clear first to prevent duplicates)
+        // Write farms (clear first, then UPDATE to exact position to prevent duplicates)
         if (farmsData.length > 0) {
-          await clearSheetData('Farms', 2);
+          await clearSheetData('Farms', 2, 'E');
           const farmRows = farmsData.map(f => [
             f.id,
             f.clientId,
@@ -4202,18 +4196,18 @@
             new Date().toISOString()
           ]);
           try {
-            await gapi.client.sheets.spreadsheets.values.append({
+            await gapi.client.sheets.spreadsheets.values.update({
               spreadsheetId: CONFIG.SHEET_ID,
-              range: 'Farms!A:E',
+              range: `Farms!A2:E${1 + farmRows.length}`,
               valueInputOption: 'RAW',
               resource: { values: farmRows }
             });
           } catch (e) { console.warn('Could not sync Farms - tab may not exist'); }
         }
 
-        // Write fields (clear first to prevent duplicates)
+        // Write fields (clear first, then UPDATE to exact position to prevent duplicates)
         if (Object.keys(fieldBoundaries).length > 0) {
-          await clearSheetData('Fields', 2);
+          await clearSheetData('Fields', 2, 'F');
           const fieldRows = Object.entries(fieldBoundaries).map(([name, fieldData]) => {
             // Handle both legacy format (array) and new format (object with boundary)
             const boundary = fieldData.boundary || fieldData;
@@ -4228,9 +4222,9 @@
               new Date().toISOString()
             ];
           });
-          await gapi.client.sheets.spreadsheets.values.append({
+          await gapi.client.sheets.spreadsheets.values.update({
             spreadsheetId: CONFIG.SHEET_ID,
-            range: 'Fields!A:F',
+            range: `Fields!A2:F${1 + fieldRows.length}`,
             valueInputOption: 'RAW',
             resource: { values: fieldRows }
           });
@@ -4245,6 +4239,16 @@
           });
           let headers = headerRes.result.values?.[0] || [];
 
+          // Convert column index to letter (supports AA, AB, etc. for columns > 26)
+          function colToLetter(col) {
+            let letter = '';
+            while (col >= 0) {
+              letter = String.fromCharCode(65 + (col % 26)) + letter;
+              col = Math.floor(col / 26) - 1;
+            }
+            return letter;
+          }
+
           // Ensure required columns exist in headers
           let headersUpdated = false;
           if (!headers.includes('yieldCorrelations')) {
@@ -4254,19 +4258,10 @@
           }
           if (headersUpdated) {
             // Update header row to include new columns
-            // Convert column index to letter (supports AA, AB, etc. for columns > 26)
-            function colToLetter(col) {
-              let letter = '';
-              while (col >= 0) {
-                letter = String.fromCharCode(65 + (col % 26)) + letter;
-                col = Math.floor(col / 26) - 1;
-              }
-              return letter;
-            }
-            const lastCol = colToLetter(headers.length - 1);
+            const lastColHeader = colToLetter(headers.length - 1);
             await gapi.client.sheets.spreadsheets.values.update({
               spreadsheetId: CONFIG.SHEET_ID,
-              range: `Samples!A1:${lastCol}1`,
+              range: `Samples!A1:${lastColHeader}1`,
               valueInputOption: 'RAW',
               resource: { values: [headers] }
             });
@@ -4286,9 +4281,11 @@
             return v;
           }));
 
-          await gapi.client.sheets.spreadsheets.values.append({
+          // Use UPDATE instead of append to write to exact position and prevent duplicates
+          const lastCol = colToLetter(headers.length - 1);
+          await gapi.client.sheets.spreadsheets.values.update({
             spreadsheetId: CONFIG.SHEET_ID,
-            range: 'Samples!A:ZZ',
+            range: `Samples!A2:${lastCol}${1 + rows.length}`,
             valueInputOption: 'RAW',
             resource: { values: rows }
           });
