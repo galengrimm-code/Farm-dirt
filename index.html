@@ -142,6 +142,15 @@
     .mobile-toolbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #e2e8f0; padding: 0.5rem; z-index: 1000; justify-content: space-around; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
     .mobile-toolbar button { flex: 1; margin: 0 0.25rem; padding: 0.6rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; background: white; font-size: 0.7rem; cursor: pointer; font-weight: 500; }
     .mobile-toolbar button.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+
+    /* Pin Drop Mode */
+    .pin-drop-mode #map { cursor: crosshair !important; }
+    .pin-drop-mode .leaflet-container { cursor: crosshair !important; }
+    .pin-drop-mode .leaflet-interactive { cursor: crosshair !important; }
+    .sample-site-marker { border-radius: 50%; border: 3px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; font-size: 14px; }
+    .temp-pin-marker { width: 28px; height: 28px; background: #7c3aed; border-radius: 50%; border: 3px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.35); animation: tempPinPulse 1.5s ease-in-out infinite; }
+    @keyframes tempPinPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15); opacity: 0.8; } }
+
     .backup-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 0.25rem 1rem; font-size: 0.7rem; color: #64748b; text-align: center; z-index: 900; }
     @media (max-width: 639px) { .backup-footer { bottom: 50px; } }
   </style>
@@ -208,6 +217,7 @@
         <div id="compareSummaryText" style="margin-top: 0.5rem; font-size: 0.75rem; color: #1e40af; font-weight: 500;">Select years to compare</div>
       </div>
       <div class="controls-right">
+        <button class="button" id="addSampleSiteBtn">📍 Add Sample Site</button>
         <button class="button" id="fieldModeBtn">📱 Field Mode</button>
         <button class="button" id="refreshBtn">🔄 Refresh</button>
       </div>
@@ -247,6 +257,7 @@
     
     <!-- Mobile bottom toolbar -->
     <div class="mobile-toolbar">
+      <button id="mobileSampleSiteBtn">📍 Site</button>
       <button id="mobileFieldModeBtn">📱 Field</button>
       <button id="mobileCompareBtn">📊 Compare</button>
       <button id="mobileRefreshBtn">🔄 Refresh</button>
@@ -337,6 +348,86 @@
       <button onclick="exitDemoMode()" style="margin-left: 1rem; padding: 0.25rem 0.75rem; background: white; color: #d97706; border: none; border-radius: 0.25rem; font-weight: 600; cursor: pointer; font-size: 0.8125rem;">
         Connect Your Sheet
       </button>
+    </div>
+
+    <!-- Sample Site Modal -->
+    <div id="sampleSiteModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 10000; align-items: center; justify-content: center; padding: 1rem;">
+      <div style="background: white; border-radius: 1rem; max-width: 420px; width: 100%; box-shadow: 0 25px 50px rgba(0,0,0,0.25); overflow: hidden; max-height: 90vh; overflow-y: auto;">
+        <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; padding: 1.25rem; text-align: center;">
+          <div style="font-size: 1.75rem; margin-bottom: 0.25rem;">📍</div>
+          <h2 style="margin: 0; font-size: 1.125rem; font-weight: 700;">Add Sample Site</h2>
+        </div>
+        <div style="padding: 1.25rem;">
+          <!-- GPS Display -->
+          <div style="background: #f8fafc; border-radius: 0.5rem; padding: 0.625rem; margin-bottom: 1rem; font-family: monospace; font-size: 0.8125rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+              <span style="color: #64748b;">Lat:</span>
+              <span id="siteModalLat" style="font-weight: 600;">-</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: #64748b;">Lng:</span>
+              <span id="siteModalLng" style="font-weight: 600;">-</span>
+            </div>
+          </div>
+
+          <!-- Type Dropdown -->
+          <div style="margin-bottom: 0.875rem;">
+            <label style="font-size: 0.6875rem; font-weight: 600; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 0.25rem;">SAMPLE TYPE</label>
+            <select id="siteTypeSelect" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; font-size: 0.875rem;">
+              <option value="TIS">🌿 Plant Tissue</option>
+              <option value="WAT">💧 Water</option>
+              <option value="SAP">🧪 Plant Sap</option>
+              <option value="ISS">🌱 In-Season Soil</option>
+            </select>
+          </div>
+
+          <!-- Client Dropdown -->
+          <div style="margin-bottom: 0.875rem;">
+            <label style="font-size: 0.6875rem; font-weight: 600; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 0.25rem;">CLIENT</label>
+            <select id="siteClientSelect" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; font-size: 0.875rem;">
+            </select>
+          </div>
+
+          <!-- Farm Dropdown -->
+          <div style="margin-bottom: 0.875rem;">
+            <label style="font-size: 0.6875rem; font-weight: 600; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 0.25rem;">FARM</label>
+            <select id="siteFarmSelect" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; font-size: 0.875rem;">
+            </select>
+          </div>
+
+          <!-- Field Display (auto-detected) -->
+          <div style="margin-bottom: 0.875rem;">
+            <label style="font-size: 0.6875rem; font-weight: 600; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 0.25rem;">DETECTED FIELD</label>
+            <div id="siteFieldDisplay" style="padding: 0.5rem 0.75rem; background: #f1f5f9; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; color: #475569;">
+              (Click on map to detect)
+            </div>
+          </div>
+
+          <!-- Generated Site ID -->
+          <div style="margin-bottom: 0.875rem;">
+            <label style="font-size: 0.6875rem; font-weight: 600; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 0.25rem;">SITE ID (AUTO-GENERATED)</label>
+            <div id="siteIdDisplay" style="padding: 0.5rem 0.75rem; background: #dbeafe; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 600; color: #1e40af; font-family: monospace;">
+              -
+            </div>
+          </div>
+
+          <!-- Notes -->
+          <div style="margin-bottom: 1.25rem;">
+            <label style="font-size: 0.6875rem; font-weight: 600; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 0.25rem;">NOTES (OPTIONAL)</label>
+            <textarea id="siteNotesInput" placeholder="e.g., Near waterway, check Zn" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; font-size: 0.875rem; min-height: 50px; resize: vertical; box-sizing: border-box;"></textarea>
+          </div>
+
+          <!-- Buttons -->
+          <div style="display: flex; gap: 0.5rem;">
+            <button onclick="closeSampleSiteModal()" style="flex: 1; padding: 0.75rem; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 0.375rem; font-weight: 600; cursor: pointer;">
+              Cancel
+            </button>
+            <button id="saveSiteBtn" onclick="saveSampleSite()" style="flex: 1; padding: 0.75rem; background: #7c3aed; color: white; border: none; border-radius: 0.375rem; font-weight: 600; cursor: pointer;">
+              Save Site
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -568,6 +659,13 @@
     let compareMode = false;
     let fieldModeActive = false;
 
+    // ========== SAMPLE SITE STATE ==========
+    let pinDropMode = false;
+    let tempPinMarker = null;
+    let pendingSiteCoords = null;
+    let sampleSitesData = [];
+    let sampleSiteMarkers = [];
+
     // ========== CACHED STABILITY DATA ==========
     // Calculated once when data loads, not on every render
     let cachedStabilityData = null;
@@ -781,6 +879,387 @@
         [Math.max(...lats), Math.max(...lons)]
       );
       map.fitBounds(bounds, { padding: [50, 50] });
+    }
+
+    // ========== SAMPLE SITE FUNCTIONS ==========
+
+    // Point-in-polygon detection using ray casting algorithm
+    function pointInPolygon(point, polygon) {
+      if (!polygon || polygon.length < 3) return false;
+      const [lat, lon] = point;
+      let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const [yi, xi] = polygon[i];
+        const [yj, xj] = polygon[j];
+        if (((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
+          inside = !inside;
+        }
+      }
+      return inside;
+    }
+
+    // Detect which field a point falls within
+    function detectFieldFromPoint(lat, lon) {
+      for (const [fieldName, fieldData] of Object.entries(fieldBoundaries)) {
+        const polys = fieldData.boundary || fieldData;
+        // Handle multi-polygon or single polygon
+        const isMultiPoly = Array.isArray(polys[0]?.[0]?.[0]);
+        const polyArray = isMultiPoly ? polys : [polys];
+        for (const poly of polyArray) {
+          if (pointInPolygon([lat, lon], poly)) {
+            return { fieldName, farmId: fieldData.farmId || '' };
+          }
+        }
+      }
+      return null;
+    }
+
+    // Toggle pin drop mode (desktop)
+    function togglePinDropMode() {
+      pinDropMode = !pinDropMode;
+      const btn = document.getElementById('addSampleSiteBtn');
+      const appContainer = document.querySelector('.app-container');
+
+      if (pinDropMode) {
+        btn?.classList.add('active');
+        appContainer?.classList.add('pin-drop-mode');
+        Utils.showStatus('Click on map to place sample site', true);
+        map.on('click', handlePinDropClick);
+      } else {
+        btn?.classList.remove('active');
+        appContainer?.classList.remove('pin-drop-mode');
+        map.off('click', handlePinDropClick);
+        if (tempPinMarker) {
+          map.removeLayer(tempPinMarker);
+          tempPinMarker = null;
+        }
+        pendingSiteCoords = null;
+      }
+    }
+
+    // Handle map click in pin drop mode (desktop)
+    function handlePinDropClick(e) {
+      const { lat, lng } = e.latlng;
+      placeTempMarkerAndOpenModal(lat, lng);
+    }
+
+    // Mobile: get current GPS location and open modal
+    function mobileSiteFromCurrentLocation() {
+      Utils.showStatus('Getting your location...', true);
+      if (!navigator.geolocation) {
+        Utils.showStatus('Geolocation not supported', false);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          placeTempMarkerAndOpenModal(lat, lng);
+          map.setView([lat, lng], 17);
+        },
+        (err) => {
+          Utils.showStatus('Could not get location: ' + err.message, false);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+
+    // Place temp marker and open modal
+    function placeTempMarkerAndOpenModal(lat, lng) {
+      if (tempPinMarker) map.removeLayer(tempPinMarker);
+
+      const tempIcon = L.divIcon({
+        html: '<div class="temp-pin-marker"></div>',
+        className: '',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      });
+      tempPinMarker = L.marker([lat, lng], { icon: tempIcon }).addTo(map);
+
+      pendingSiteCoords = { lat, lng };
+      const fieldInfo = detectFieldFromPoint(lat, lng);
+      openSampleSiteModal(lat, lng, fieldInfo);
+    }
+
+    // Open sample site modal
+    function openSampleSiteModal(lat, lng, fieldInfo) {
+      const modal = document.getElementById('sampleSiteModal');
+
+      document.getElementById('siteModalLat').textContent = lat.toFixed(6);
+      document.getElementById('siteModalLng').textContent = lng.toFixed(6);
+
+      // Populate client dropdown
+      const clientSelect = document.getElementById('siteClientSelect');
+      let clientHtml = '<option value="">-- Select Client --</option>';
+      clientsData.forEach(c => {
+        clientHtml += `<option value="${c.id}">${c.name}</option>`;
+      });
+      clientSelect.innerHTML = clientHtml;
+      clientSelect.onchange = updateSiteFarmDropdown;
+
+      // Clear farm dropdown
+      document.getElementById('siteFarmSelect').innerHTML = '<option value="">-- Select Farm --</option>';
+
+      // Show detected field
+      const fieldDisplay = document.getElementById('siteFieldDisplay');
+      if (fieldInfo) {
+        fieldDisplay.textContent = fieldInfo.fieldName;
+        fieldDisplay.style.color = '#16a34a';
+        fieldDisplay.style.background = '#dcfce7';
+
+        // Auto-select client/farm if we can determine from fieldInfo
+        if (fieldInfo.farmId) {
+          const farm = farmsData.find(f => f.id === fieldInfo.farmId);
+          if (farm) {
+            clientSelect.value = farm.clientId;
+            updateSiteFarmDropdown();
+            document.getElementById('siteFarmSelect').value = fieldInfo.farmId;
+          }
+        }
+      } else {
+        fieldDisplay.textContent = 'No field detected at this location';
+        fieldDisplay.style.color = '#ef4444';
+        fieldDisplay.style.background = '#fee2e2';
+      }
+
+      document.getElementById('siteTypeSelect').onchange = updateSiteIdPreview;
+      updateSiteIdPreview();
+
+      document.getElementById('siteNotesInput').value = '';
+
+      modal.style.display = 'flex';
+    }
+
+    // Update farm dropdown based on client selection
+    function updateSiteFarmDropdown() {
+      const clientId = document.getElementById('siteClientSelect').value;
+      const farmSelect = document.getElementById('siteFarmSelect');
+
+      let farmHtml = '<option value="">-- Select Farm --</option>';
+      farmsData.filter(f => f.clientId === clientId).forEach(f => {
+        farmHtml += `<option value="${f.id}">${f.name}</option>`;
+      });
+      farmSelect.innerHTML = farmHtml;
+      updateSiteIdPreview();
+    }
+
+    // Update site ID preview
+    function updateSiteIdPreview() {
+      const typeCode = document.getElementById('siteTypeSelect').value;
+      const fieldName = document.getElementById('siteFieldDisplay').textContent;
+
+      // Generate field initials
+      let fieldInitials = 'XX';
+      if (fieldName && !fieldName.includes('No field')) {
+        const words = fieldName.replace(/[^a-zA-Z0-9\s]/g, '').split(/\s+/).filter(w => w);
+        if (words.length >= 2) {
+          fieldInitials = (words[0][0] + words[1][0]).toUpperCase();
+        } else if (words[0]) {
+          fieldInitials = words[0].substring(0, 2).toUpperCase();
+        }
+      }
+
+      // Get next sequence number
+      const prefix = `${typeCode}-${fieldInitials}`;
+      const existingCount = sampleSitesData.filter(s => s.SiteID && s.SiteID.startsWith(prefix)).length;
+      const seqNum = String(existingCount + 1).padStart(3, '0');
+
+      document.getElementById('siteIdDisplay').textContent = `${prefix}-${seqNum}`;
+    }
+
+    // Close modal
+    function closeSampleSiteModal() {
+      document.getElementById('sampleSiteModal').style.display = 'none';
+      if (tempPinMarker) {
+        map.removeLayer(tempPinMarker);
+        tempPinMarker = null;
+      }
+      pendingSiteCoords = null;
+
+      // Exit pin drop mode on desktop
+      if (pinDropMode) {
+        togglePinDropMode();
+      }
+    }
+
+    // Save sample site
+    async function saveSampleSite() {
+      if (!pendingSiteCoords) {
+        Utils.showStatus('No location selected', false);
+        return;
+      }
+
+      if (!SheetsAPI.isSignedIn) {
+        Utils.showStatus('Please sign in to save sample sites', false);
+        return;
+      }
+
+      const siteId = document.getElementById('siteIdDisplay').textContent;
+      const typeCode = document.getElementById('siteTypeSelect').value;
+      const clientId = document.getElementById('siteClientSelect').value;
+      const farmId = document.getElementById('siteFarmSelect').value;
+      const fieldName = document.getElementById('siteFieldDisplay').textContent;
+      const notes = document.getElementById('siteNotesInput').value.trim();
+
+      const client = clientsData.find(c => c.id === clientId);
+      const farm = farmsData.find(f => f.id === farmId);
+
+      const siteData = {
+        SiteID: siteId,
+        Type: typeCode,
+        Client: client?.name || '',
+        Farm: farm?.name || '',
+        Field: fieldName.includes('No field') ? '' : fieldName,
+        Lat: pendingSiteCoords.lat,
+        Lng: pendingSiteCoords.lng,
+        Notes: notes,
+        Active: 'TRUE',
+        CreatedDate: new Date().toISOString()
+      };
+
+      try {
+        document.getElementById('saveSiteBtn').textContent = 'Saving...';
+        document.getElementById('saveSiteBtn').disabled = true;
+
+        await ensureSampleSitesTab();
+        await appendSampleSiteToSheet(siteData);
+
+        sampleSitesData.push(siteData);
+        addSampleSiteMarker(siteData);
+
+        closeSampleSiteModal();
+        Utils.showStatus(`Sample site ${siteId} saved`, true);
+      } catch (error) {
+        console.error('Error saving sample site:', error);
+        Utils.showStatus('Error saving: ' + error.message, false);
+      } finally {
+        document.getElementById('saveSiteBtn').textContent = 'Save Site';
+        document.getElementById('saveSiteBtn').disabled = false;
+      }
+    }
+
+    // Ensure SampleSites tab exists with headers
+    async function ensureSampleSitesTab() {
+      const tabName = 'SampleSites';
+      try {
+        await gapi.client.sheets.spreadsheets.values.get({
+          spreadsheetId: CONFIG.SHEET_ID,
+          range: `${tabName}!A1`
+        });
+        return true;
+      } catch (e) {
+        if (e.result?.error?.code === 400 || e.result?.error?.message?.includes('Unable to parse range')) {
+          try {
+            await gapi.client.sheets.spreadsheets.batchUpdate({
+              spreadsheetId: CONFIG.SHEET_ID,
+              resource: { requests: [{ addSheet: { properties: { title: tabName } } }] }
+            });
+
+            await gapi.client.sheets.spreadsheets.values.update({
+              spreadsheetId: CONFIG.SHEET_ID,
+              range: `${tabName}!A1:J1`,
+              valueInputOption: 'RAW',
+              resource: { values: [['SiteID', 'Type', 'Client', 'Farm', 'Field', 'Lat', 'Lng', 'Notes', 'Active', 'CreatedDate']] }
+            });
+
+            console.log('Created SampleSites tab with headers');
+            return true;
+          } catch (createError) {
+            console.error('Failed to create SampleSites tab:', createError);
+            throw createError;
+          }
+        }
+        throw e;
+      }
+    }
+
+    // Append site to sheet
+    async function appendSampleSiteToSheet(siteData) {
+      const row = [
+        siteData.SiteID, siteData.Type, siteData.Client, siteData.Farm, siteData.Field,
+        siteData.Lat, siteData.Lng, siteData.Notes, siteData.Active, siteData.CreatedDate
+      ];
+
+      await gapi.client.sheets.spreadsheets.values.append({
+        spreadsheetId: CONFIG.SHEET_ID,
+        range: 'SampleSites!A:J',
+        valueInputOption: 'RAW',
+        resource: { values: [row] }
+      });
+    }
+
+    // Load sample sites from sheet
+    async function loadSampleSitesFromSheet() {
+      try {
+        const response = await gapi.client.sheets.spreadsheets.values.get({
+          spreadsheetId: CONFIG.SHEET_ID,
+          range: 'SampleSites!A2:J1000'
+        });
+
+        const rows = response.result.values || [];
+        sampleSitesData = rows.map(row => ({
+          SiteID: row[0] || '',
+          Type: row[1] || '',
+          Client: row[2] || '',
+          Farm: row[3] || '',
+          Field: row[4] || '',
+          Lat: parseFloat(row[5]) || 0,
+          Lng: parseFloat(row[6]) || 0,
+          Notes: row[7] || '',
+          Active: row[8] || 'TRUE',
+          CreatedDate: row[9] || ''
+        })).filter(s => s.Lat && s.Lng);
+
+        console.log(`Loaded ${sampleSitesData.length} sample sites`);
+      } catch (e) {
+        console.log('SampleSites tab not found or empty');
+        sampleSitesData = [];
+      }
+    }
+
+    // Add marker for a sample site
+    function addSampleSiteMarker(site) {
+      if (!site.Lat || !site.Lng) return;
+
+      const typeColors = { 'TIS': '#22c55e', 'WAT': '#3b82f6', 'SAP': '#f59e0b', 'ISS': '#8b5cf6' };
+      const typeEmoji = { 'TIS': '🌿', 'WAT': '💧', 'SAP': '🧪', 'ISS': '🌱' };
+      const typeNames = { 'TIS': 'Tissue', 'WAT': 'Water', 'SAP': 'Sap', 'ISS': 'In-Season Soil' };
+
+      const color = typeColors[site.Type] || '#6b7280';
+      const emoji = typeEmoji[site.Type] || '📍';
+
+      const icon = L.divIcon({
+        html: `<div class="sample-site-marker" style="width:28px;height:28px;background:${color};">${emoji}</div>`,
+        className: '',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      });
+
+      const marker = L.marker([site.Lat, site.Lng], { icon }).addTo(map);
+
+      const popupContent = `
+        <div style="min-width: 160px;">
+          <div style="font-weight: 700; font-size: 1rem; color: #1e293b; margin-bottom: 0.5rem;">${emoji} ${site.SiteID}</div>
+          <div style="font-size: 0.8125rem; color: #475569;">
+            <div><strong>Type:</strong> ${typeNames[site.Type] || site.Type}</div>
+            ${site.Client ? `<div><strong>Client:</strong> ${site.Client}</div>` : ''}
+            ${site.Farm ? `<div><strong>Farm:</strong> ${site.Farm}</div>` : ''}
+            ${site.Field ? `<div><strong>Field:</strong> ${site.Field}</div>` : ''}
+            ${site.Notes ? `<div style="margin-top:0.375rem;font-style:italic;color:#64748b;">${site.Notes}</div>` : ''}
+            <div style="margin-top:0.375rem;font-size:0.6875rem;color:#94a3b8;">Added: ${new Date(site.CreatedDate).toLocaleDateString()}</div>
+          </div>
+        </div>
+      `;
+      marker.bindPopup(popupContent);
+
+      sampleSiteMarkers.push(marker);
+    }
+
+    // Display all sample site markers
+    function displaySampleSiteMarkers() {
+      sampleSiteMarkers.forEach(m => map.removeLayer(m));
+      sampleSiteMarkers = [];
+      sampleSitesData.filter(s => s.Active !== 'FALSE').forEach(addSampleSiteMarker);
     }
 
     // ========== INIT ==========
@@ -1046,7 +1525,11 @@
         loadLocalData();
         Utils.showStatus('Data refreshed', true);
       });
-      
+
+      // Sample site buttons
+      document.getElementById('addSampleSiteBtn').addEventListener('click', togglePinDropMode);
+      document.getElementById('mobileSampleSiteBtn').addEventListener('click', mobileSiteFromCurrentLocation);
+
       // Mobile toolbar buttons
       document.getElementById('mobileFieldModeBtn').addEventListener('click', toggleFieldMode);
       document.getElementById('mobileRefreshBtn').addEventListener('click', () => {
@@ -1285,6 +1768,13 @@
         refreshStabilityCache(); // Pre-calculate stability data
         updateMap();
         saveLocalData();
+
+        // Load sample sites (may not exist yet, so wrapped in try/catch)
+        try {
+          await loadSampleSitesFromSheet();
+          displaySampleSiteMarkers();
+        } catch (e) { console.log('Sample sites not loaded:', e); }
+
         Utils.showStatus(`Loaded ${sampleData.length} samples, ${Object.keys(fieldBoundaries).length} fields`, true);
 
         // Restore saved OAuth token for edit capabilities (if available)
@@ -1335,6 +1825,13 @@
         refreshStabilityCache(); // Pre-calculate stability data
         updateMap();
         saveLocalData();
+
+        // Load sample sites
+        try {
+          await loadSampleSitesFromSheet();
+          displaySampleSiteMarkers();
+        } catch (e) { console.log('Sample sites not loaded:', e); }
+
         Utils.showStatus(`✓ Loaded ${sampleData.length} samples, ${Object.keys(fieldBoundaries).length} fields`, true);
       };
 
