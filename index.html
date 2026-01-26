@@ -452,8 +452,8 @@
 
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.163";
-    const BUILD_DATE = "2026-01-26T07:39:01";
+    const APP_VERSION = "v1.0.164";
+    const BUILD_DATE = "2026-01-26T07:43:40";
 
     // ========== CONFIG ==========
     // Reference shared data config and add app-specific config
@@ -1459,6 +1459,7 @@
       const cacheTime = localStorage.getItem('soilDataCacheTime');
       const cacheFresh = cacheTime && (Date.now() - parseInt(cacheTime)) < 300000; // 5 minutes
       const hasFieldData = Object.keys(fieldBoundaries).length > 0;
+      console.log('Cache check:', { cacheFresh, hasFieldData, fieldCount: Object.keys(fieldBoundaries).length, sampleCount: sampleData.length });
 
       try {
         // Try to load from Google Sheets if cache is stale OR missing field boundaries
@@ -1470,7 +1471,7 @@
             loadFromBackup();
           }
         } else {
-          console.log('Using fresh cached data');
+          console.log('Using fresh cached data (cache fresh and has', Object.keys(fieldBoundaries).length, 'fields)');
           // Still restore token state for UI
           if (SheetsAPI.restoreSavedToken()) {
             handleSignInChange(true);
