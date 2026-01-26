@@ -593,8 +593,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.169";
-    const BUILD_DATE = "2026-01-26T09:13:35";
+    const APP_VERSION = "v1.0.170";
+    const BUILD_DATE = "2026-01-26T09:24:25";
 
     // Reference shared data config with analysis-specific additions
     const CONFIG = {
@@ -1177,6 +1177,118 @@
       if (cv < 10) return 'Stable';
       if (cv <= 20) return 'Moderate';
       return 'Volatile';
+    }
+
+    // --- Nutrient-Specific CV Explanations ---
+    // Returns { title, explanation, drivers, suggestion } for high-variability warnings
+    function getNutrientCVExplanation(nutrient, cvValue) {
+      const cv = cvValue ? cvValue.toFixed(0) : '?';
+
+      // Micronutrients: Zn, B, Cu, Fe, Mn
+      const micronutrients = ['Zn', 'B', 'Cu', 'Fe', 'Mn', 'Boron'];
+      if (micronutrients.includes(nutrient)) {
+        const isFeMn = ['Fe', 'Mn'].includes(nutrient);
+        return {
+          title: `High variability detected (CV = ${cv}%)`,
+          explanation: isFeMn
+            ? `${nutrient} tests are sensitive to soil moisture and redox conditions at sampling. Wet vs dry sampling can cause large swings.`
+            : `This micronutrient commonly shows high variability due to low concentrations, strong pH effects, and localized soil chemistry. Small absolute differences can produce large CV values.`,
+          drivers: isFeMn
+            ? ['Soil moisture at sampling', 'Redox conditions', 'pH zone differences', 'Organic matter distribution']
+            : ['pH changes between zones', 'Organic matter differences', 'Manure or banded fertilizer history', 'Lab extraction sensitivity'],
+          suggestion: isFeMn
+            ? `Use ${nutrient} trends as contextual indicators, not standalone decision drivers.`
+            : 'High CV is common for this nutrient. Interpret trends cautiously and confirm with consistent sampling or tissue tests.'
+        };
+      }
+
+      // Phosphorus
+      if (nutrient === 'P') {
+        return {
+          title: `High variability detected (CV = ${cv}%)`,
+          explanation: 'High variability in P is often linked to placement history (banded fertilizer or manure) and sampling path differences.',
+          drivers: ['Banded P vs broadcast', 'Manure application patterns', 'Sampling depth inconsistency', 'Soil pH effects on availability'],
+          suggestion: 'If P has been banded or manure-applied, consider zone or grid sampling to better capture true distribution.'
+        };
+      }
+
+      // Potassium
+      if (nutrient === 'K') {
+        return {
+          title: `High variability detected (CV = ${cv}%)`,
+          explanation: 'Potassium variability often reflects soil texture differences and moisture conditions at sampling.',
+          drivers: ['Clay vs sand zones', 'Soil moisture at sampling', 'Cation exchange differences', 'Crop removal patterns'],
+          suggestion: 'Resample at similar moisture conditions and consider texture-based zones.'
+        };
+      }
+
+      // pH - uses SD not CV, but include for completeness
+      if (nutrient === 'pH') {
+        return {
+          title: `High variability detected (SD = ${cvValue ? cvValue.toFixed(2) : '?'})`,
+          explanation: 'pH is typically stable across a field. High variability often indicates real spatial differences rather than noise.',
+          drivers: ['Past lime application patterns', 'Soil type boundaries', 'Topography and erosion', 'Variable rate lime history'],
+          suggestion: 'High pH variability is a strong signal for zone-based management.'
+        };
+      }
+
+      // Organic Matter
+      if (nutrient === 'OM') {
+        return {
+          title: `High variability detected (CV = ${cv}%)`,
+          explanation: 'Organic matter normally changes slowly. High variability usually reflects soil type, erosion, or sampling depth differences.',
+          drivers: ['Topsoil depth differences', 'Erosion and deposition zones', 'Sampling depth inconsistency', 'Different lab methods between years'],
+          suggestion: 'Manage OM by landscape position rather than uniform field averages. Keep sampling depth and lab consistent.'
+        };
+      }
+
+      // CEC
+      if (nutrient === 'CEC') {
+        return {
+          title: `High variability detected (CV = ${cv}%)`,
+          explanation: 'CEC reflects soil texture and organic matter. High variability often indicates real soil type differences across the field.',
+          drivers: ['Soil texture changes', 'Organic matter differences', 'Erosion patterns', 'Sampling depth variation'],
+          suggestion: 'CEC variability often mirrors soil type boundaries. Consider texture-based management zones.'
+        };
+      }
+
+      // Base Saturations (Ca_sat, Mg_sat, K_sat, H_sat)
+      if (['Ca_sat', 'Mg_sat', 'K_sat', 'H_sat'].includes(nutrient)) {
+        return {
+          title: `High variability detected (CV = ${cv}%)`,
+          explanation: 'Base saturation variability usually reflects CEC differences and liming history across the field.',
+          drivers: ['Soil texture zones', 'Variable lime applications', 'CEC differences', 'pH management history'],
+          suggestion: 'Consider whether CEC varies similarly. Zone-based management may be warranted.'
+        };
+      }
+
+      // Sulfur
+      if (nutrient === 'S') {
+        return {
+          title: `High variability detected (CV = ${cv}%)`,
+          explanation: 'Sulfur is mobile in soil and can vary significantly with drainage, organic matter, and recent rainfall.',
+          drivers: ['Drainage patterns', 'Organic matter distribution', 'Recent rainfall/leaching', 'Atmospheric deposition patterns'],
+          suggestion: 'Sulfur tests are best interpreted alongside organic matter and drainage conditions.'
+        };
+      }
+
+      // P:Zn Ratio
+      if (nutrient === 'P_Zn_Ratio') {
+        return {
+          title: `High variability detected (CV = ${cv}%)`,
+          explanation: 'P:Zn ratio variability often amplifies the variability of both P and Zn measurements.',
+          drivers: ['P placement history', 'Zn micronutrient variability', 'pH zone differences', 'Combined measurement noise'],
+          suggestion: 'Review P and Zn trends individually. If both are stable, ratio variability may be less concerning.'
+        };
+      }
+
+      // Default fallback for any other nutrient
+      return {
+        title: `High variability detected (CV = ${cv}%)`,
+        explanation: 'Field averages are inconsistent across samples. When variability is high, trends may reflect sampling or spatial effects rather than true nutrient change.',
+        drivers: ['Sampling path changed between years', 'Inconsistent sampling depth', 'Different soil moisture at sampling', 'Lab or test method changes'],
+        suggestion: 'When variability is high, confirm trends with consistent sampling methodology before making major adjustments.'
+      };
     }
 
     // --- PART 2: Flat Thresholds (slope thresholds for "no real change") ---
@@ -2376,39 +2488,22 @@
               }
             }
 
-            // Variability causes expandable section for volatile data
+            // Variability causes expandable section for volatile data - NUTRIENT-SPECIFIC
             let volatilityTooltip = '';
             if (trendInsight && trendInsight.stability.label === 'Volatile') {
-              let stabilityMetric;
-              if (attr === 'pH') {
-                stabilityMetric = `pH uses Standard Deviation (SD = ${trendInsight.stability.value.toFixed(2)}) instead of CV because pH is a logarithmic scale. SD > 0.35 indicates high variability.`;
-              } else if (attr === 'OM') {
-                stabilityMetric = `Coefficient of Variation (CV = ${trendInsight.stability.value.toFixed(0)}%) measures how much values vary relative to the average. CV > 20% indicates high variability for OM (stricter threshold due to sensitivity).`;
-              } else {
-                stabilityMetric = `Coefficient of Variation (CV = ${trendInsight.stability.value.toFixed(0)}%) measures how much values vary relative to the average. CV > 30% indicates high variability.`;
-              }
-
-              // OM-specific volatility warning
-              const omWarning = attr === 'OM'
-                ? `<p style="margin-top: 0.5rem; padding: 0.5rem; background: #fef3c7; border-radius: 0.25rem; color: #92400e; font-weight: 500;">⚠️ OM is sensitive to sampling depth and lab method; keep depth consistent and use the same lab/method across years.</p>`
-                : '';
+              const cvInfo = getNutrientCVExplanation(attr, trendInsight.stability.value);
+              const driversHtml = cvInfo.drivers.map(d => `<li>${d}</li>`).join('');
 
               volatilityTooltip = `
-                <details style="margin-top: 0.5rem; font-size: 0.75rem; color: #64748b;">
-                  <summary style="cursor: pointer; color: #3b82f6;">ℹ️ Why high variability?</summary>
-                  <div style="margin-top: 0.5rem; padding: 0.75rem; background: #f8fafc; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
-                    <p style="margin-bottom: 0.5rem; color: #475569;">${stabilityMetric}</p>
-                    ${omWarning}
-                    <p style="margin-bottom: 0.5rem; color: #475569;">This measures how much the field's yearly averages vary over time. High variability can be caused by:</p>
-                    <ul style="margin: 0; padding-left: 1.25rem; color: #475569;">
-                      <li>Sampling path changed between years</li>
-                      <li>Inconsistent sampling depth</li>
-                      <li>Different soil moisture conditions at sampling</li>
-                      <li>Lab or test method changes</li>
-                      <li>True spatial variability within the field</li>
-                      <li>Variable rate applications or manure history</li>
+                <details style="margin-top: 0.5rem; font-size: 0.75rem; color: #64748b;" open>
+                  <summary style="cursor: pointer; color: #dc2626; font-weight: 500;">⚠️ ${cvInfo.title}</summary>
+                  <div style="margin-top: 0.5rem; padding: 0.75rem; background: #fef2f2; border-radius: 0.375rem; border: 1px solid #fecaca;">
+                    <p style="margin-bottom: 0.5rem; color: #991b1b;">${cvInfo.explanation}</p>
+                    <p style="margin: 0.5rem 0 0.25rem 0; font-weight: 600; color: #475569; font-size: 0.7rem;">Common drivers:</p>
+                    <ul style="margin: 0; padding-left: 1.25rem; color: #64748b; font-size: 0.7rem;">
+                      ${driversHtml}
                     </ul>
-                    <p style="margin-top: 0.5rem; color: #64748b; font-style: italic;">When variability is high, trends may not reflect true changes. Consider resampling with consistent methodology to confirm.</p>
+                    <p style="margin-top: 0.75rem; padding: 0.5rem; background: #f0fdf4; border-radius: 0.25rem; color: #166534; font-weight: 500;">💡 ${cvInfo.suggestion}</p>
                   </div>
                 </details>`;
             }
@@ -2919,39 +3014,22 @@
               }
             }
 
-            // Variability causes expandable section for volatile data
+            // Variability causes expandable section for volatile data - NUTRIENT-SPECIFIC
             let volatilityTooltip = '';
             if (trendInsight && trendInsight.stability.label === 'Volatile') {
-              let stabilityMetric;
-              if (attr === 'pH') {
-                stabilityMetric = `pH uses Standard Deviation (SD = ${trendInsight.stability.value.toFixed(2)}) instead of CV because pH is a logarithmic scale. SD > 0.35 indicates high variability.`;
-              } else if (attr === 'OM') {
-                stabilityMetric = `Coefficient of Variation (CV = ${trendInsight.stability.value.toFixed(0)}%) measures how much values vary relative to the average. CV > 20% indicates high variability for OM (stricter threshold due to sensitivity).`;
-              } else {
-                stabilityMetric = `Coefficient of Variation (CV = ${trendInsight.stability.value.toFixed(0)}%) measures how much values vary relative to the average. CV > 30% indicates high variability.`;
-              }
-
-              // OM-specific volatility warning
-              const omWarning = attr === 'OM'
-                ? `<p style="margin-top: 0.5rem; padding: 0.5rem; background: #fef3c7; border-radius: 0.25rem; color: #92400e; font-weight: 500;">⚠️ OM is sensitive to sampling depth and lab method; keep depth consistent and use the same lab/method across years.</p>`
-                : '';
+              const cvInfo = getNutrientCVExplanation(attr, trendInsight.stability.value);
+              const driversHtml = cvInfo.drivers.map(d => `<li>${d}</li>`).join('');
 
               volatilityTooltip = `
-                <details style="margin-top: 0.5rem; font-size: 0.75rem; color: #64748b;">
-                  <summary style="cursor: pointer; color: #3b82f6;">ℹ️ Why high variability?</summary>
-                  <div style="margin-top: 0.5rem; padding: 0.75rem; background: #f8fafc; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
-                    <p style="margin-bottom: 0.5rem; color: #475569;">${stabilityMetric}</p>
-                    ${omWarning}
-                    <p style="margin-bottom: 0.5rem; color: #475569;">This measures how much the field's yearly averages vary over time. High variability can be caused by:</p>
-                    <ul style="margin: 0; padding-left: 1.25rem; color: #475569;">
-                      <li>Sampling path changed between years</li>
-                      <li>Inconsistent sampling depth</li>
-                      <li>Different soil moisture conditions at sampling</li>
-                      <li>Lab or test method changes</li>
-                      <li>True spatial variability within the field</li>
-                      <li>Variable rate applications or manure history</li>
+                <details style="margin-top: 0.5rem; font-size: 0.75rem; color: #64748b;" open>
+                  <summary style="cursor: pointer; color: #dc2626; font-weight: 500;">⚠️ ${cvInfo.title}</summary>
+                  <div style="margin-top: 0.5rem; padding: 0.75rem; background: #fef2f2; border-radius: 0.375rem; border: 1px solid #fecaca;">
+                    <p style="margin-bottom: 0.5rem; color: #991b1b;">${cvInfo.explanation}</p>
+                    <p style="margin: 0.5rem 0 0.25rem 0; font-weight: 600; color: #475569; font-size: 0.7rem;">Common drivers:</p>
+                    <ul style="margin: 0; padding-left: 1.25rem; color: #64748b; font-size: 0.7rem;">
+                      ${driversHtml}
                     </ul>
-                    <p style="margin-top: 0.5rem; color: #64748b; font-style: italic;">When variability is high, trends may not reflect true changes. Consider resampling with consistent methodology to confirm.</p>
+                    <p style="margin-top: 0.75rem; padding: 0.5rem; background: #f0fdf4; border-radius: 0.25rem; color: #166534; font-weight: 500;">💡 ${cvInfo.suggestion}</p>
                   </div>
                 </details>`;
             }
