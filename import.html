@@ -495,11 +495,28 @@
 
       <!-- Collapsible Content (collapsed by default) -->
       <div id="fieldManagementContent" style="margin-top: 1rem; display: none;">
+        <!-- Quick Actions Bar -->
+        <div id="fieldQuickActions" style="margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+          <span style="font-size: 0.8rem; color: #64748b;">Quick select:</span>
+          <button onclick="selectFieldsWithoutFarm()" style="padding: 0.375rem 0.75rem; background: #fef3c7; border: 1px solid #fde047; border-radius: 0.375rem; cursor: pointer; font-size: 0.8rem; color: #854d0e;">Fields without farm</button>
+          <button onclick="selectAllFieldsBtn()" style="padding: 0.375rem 0.75rem; background: #e0f2fe; border: 1px solid #7dd3fc; border-radius: 0.375rem; cursor: pointer; font-size: 0.8rem; color: #0369a1;">All fields</button>
+        </div>
+
+        <!-- Bulk Action Bar (hidden by default) -->
+        <div id="fieldBulkActionBar" style="display: none; margin-bottom: 0.75rem; padding: 0.75rem; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border-radius: 0.5rem; align-items: center; gap: 1rem;">
+          <span style="color: white; font-weight: 500;"><span id="selectedFieldCount">0</span> fields selected</span>
+          <button onclick="openBulkAssignFarmModal()" style="padding: 0.5rem 1rem; background: white; color: #7c3aed; border: none; border-radius: 0.375rem; font-weight: 500; cursor: pointer;">📁 Assign to Farm</button>
+          <button onclick="clearFieldSelection()" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 0.375rem; cursor: pointer;">Clear Selection</button>
+        </div>
+
         <!-- Field Table -->
         <div id="fieldManagementTable" style="background: white; border-radius: 0.5rem; border: 1px solid #bae6fd; overflow: hidden;">
           <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
             <thead style="background: #f0f9ff;">
               <tr>
+                <th style="padding: 0.75rem; text-align: center; border-bottom: 2px solid #bae6fd; color: #0369a1; width: 40px;">
+                  <input type="checkbox" id="selectAllFields" onchange="toggleSelectAllFields(this)" title="Select all fields">
+                </th>
                 <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #bae6fd; color: #0369a1;">Field Name</th>
                 <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #bae6fd; color: #0369a1;">Acres</th>
                 <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #bae6fd; color: #0369a1;">Samples</th>
@@ -509,7 +526,7 @@
             </thead>
             <tbody id="fieldTableBody">
               <tr>
-                <td colspan="5" style="padding: 2rem; text-align: center; color: #64748b;">
+                <td colspan="6" style="padding: 2rem; text-align: center; color: #64748b;">
                   <em>No field boundaries loaded</em>
                 </td>
               </tr>
@@ -596,6 +613,40 @@
       <div class="modal-footer" style="border-top: 1px solid #e2e8f0;">
         <button class="button" style="background: #94a3b8;" onclick="closeFieldDeleteModal()">Cancel</button>
         <button class="button danger" onclick="confirmFieldDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk Assign Farm Modal -->
+  <div id="bulkAssignFarmModal" class="modal-overlay">
+    <div class="modal" style="max-width: 450px;">
+      <div class="modal-header" style="background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);">
+        <h3>📁 Assign Fields to Farm</h3>
+        <button class="modal-close" onclick="closeBulkAssignFarmModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 1.5rem;">
+        <p style="margin: 0 0 1rem 0; color: #475569;">
+          Assign <strong><span id="bulkAssignFieldCount">0</span> selected fields</strong> to a client/farm.
+        </p>
+        <div style="margin-bottom: 1rem;">
+          <label style="font-size: 0.85rem; font-weight: 600; color: #334155; display: block; margin-bottom: 0.5rem;">Client:</label>
+          <select id="bulkAssignClient" onchange="updateBulkAssignFarmOptions()" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; font-size: 0.9rem;">
+            <option value="">-- Select Client --</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size: 0.85rem; font-weight: 600; color: #334155; display: block; margin-bottom: 0.5rem;">Farm:</label>
+          <select id="bulkAssignFarm" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; font-size: 0.9rem;">
+            <option value="">-- Select Farm --</option>
+          </select>
+        </div>
+        <div id="bulkAssignFieldList" style="margin-top: 1rem; max-height: 150px; overflow-y: auto; background: #f8fafc; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.8rem; color: #64748b;">
+          <!-- Selected field names will be listed here -->
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top: 1px solid #e2e8f0;">
+        <button class="button" style="background: #94a3b8;" onclick="closeBulkAssignFarmModal()">Cancel</button>
+        <button class="button" style="background: #8b5cf6;" onclick="confirmBulkAssignFarm()">Assign to Farm</button>
       </div>
     </div>
   </div>
@@ -1133,8 +1184,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.165";
-    const BUILD_DATE = "2026-01-26T07:45:30";
+    const APP_VERSION = "v1.0.166";
+    const BUILD_DATE = "2026-01-26T07:59:40";
 
     // Reference shared data config with import-specific additions
     const CONFIG = {
@@ -6432,13 +6483,14 @@
       if (fieldNames.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="5" style="padding: 2rem; text-align: center; color: #64748b;">
+            <td colspan="6" style="padding: 2rem; text-align: center; color: #64748b;">
               <em>No field boundaries loaded</em>
             </td>
           </tr>
         `;
         summaryDiv.style.display = 'none';
         document.getElementById('fieldManagementQuickSummary').textContent = '0 fields';
+        document.getElementById('fieldBulkActionBar').style.display = 'none';
         return;
       }
 
@@ -6477,13 +6529,18 @@
 
         // Determine row styling based on data
         const hasNoSamples = sampleCount === 0;
-        const rowStyle = hasNoSamples ? 'background: #fef3c7;' : '';
+        const hasNoFarm = !fieldData.farmId;
+        const rowStyle = hasNoFarm ? 'background: #fef3c7;' : (hasNoSamples ? 'background: #fff7ed;' : '');
 
         return `
           <tr style="${rowStyle}">
+            <td style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e0f2fe;">
+              <input type="checkbox" class="field-select-checkbox" data-field="${escapeHtml(fieldName)}" onchange="updateFieldSelectionCount()">
+            </td>
             <td style="padding: 0.75rem; border-bottom: 1px solid #e0f2fe;">
               <span style="font-weight: 500;">${escapeHtml(fieldName)}</span>
-              ${hasNoSamples ? '<span style="margin-left: 0.5rem; font-size: 0.7rem; background: #fde047; padding: 0.125rem 0.375rem; border-radius: 0.25rem; color: #854d0e;">No samples</span>' : ''}
+              ${hasNoFarm ? '<span style="margin-left: 0.5rem; font-size: 0.7rem; background: #fde047; padding: 0.125rem 0.375rem; border-radius: 0.25rem; color: #854d0e;">No farm</span>' : ''}
+              ${hasNoSamples ? '<span style="margin-left: 0.5rem; font-size: 0.7rem; background: #fed7aa; padding: 0.125rem 0.375rem; border-radius: 0.25rem; color: #9a3412;">No samples</span>' : ''}
               ${farmLabel ? `<div style="font-size: 0.7rem; color: #8b5cf6; margin-top: 0.25rem;">📁 ${escapeHtml(farmLabel)}</div>` : ''}
             </td>
             <td style="padding: 0.75rem; text-align: right; border-bottom: 1px solid #e0f2fe;">${acres.toFixed(1)}</td>
@@ -6769,6 +6826,180 @@
       });
 
       return totalPoints > 0 ? [totalLat / totalPoints, totalLon / totalPoints] : [0, 0];
+    }
+
+    // ============================================
+    // Bulk Field Selection and Farm Assignment
+    // ============================================
+
+    // Get selected field names
+    function getSelectedFields() {
+      const checkboxes = document.querySelectorAll('.field-select-checkbox:checked');
+      return Array.from(checkboxes).map(cb => cb.dataset.field);
+    }
+
+    // Update selection count and show/hide bulk action bar
+    function updateFieldSelectionCount() {
+      const selected = getSelectedFields();
+      const actionBar = document.getElementById('fieldBulkActionBar');
+      const countSpan = document.getElementById('selectedFieldCount');
+      const selectAllCheckbox = document.getElementById('selectAllFields');
+
+      countSpan.textContent = selected.length;
+
+      if (selected.length > 0) {
+        actionBar.style.display = 'flex';
+      } else {
+        actionBar.style.display = 'none';
+      }
+
+      // Update select all checkbox state
+      const allCheckboxes = document.querySelectorAll('.field-select-checkbox');
+      if (allCheckboxes.length > 0 && selected.length === allCheckboxes.length) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+      } else if (selected.length > 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+      } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+      }
+    }
+
+    // Toggle select all fields
+    function toggleSelectAllFields(checkbox) {
+      const allCheckboxes = document.querySelectorAll('.field-select-checkbox');
+      allCheckboxes.forEach(cb => cb.checked = checkbox.checked);
+      updateFieldSelectionCount();
+    }
+
+    // Clear all field selections
+    function clearFieldSelection() {
+      const allCheckboxes = document.querySelectorAll('.field-select-checkbox');
+      allCheckboxes.forEach(cb => cb.checked = false);
+      document.getElementById('selectAllFields').checked = false;
+      updateFieldSelectionCount();
+    }
+
+    // Select all fields without a farm assigned
+    function selectFieldsWithoutFarm() {
+      const allCheckboxes = document.querySelectorAll('.field-select-checkbox');
+      allCheckboxes.forEach(cb => {
+        const fieldName = cb.dataset.field;
+        const fieldData = fieldBoundaries[fieldName];
+        const hasFarm = fieldData && fieldData.farmId;
+        cb.checked = !hasFarm;
+      });
+      updateFieldSelectionCount();
+    }
+
+    // Select all fields (button version)
+    function selectAllFieldsBtn() {
+      const allCheckboxes = document.querySelectorAll('.field-select-checkbox');
+      allCheckboxes.forEach(cb => cb.checked = true);
+      document.getElementById('selectAllFields').checked = true;
+      updateFieldSelectionCount();
+    }
+
+    // Open bulk assign farm modal
+    function openBulkAssignFarmModal() {
+      const selected = getSelectedFields();
+      if (selected.length === 0) return;
+
+      // Update count
+      document.getElementById('bulkAssignFieldCount').textContent = selected.length;
+
+      // Populate client dropdown
+      const clientSelect = document.getElementById('bulkAssignClient');
+      clientSelect.innerHTML = '<option value="">-- Select Client --</option>';
+      clientsData.forEach(client => {
+        const opt = document.createElement('option');
+        opt.value = client.id;
+        opt.textContent = client.name;
+        clientSelect.appendChild(opt);
+      });
+
+      // Clear farm dropdown
+      document.getElementById('bulkAssignFarm').innerHTML = '<option value="">-- Select Client First --</option>';
+
+      // Show selected field names
+      const fieldListDiv = document.getElementById('bulkAssignFieldList');
+      fieldListDiv.innerHTML = selected.map(f => `<div style="padding: 0.25rem 0;">• ${escapeHtml(f)}</div>`).join('');
+
+      document.getElementById('bulkAssignFarmModal').style.display = 'flex';
+    }
+
+    // Update farm dropdown when client changes
+    function updateBulkAssignFarmOptions() {
+      const clientId = document.getElementById('bulkAssignClient').value;
+      const farmSelect = document.getElementById('bulkAssignFarm');
+
+      if (!clientId) {
+        farmSelect.innerHTML = '<option value="">-- Select Client First --</option>';
+        return;
+      }
+
+      const farms = farmsData.filter(f => f.clientId === clientId);
+      farmSelect.innerHTML = '<option value="">-- Select Farm --</option>';
+
+      farms.forEach(farm => {
+        const opt = document.createElement('option');
+        opt.value = farm.id;
+        opt.textContent = farm.name;
+        farmSelect.appendChild(opt);
+      });
+    }
+
+    // Close bulk assign modal
+    function closeBulkAssignFarmModal() {
+      document.getElementById('bulkAssignFarmModal').style.display = 'none';
+    }
+
+    // Confirm bulk farm assignment
+    async function confirmBulkAssignFarm() {
+      const farmId = document.getElementById('bulkAssignFarm').value;
+      if (!farmId) {
+        showStatus('Please select a farm', false);
+        return;
+      }
+
+      const selected = getSelectedFields();
+      if (selected.length === 0) return;
+
+      // Get farm name for message
+      const farm = farmsData.find(f => f.id === farmId);
+      const client = clientsData.find(c => c.id === farm?.clientId);
+      const farmLabel = client ? `${client.name} > ${farm.name}` : farm?.name || farmId;
+
+      // Update each selected field's farmId
+      selected.forEach(fieldName => {
+        if (fieldBoundaries[fieldName]) {
+          // Ensure field data is in object format
+          if (Array.isArray(fieldBoundaries[fieldName])) {
+            fieldBoundaries[fieldName] = {
+              boundary: fieldBoundaries[fieldName],
+              farmId: farmId
+            };
+          } else {
+            fieldBoundaries[fieldName].farmId = farmId;
+          }
+        }
+      });
+
+      // Save changes
+      await saveLocalData();
+      await saveToIndexedDB();
+
+      closeBulkAssignFarmModal();
+      clearFieldSelection();
+      refreshFieldTable();
+      showStatus(`✓ Assigned ${selected.length} fields to ${farmLabel}`, true);
+
+      // Sync to Sheets if signed in
+      if (SheetsAPI.isSignedIn) {
+        syncToSheets();
+      }
     }
 
     // Refresh field table on page load
