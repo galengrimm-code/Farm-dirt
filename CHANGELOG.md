@@ -4,6 +4,26 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 
 ---
 
+## [v1.0.76] - January 26, 2026
+
+### Sample Site Logging
+- **Multi-select sample types**: Select multiple sample types (Soil, Tissue, Nematode, etc.) when logging a sample site
+- **Edit sample sites**: Click existing sample site markers to add or remove sample types
+- **Sample type display**: Sample sites show which types have been collected
+
+### Analysis Improvements
+- **Nutrient-specific CV explanations**: Variability cards now explain WHY each nutrient varies (e.g., P varies due to stratification from no-till, K varies due to crop removal patterns)
+- **Enhanced 5-Trigger Framework**: Added interaction notes and tighter thresholds for nutrient recommendations
+
+### Import Page
+- **Section headers**: Reorganized Import page into "Data Import" and "Data Management" sections for clarity
+- **Manual Sync to Sheets button**: Added button to manually trigger Google Sheets sync
+
+### Bug Fixes
+- **Reverted sample marker delete**: Removed delete functionality from sample site markers (was causing issues)
+
+---
+
 ## [v1.0.75] - January 24, 2026
 
 ### Organic Matter (OM) Improvements
@@ -451,6 +471,7 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| v1.0.76 | Jan 26, 2026 | Sample site editing, multi-select types, CV explanations, 5-Trigger enhancements |
 | v1.0.75 | Jan 24, 2026 | OM agronomic recommendations, Sheets sync fix, Sample Site modal |
 | v1.0.74 | Jan 23, 2026 | Field Trends insights (P:Zn, OM, Zn), Methodology page, pH default |
 | v1.0.73 | Jan 21, 2026 | Dynamic zoom-based color scaling, Google Sheet URL support |
