@@ -631,6 +631,7 @@
                   <thead>
                     <tr style="background: #f1f5f9;">
                       <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e2e8f0;">Point ID</th>
+                      <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e2e8f0;">Field</th>
                       <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #e2e8f0;">Nutrient Value</th>
                       <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #e2e8f0;">Yield</th>
                       <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e2e8f0;">Flags</th>
@@ -711,8 +712,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.178";
-    const BUILD_DATE = "2026-01-27T07:05:41";
+    const APP_VERSION = "v1.0.179";
+    const BUILD_DATE = "2026-01-27T07:39:21";
 
     // Reference shared data config with analysis-specific additions
     const CONFIG = {
@@ -6261,7 +6262,7 @@
 
       const tbody = document.getElementById('belowPointsBody');
       if (below.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #64748b; padding: 1rem;">No points below breakpoint</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #64748b; padding: 1rem;">No points below breakpoint</td></tr>';
         return;
       }
 
@@ -6279,11 +6280,13 @@
         if (zn && zn < 1.0) flags.push('Very low Zn');
 
         const pointId = p.sampleId || p.id || `${p.lat?.toFixed(4)},${p.lon?.toFixed(4)}`;
+        const fieldName = p.field || 'Unknown';
         const yieldDisplay = p.yieldValue ? p.yieldValue.toFixed(1) : '--';
         const nutrientDisplay = p.nutrientValue ? p.nutrientValue.toFixed(1) : '--';
 
         return `<tr style="background: ${flags.length > 0 ? '#fef2f2' : '#fff'};">
           <td style="padding: 0.5rem; border-bottom: 1px solid #e2e8f0;">${pointId}</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #e2e8f0;">${fieldName}</td>
           <td style="padding: 0.5rem; border-bottom: 1px solid #e2e8f0; text-align: right; font-family: monospace;">${nutrientDisplay}${unit ? ' ' + unit : ''}</td>
           <td style="padding: 0.5rem; border-bottom: 1px solid #e2e8f0; text-align: right; font-family: monospace;">${yieldDisplay} bu/ac</td>
           <td style="padding: 0.5rem; border-bottom: 1px solid #e2e8f0; font-size: 0.75rem;">${flags.map(f => `<span style="background: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 4px; margin-right: 4px;">${f}</span>`).join('')}</td>
