@@ -470,8 +470,8 @@
 
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.185";
-    const BUILD_DATE = "2026-01-27T08:17:57";
+    const APP_VERSION = "v1.0.186";
+    const BUILD_DATE = "2026-01-27T08:25:20";
 
     // ========== CONFIG ==========
     // Reference shared data config and add app-specific config
@@ -1698,10 +1698,33 @@
       const zoomTarget = sessionStorage.getItem('zoomToPoint');
       if (zoomTarget) {
         try {
-          const { lat, lon } = JSON.parse(zoomTarget);
+          const { lat, lon, zonePoints } = JSON.parse(zoomTarget);
           if (lat && lon) {
             map.setView([lat, lon], 17);
-            // Add pulsing highlight marker
+
+            const highlightMarkers = [];
+
+            // If we have zone points, highlight all of them
+            if (zonePoints && zonePoints.length > 0) {
+              zonePoints.forEach(pt => {
+                // Add a red circle around each point
+                const circle = L.circleMarker([pt.lat, pt.lon], {
+                  radius: 18,
+                  color: '#dc2626',
+                  weight: 4,
+                  fillColor: '#dc2626',
+                  fillOpacity: 0.2,
+                  className: 'zone-point-highlight'
+                }).addTo(map);
+                highlightMarkers.push(circle);
+              });
+
+              // Also fit bounds to show all points
+              const bounds = L.latLngBounds(zonePoints.map(pt => [pt.lat, pt.lon]));
+              map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
+            }
+
+            // Add pulsing highlight marker at centroid
             const highlightIcon = L.divIcon({
               className: 'zone-highlight-marker',
               html: '<div class="zone-highlight-ring"></div><div class="zone-highlight-dot"></div>',
@@ -1709,10 +1732,12 @@
               iconAnchor: [40, 40]
             });
             const highlightMarker = L.marker([lat, lon], { icon: highlightIcon, zIndexOffset: 1000 }).addTo(map);
-            // Remove marker after 8 seconds
+            highlightMarkers.push(highlightMarker);
+
+            // Remove all markers after 10 seconds
             setTimeout(() => {
-              map.removeLayer(highlightMarker);
-            }, 8000);
+              highlightMarkers.forEach(m => map.removeLayer(m));
+            }, 10000);
           }
         } catch (e) {
           console.warn('Error parsing zoomToPoint:', e);

@@ -576,9 +576,8 @@
               <option value="K">Potassium (K)</option>
               <option value="pH">pH</option>
               <option value="OM">Organic Matter (OM)</option>
-              <option value="Mg">Magnesium (Mg)</option>
               <option value="S">Sulfur (S)</option>
-              <option value="Ca">Calcium (Ca)</option>
+              <option value="CEC">CEC</option>
               <option value="Ca_sat">Calcium Sat %</option>
               <option value="Mg_sat">Magnesium Sat %</option>
               <option value="K_Sat">Potassium Sat %</option>
@@ -796,8 +795,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.185";
-    const BUILD_DATE = "2026-01-27T08:17:57";
+    const APP_VERSION = "v1.0.186";
+    const BUILD_DATE = "2026-01-27T08:25:20";
 
     // Reference shared data config with analysis-specific additions
     const CONFIG = {
@@ -6276,7 +6275,7 @@
       currentNutrientKey = nutrient;
 
       // Update nutrient label in impact table
-      const nutrientLabels = { 'Zn': 'Zn', 'P': 'P', 'K': 'K', 'pH': 'pH', 'OM': 'OM', 'Mg': 'Mg', 'S': 'S', 'Ca': 'Ca', 'Ca_sat': 'Ca%', 'Mg_sat': 'Mg%', 'K_Sat': 'K%' };
+      const nutrientLabels = { 'Zn': 'Zn', 'P': 'P', 'K': 'K', 'pH': 'pH', 'OM': 'OM', 'S': 'S', 'CEC': 'CEC', 'Ca_sat': 'Ca%', 'Mg_sat': 'Mg%', 'K_Sat': 'K%' };
       document.getElementById('impactNutrientLabel').textContent = nutrientLabels[nutrient] || nutrient;
 
       // Display layered summaries
@@ -6305,12 +6304,12 @@
 
       const nutrientNames = {
         'Zn': 'Zinc (Zn)', 'P': 'Phosphorus (P)', 'K': 'Potassium (K)', 'pH': 'pH', 'OM': 'Organic Matter',
-        'Mg': 'Magnesium (Mg)', 'S': 'Sulfur (S)', 'Ca': 'Calcium (Ca)',
+        'S': 'Sulfur (S)', 'CEC': 'CEC',
         'Ca_sat': 'Calcium Sat %', 'Mg_sat': 'Magnesium Sat %', 'K_Sat': 'Potassium Sat %'
       };
       const units = {
         'Zn': 'ppm', 'P': 'ppm', 'K': 'ppm', 'pH': '', 'OM': '%',
-        'Mg': 'ppm', 'S': 'ppm', 'Ca': 'ppm',
+        'S': 'ppm', 'CEC': 'meq/100g',
         'Ca_sat': '%', 'Mg_sat': '%', 'K_Sat': '%'
       };
 
@@ -6355,7 +6354,7 @@
 
       const nutrientNamesLower = {
         'Zn': 'zinc', 'P': 'phosphorus', 'K': 'potassium', 'pH': 'pH', 'OM': 'organic matter',
-        'Mg': 'magnesium', 'S': 'sulfur', 'Ca': 'calcium',
+        'S': 'sulfur', 'CEC': 'CEC',
         'Ca_sat': 'calcium saturation', 'Mg_sat': 'magnesium saturation', 'K_Sat': 'potassium saturation'
       };
       const name = nutrientNamesLower[result.nutrientKey] || result.nutrientKey;
@@ -6505,6 +6504,9 @@
       const unit = { 'Zn': 'ppm', 'P': 'ppm', 'K': 'ppm', 'pH': '', 'OM': '%' }[nutrientKey] || '';
       const avgYieldAbove = parseFloat(document.getElementById('avgYieldAbove')?.textContent) || 0;
 
+      // Store clusters globally for zoomToZone access
+      window._zoneClusters = significantClusters;
+
       let html = '';
       significantClusters.slice(0, 6).forEach((cluster, i) => {
         const count = cluster.points.length;
@@ -6538,7 +6540,7 @@
                 <span style="font-size: 0.7rem; color: #888;">bu/ac</span>
               </div>
             </div>
-            <button onclick="zoomToZone(${cluster.centroid.lat}, ${cluster.centroid.lon})" style="width: 100%; padding: 0.5rem; background: #3b82f6; color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.8rem;">
+            <button onclick="zoomToZone(${i})" style="width: 100%; padding: 0.5rem; background: #3b82f6; color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.8rem;">
               📍 View Zone
             </button>
           </div>
@@ -6650,8 +6652,21 @@
       window.location.href = 'index.html';
     }
 
-    function zoomToZone(lat, lon) {
-      sessionStorage.setItem('zoomToPoint', JSON.stringify({ lat, lon }));
+    function zoomToZone(clusterIndex) {
+      const cluster = window._zoneClusters?.[clusterIndex];
+      if (!cluster) return;
+
+      // Extract all point coordinates
+      const points = cluster.points.map(p => ({
+        lat: p.lat,
+        lon: p.lon || p.lng
+      }));
+
+      sessionStorage.setItem('zoomToPoint', JSON.stringify({
+        lat: cluster.centroid.lat,
+        lon: cluster.centroid.lon,
+        zonePoints: points
+      }));
       window.location.href = 'index.html';
     }
 
