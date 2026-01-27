@@ -611,34 +611,99 @@
             <div id="bpInterpretation" style="background: #e8f4fd; border-left: 4px solid #3b82f6; padding: 1rem; border-radius: 0 0.5rem 0.5rem 0; margin-top: 1rem;"></div>
           </div>
 
+          <!-- PART 1: Impact Summary Table -->
           <div style="background: white; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 1.5rem;">
-            <h3 style="margin: 0 0 0.5rem 0; color: #1e293b; font-size: 1.1rem;">📍 Top Points to Address</h3>
-            <p style="margin: 0 0 1rem 0; font-size: 0.85rem; color: #64748b;">Highest priority areas based on breakpoint + interaction stacking</p>
-            <div id="topPointsList"></div>
+            <h3 style="margin: 0 0 1rem 0; color: #1e293b; font-size: 1.1rem;">📊 Impact Summary</h3>
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                <thead>
+                  <tr style="background: #f8f9fa;">
+                    <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e2e8f0;">Category</th>
+                    <th style="padding: 0.75rem; text-align: center; border-bottom: 2px solid #e2e8f0;">Points</th>
+                    <th style="padding: 0.75rem; text-align: center; border-bottom: 2px solid #e2e8f0;">Est. Acres</th>
+                    <th style="padding: 0.75rem; text-align: center; border-bottom: 2px solid #e2e8f0;">Avg <span id="impactNutrientLabel">Nutrient</span></th>
+                    <th style="padding: 0.75rem; text-align: center; border-bottom: 2px solid #e2e8f0;">Avg Yield</th>
+                    <th style="padding: 0.75rem; text-align: center; border-bottom: 2px solid #e2e8f0;">vs Above BP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="background: #fef2f2;">
+                    <td style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; color: #dc2626; font-weight: 500;">🔴 Below Breakpoint</td>
+                    <td id="sumBelow" style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e2e8f0;">--</td>
+                    <td id="acresBelow" style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e2e8f0;">--</td>
+                    <td id="avgNutrientBelow" style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e2e8f0;">--</td>
+                    <td id="avgYieldBelow" style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e2e8f0;">--</td>
+                    <td id="penaltyBelow" style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e2e8f0; color: #dc2626; font-weight: 600;">--</td>
+                  </tr>
+                  <tr style="background: #fffbeb;">
+                    <td style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; color: #d97706; font-weight: 500;">🟡 Near Breakpoint</td>
+                    <td id="sumNear" style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e2e8f0;">--</td>
+                    <td id="acresNear" style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e2e8f0;">--</td>
+                    <td id="avgNutrientNear" style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e2e8f0;">--</td>
+                    <td id="avgYieldNear" style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e2e8f0;">--</td>
+                    <td id="penaltyNear" style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e2e8f0; color: #d97706; font-weight: 600;">--</td>
+                  </tr>
+                  <tr style="background: #f0fdf4;">
+                    <td style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; color: #059669; font-weight: 500;">🟢 Above Breakpoint</td>
+                    <td id="sumAbove" style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e2e8f0;">--</td>
+                    <td id="acresAbove" style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e2e8f0;">--</td>
+                    <td id="avgNutrientAbove" style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e2e8f0;">--</td>
+                    <td id="avgYieldAbove" style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e2e8f0;">--</td>
+                    <td style="padding: 0.75rem; text-align: center; border-bottom: 1px solid #e2e8f0; color: #666; font-style: italic;">baseline</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="yieldOpportunityBox" style="background: #ecfdf5; border: 1px solid #059669; border-radius: 0.5rem; padding: 1rem; text-align: center; margin-top: 1rem;">
+              <strong style="color: #059669;">💰 Estimated Yield Opportunity:</strong>
+              <span id="yieldOpportunity" style="margin-left: 0.5rem;">--</span>
+            </div>
           </div>
 
+          <!-- PART 2: Field Breakdown -->
           <div style="background: white; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 1.5rem;">
-            <h3 style="margin: 0 0 1rem 0; color: #1e293b; font-size: 1.1rem;">Point Classification</h3>
-            <div style="display: flex; gap: 1rem; margin: 1rem 0; flex-wrap: wrap;">
-              <span style="background: #fee2e2; color: #991b1b; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 500;">🔴 Below: <span id="countBelow">--</span></span>
-              <span style="background: #fef3c7; color: #92400e; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 500;">🟡 Near: <span id="countNear">--</span></span>
-              <span style="background: #d1fae5; color: #065f46; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 500;">🟢 Above: <span id="countAbove">--</span></span>
-            </div>
-            <details style="margin-top: 1rem;">
-              <summary style="cursor: pointer; font-weight: 500; color: #3b82f6; padding: 0.5rem 0;">View all points below breakpoint</summary>
-              <div style="overflow-x: auto; margin-top: 0.5rem;">
-                <table id="belowPointsTable" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
-                  <thead>
-                    <tr style="background: #f1f5f9;">
-                      <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e2e8f0;">Point ID</th>
-                      <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e2e8f0;">Field</th>
-                      <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #e2e8f0;">Nutrient Value</th>
-                      <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #e2e8f0;">Yield</th>
-                      <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e2e8f0;">Flags</th>
-                    </tr>
-                  </thead>
-                  <tbody id="belowPointsBody"></tbody>
-                </table>
+            <h3 style="margin: 0 0 0.5rem 0; color: #1e293b; font-size: 1.1rem;">🌾 Fields to Address</h3>
+            <p style="margin: 0 0 1rem 0; font-size: 0.85rem; color: #64748b;">Fields ranked by number of points below breakpoint</p>
+            <div id="fieldBreakdownList"></div>
+          </div>
+
+          <!-- PART 3: Management Zone Clusters -->
+          <div style="background: white; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 1.5rem;">
+            <h3 style="margin: 0 0 0.5rem 0; color: #1e293b; font-size: 1.1rem;">📍 Management Zones</h3>
+            <p style="margin: 0 0 1rem 0; font-size: 0.85rem; color: #64748b;">Clusters of nearby points below breakpoint - target these areas</p>
+            <div id="zoneClusters" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;"></div>
+          </div>
+
+          <!-- PART 4: Point Details (Collapsed) -->
+          <div style="background: white; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 1.5rem;">
+            <details>
+              <summary style="cursor: pointer; padding: 0.5rem 0;">
+                <h3 style="display: inline; margin: 0; color: #1e293b; font-size: 1.1rem;">📋 Individual Point Details</h3>
+                <span style="font-size: 0.75rem; color: #888; margin-left: 0.5rem;">(click to expand)</span>
+              </summary>
+              <div style="margin-top: 1rem;">
+                <div style="margin-bottom: 1rem;">
+                  <label style="font-size: 0.85rem; color: #666;">Filter by field:
+                    <select id="pointFieldFilter" onchange="filterPointsTable()" style="margin-left: 0.5rem; padding: 0.375rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.375rem;">
+                      <option value="">All Fields</option>
+                    </select>
+                  </label>
+                </div>
+                <div style="overflow-x: auto;">
+                  <table id="belowPointsTable" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                    <thead>
+                      <tr style="background: #f1f5f9;">
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e2e8f0;">Point ID</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e2e8f0;">Field</th>
+                        <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #e2e8f0;">Nutrient Value</th>
+                        <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #e2e8f0;">Yield</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e2e8f0;">Flags</th>
+                        <th style="padding: 0.75rem; text-align: center; border-bottom: 2px solid #e2e8f0;">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="belowPointsBody"></tbody>
+                  </table>
+                </div>
               </div>
             </details>
           </div>
@@ -712,8 +777,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.179";
-    const BUILD_DATE = "2026-01-27T07:39:21";
+    const APP_VERSION = "v1.0.180";
+    const BUILD_DATE = "2026-01-27T07:51:59";
 
     // Reference shared data config with analysis-specific additions
     const CONFIG = {
@@ -6158,6 +6223,10 @@
       // Initialize the breakpoint tab - nothing to pre-load
     }
 
+    // Store classified data globally for filtering
+    let currentClassifiedData = null;
+    let currentNutrientKey = null;
+
     function runBreakpointAnalysis() {
       const nutrient = document.getElementById('breakpointNutrient').value;
       const crop = document.getElementById('yieldCropSelect').value;
@@ -6179,14 +6248,25 @@
         return;
       }
 
+      // Display breakpoint result card
       displayBreakpointResults(result);
 
+      // Classify all points
       const classified = Utils.classifyByBreakpoint(dataPoints, nutrient, result.breakpoint);
-      displayClassification(classified, nutrient, result.breakpoint);
+      currentClassifiedData = classified;
+      currentNutrientKey = nutrient;
 
-      const topPoints = Utils.rankPointsToAddress(dataPoints, { breakpoints: { [nutrient]: result } });
-      displayTopPoints(topPoints);
+      // Update nutrient label in impact table
+      const nutrientLabels = { 'Zn': 'Zn', 'P': 'P', 'K': 'K', 'pH': 'pH', 'OM': 'OM' };
+      document.getElementById('impactNutrientLabel').textContent = nutrientLabels[nutrient] || nutrient;
 
+      // Display layered summaries
+      displayImpactSummary(classified, result);
+      displayFieldBreakdown(classified, nutrient);
+      displayZoneClusters(classified, nutrient);
+      displayPointDetails(classified, nutrient);
+
+      // Hinge-MVR if enabled
       if (document.getElementById('hingeToggle').checked && result.confidence !== 'Low') {
         const covariates = ['pH', 'OM', 'P'].filter(c => c !== nutrient);
         const hingeResult = Utils.runHingeMVR(dataPoints, {
@@ -6251,25 +6331,241 @@
       document.getElementById('bpInterpretation').innerHTML = interp;
     }
 
-    function displayClassification(classified, nutrientKey, breakpoint) {
+    // PART 1: Impact Summary Table
+    function displayImpactSummary(classified, breakpointResult, acresPerPoint = 2.5) {
       const below = classified.filter(p => p.classification === 'BELOW_BREAKPOINT');
       const near = classified.filter(p => p.classification === 'NEAR_BREAKPOINT');
       const above = classified.filter(p => p.classification === 'ABOVE_BREAKPOINT');
 
-      document.getElementById('countBelow').textContent = below.length;
-      document.getElementById('countNear').textContent = near.length;
-      document.getElementById('countAbove').textContent = above.length;
+      const avgYieldAbove = Utils.mean(above.map(p => p.yieldValue)) || 0;
+      const avgYieldBelow = Utils.mean(below.map(p => p.yieldValue)) || 0;
+      const avgYieldNear = Utils.mean(near.map(p => p.yieldValue)) || 0;
 
-      const tbody = document.getElementById('belowPointsBody');
+      const avgNutrientBelow = Utils.mean(below.map(p => p.nutrientValue)) || 0;
+      const avgNutrientNear = Utils.mean(near.map(p => p.nutrientValue)) || 0;
+      const avgNutrientAbove = Utils.mean(above.map(p => p.nutrientValue)) || 0;
+
+      // Populate table
+      document.getElementById('sumBelow').textContent = below.length;
+      document.getElementById('sumNear').textContent = near.length;
+      document.getElementById('sumAbove').textContent = above.length;
+
+      document.getElementById('acresBelow').textContent = `~${(below.length * acresPerPoint).toLocaleString()} ac`;
+      document.getElementById('acresNear').textContent = `~${(near.length * acresPerPoint).toLocaleString()} ac`;
+      document.getElementById('acresAbove').textContent = `~${(above.length * acresPerPoint).toLocaleString()} ac`;
+
+      document.getElementById('avgNutrientBelow').textContent = avgNutrientBelow.toFixed(1);
+      document.getElementById('avgNutrientNear').textContent = avgNutrientNear.toFixed(1);
+      document.getElementById('avgNutrientAbove').textContent = avgNutrientAbove.toFixed(1);
+
+      document.getElementById('avgYieldBelow').textContent = `${avgYieldBelow.toFixed(1)} bu/ac`;
+      document.getElementById('avgYieldNear').textContent = `${avgYieldNear.toFixed(1)} bu/ac`;
+      document.getElementById('avgYieldAbove').textContent = `${avgYieldAbove.toFixed(1)} bu/ac`;
+
+      const penaltyBelow = avgYieldAbove - avgYieldBelow;
+      const penaltyNear = avgYieldAbove - avgYieldNear;
+
+      document.getElementById('penaltyBelow').textContent = penaltyBelow > 0 ? `-${penaltyBelow.toFixed(1)} bu/ac` : `+${Math.abs(penaltyBelow).toFixed(1)} bu/ac`;
+      document.getElementById('penaltyNear').textContent = penaltyNear > 0 ? `-${penaltyNear.toFixed(1)} bu/ac` : `+${Math.abs(penaltyNear).toFixed(1)} bu/ac`;
+
+      // Yield opportunity calculation
+      const acresBelow = below.length * acresPerPoint;
+      const totalOpportunity = acresBelow * penaltyBelow;
+      document.getElementById('yieldOpportunity').textContent =
+        `${acresBelow.toLocaleString()} acres × ${penaltyBelow.toFixed(1)} bu/ac = ${Math.round(totalOpportunity).toLocaleString()} bu potential gain`;
+    }
+
+    // PART 2: Field Breakdown
+    function displayFieldBreakdown(classified, nutrientKey, acresPerPoint = 2.5) {
+      const below = classified.filter(p => p.classification === 'BELOW_BREAKPOINT');
+      const container = document.getElementById('fieldBreakdownList');
+
       if (below.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #64748b; padding: 1rem;">No points below breakpoint</td></tr>';
+        container.innerHTML = '<p style="color: #888; font-style: italic; text-align: center; padding: 1rem;">No fields with points below breakpoint.</p>';
         return;
       }
 
-      below.sort((a, b) => a.nutrientValue - b.nutrientValue);
+      // Group by field
+      const byField = {};
+      below.forEach(p => {
+        const fieldName = p.field || 'Unknown Field';
+        if (!byField[fieldName]) {
+          byField[fieldName] = { field: fieldName, points: [], totalInField: 0 };
+        }
+        byField[fieldName].points.push(p);
+      });
+
+      // Get total points per field for percentage
+      classified.forEach(p => {
+        const fieldName = p.field || 'Unknown Field';
+        if (byField[fieldName]) byField[fieldName].totalInField++;
+      });
+
+      // Sort by count descending
+      const sorted = Object.values(byField).sort((a, b) => b.points.length - a.points.length);
       const unit = { 'Zn': 'ppm', 'P': 'ppm', 'K': 'ppm', 'pH': '', 'OM': '%' }[nutrientKey] || '';
 
-      tbody.innerHTML = below.map(p => {
+      let html = '';
+      sorted.slice(0, 5).forEach((fieldData, i) => {
+        const count = fieldData.points.length;
+        const acres = count * acresPerPoint;
+        const pct = fieldData.totalInField > 0 ? ((count / fieldData.totalInField) * 100).toFixed(0) : 0;
+        const avgNutrient = Utils.mean(fieldData.points.map(p => p.nutrientValue)) || 0;
+        const avgYield = Utils.mean(fieldData.points.map(p => p.yieldValue)) || 0;
+
+        html += `
+          <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; margin-bottom: 0.75rem;">
+            <div style="font-size: 1.25rem; font-weight: bold; color: #3b82f6; min-width: 40px;">#${i + 1}</div>
+            <div style="flex: 1;">
+              <strong style="color: #1e293b; font-size: 1rem;">${fieldData.field}</strong>
+              <div style="display: flex; gap: 1rem; font-size: 0.8rem; color: #666; margin: 0.25rem 0;">
+                <span>${count} points below breakpoint (${pct}% of field)</span>
+                <span>~${acres.toFixed(0)} acres</span>
+              </div>
+              <div style="font-size: 0.8rem; color: #888;">
+                Avg: ${avgNutrient.toFixed(1)}${unit} | Yield: ${avgYield.toFixed(1)} bu/ac
+              </div>
+            </div>
+            <button onclick="filterMapToField('${fieldData.field}')" style="padding: 0.5rem 0.75rem; background: #3b82f6; color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.8rem;">
+              📍 View on Map
+            </button>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // PART 3: Management Zone Clusters
+    function displayZoneClusters(classified, nutrientKey, acresPerPoint = 2.5) {
+      const below = classified.filter(p => p.classification === 'BELOW_BREAKPOINT');
+      const container = document.getElementById('zoneClusters');
+
+      if (below.length === 0) {
+        container.innerHTML = '<p style="color: #888; font-style: italic; text-align: center; padding: 1rem; grid-column: 1/-1;">No problem zones detected.</p>';
+        return;
+      }
+
+      // Cluster points within 500 feet of each other
+      const clusters = clusterNearbyPoints(below, 500);
+
+      // Filter to clusters with 2+ points
+      const significantClusters = clusters.filter(c => c.points.length >= 2);
+
+      if (significantClusters.length === 0) {
+        container.innerHTML = '<p style="color: #888; font-style: italic; text-align: center; padding: 1rem; grid-column: 1/-1;">No concentrated problem zones detected. Points below breakpoint are scattered.</p>';
+        return;
+      }
+
+      const unit = { 'Zn': 'ppm', 'P': 'ppm', 'K': 'ppm', 'pH': '', 'OM': '%' }[nutrientKey] || '';
+      const avgYieldAbove = parseFloat(document.getElementById('avgYieldAbove')?.textContent) || 0;
+
+      let html = '';
+      significantClusters.slice(0, 6).forEach((cluster, i) => {
+        const count = cluster.points.length;
+        const acres = count * acresPerPoint;
+        const avgNutrient = Utils.mean(cluster.points.map(p => p.nutrientValue)) || 0;
+        const avgYield = Utils.mean(cluster.points.map(p => p.yieldValue)) || 0;
+        const penalty = avgYieldAbove - avgYield;
+        const fieldNames = [...new Set(cluster.points.map(p => p.field || 'Unknown'))].slice(0, 2).join(', ');
+
+        html += `
+          <div style="border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <span style="background: #fee2e2; color: #991b1b; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-weight: 600; font-size: 0.85rem;">Zone ${String.fromCharCode(65 + i)}</span>
+              <span style="font-size: 0.8rem; color: #666;">${fieldNames}</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 0.75rem; text-align: center;">
+              <div>
+                <span style="display: block; font-size: 1.1rem; font-weight: bold; color: #333;">${count}</span>
+                <span style="font-size: 0.7rem; color: #888;">points</span>
+              </div>
+              <div>
+                <span style="display: block; font-size: 1.1rem; font-weight: bold; color: #333;">~${acres.toFixed(0)}</span>
+                <span style="font-size: 0.7rem; color: #888;">acres</span>
+              </div>
+              <div>
+                <span style="display: block; font-size: 1.1rem; font-weight: bold; color: #333;">${avgNutrient.toFixed(1)}</span>
+                <span style="font-size: 0.7rem; color: #888;">avg ${unit || 'value'}</span>
+              </div>
+              <div>
+                <span style="display: block; font-size: 1.1rem; font-weight: bold; color: #dc2626;">-${penalty.toFixed(1)}</span>
+                <span style="font-size: 0.7rem; color: #888;">bu/ac</span>
+              </div>
+            </div>
+            <button onclick="zoomToZone(${cluster.centroid.lat}, ${cluster.centroid.lon})" style="width: 100%; padding: 0.5rem; background: #3b82f6; color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.8rem;">
+              📍 View Zone
+            </button>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // Cluster nearby points helper
+    function clusterNearbyPoints(points, distanceThresholdFeet = 500) {
+      const clusters = [];
+      const assigned = new Set();
+
+      points.forEach((point, i) => {
+        if (assigned.has(i)) return;
+
+        const cluster = {
+          points: [point],
+          centroid: { lat: point.lat, lon: point.lon || point.lng }
+        };
+        assigned.add(i);
+
+        // Find nearby points
+        points.forEach((other, j) => {
+          if (assigned.has(j)) return;
+          const dist = Utils.getDistanceFeet(point.lat, point.lon || point.lng, other.lat, other.lon || other.lng);
+          if (dist <= distanceThresholdFeet) {
+            cluster.points.push(other);
+            assigned.add(j);
+          }
+        });
+
+        // Recalculate centroid
+        cluster.centroid = {
+          lat: Utils.mean(cluster.points.map(p => p.lat)),
+          lon: Utils.mean(cluster.points.map(p => p.lon || p.lng))
+        };
+
+        clusters.push(cluster);
+      });
+
+      return clusters.sort((a, b) => b.points.length - a.points.length);
+    }
+
+    // PART 4: Point Details (collapsed table)
+    function displayPointDetails(classified, nutrientKey) {
+      const below = classified.filter(p => p.classification === 'BELOW_BREAKPOINT');
+
+      // Populate field filter dropdown
+      const fieldFilter = document.getElementById('pointFieldFilter');
+      const uniqueFields = [...new Set(below.map(p => p.field || 'Unknown'))].sort();
+      fieldFilter.innerHTML = '<option value="">All Fields</option>' +
+        uniqueFields.map(f => `<option value="${f}">${f}</option>`).join('');
+
+      // Populate table
+      renderPointsTable(below, nutrientKey);
+    }
+
+    function renderPointsTable(points, nutrientKey, filterField = '') {
+      const tbody = document.getElementById('belowPointsBody');
+      const filtered = filterField ? points.filter(p => (p.field || 'Unknown') === filterField) : points;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #64748b; padding: 1rem;">No points to display</td></tr>';
+        return;
+      }
+
+      filtered.sort((a, b) => a.nutrientValue - b.nutrientValue);
+      const unit = { 'Zn': 'ppm', 'P': 'ppm', 'K': 'ppm', 'pH': '', 'OM': '%' }[nutrientKey] || '';
+
+      tbody.innerHTML = filtered.map(p => {
         const flags = [];
         const pH = p.pH || p.soil?.pH;
         const zn = p.Zn || p.soil?.Zn;
@@ -6279,7 +6575,7 @@
         if (zn && phos && (phos / zn) > 12) flags.push('High P:Zn');
         if (zn && zn < 1.0) flags.push('Very low Zn');
 
-        const pointId = p.sampleId || p.id || `${p.lat?.toFixed(4)},${p.lon?.toFixed(4)}`;
+        const pointId = p.sampleId || p.id || `${p.lat?.toFixed(4)},${(p.lon || p.lng)?.toFixed(4)}`;
         const fieldName = p.field || 'Unknown';
         const yieldDisplay = p.yieldValue ? p.yieldValue.toFixed(1) : '--';
         const nutrientDisplay = p.nutrientValue ? p.nutrientValue.toFixed(1) : '--';
@@ -6290,33 +6586,28 @@
           <td style="padding: 0.5rem; border-bottom: 1px solid #e2e8f0; text-align: right; font-family: monospace;">${nutrientDisplay}${unit ? ' ' + unit : ''}</td>
           <td style="padding: 0.5rem; border-bottom: 1px solid #e2e8f0; text-align: right; font-family: monospace;">${yieldDisplay} bu/ac</td>
           <td style="padding: 0.5rem; border-bottom: 1px solid #e2e8f0; font-size: 0.75rem;">${flags.map(f => `<span style="background: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 4px; margin-right: 4px;">${f}</span>`).join('')}</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #e2e8f0; text-align: center;">
+            <button onclick="zoomToBreakpointPoint(${p.lat}, ${p.lon || p.lng})" style="padding: 0.25rem 0.5rem; background: #eff6ff; color: #1d4ed8; border: 1px solid #3b82f6; border-radius: 0.25rem; cursor: pointer; font-size: 0.75rem;">📍</button>
+          </td>
         </tr>`;
       }).join('');
     }
 
-    function displayTopPoints(topPoints) {
-      const container = document.getElementById('topPointsList');
+    function filterPointsTable() {
+      if (!currentClassifiedData || !currentNutrientKey) return;
+      const filterField = document.getElementById('pointFieldFilter').value;
+      const below = currentClassifiedData.filter(p => p.classification === 'BELOW_BREAKPOINT');
+      renderPointsTable(below, currentNutrientKey, filterField);
+    }
 
-      if (!topPoints || topPoints.length === 0) {
-        container.innerHTML = '<p style="color: #64748b; font-style: italic;">No high-priority points identified based on current analysis.</p>';
-        return;
-      }
+    function filterMapToField(fieldName) {
+      sessionStorage.setItem('filterToField', fieldName);
+      window.location.href = 'index.html';
+    }
 
-      let html = '';
-      topPoints.slice(0, 3).forEach((point, i) => {
-        html += `<div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; margin-bottom: 0.75rem; background: ${i === 0 ? '#fef2f2' : '#fff'};">
-          <div style="font-size: 1.5rem; font-weight: bold; color: #3b82f6; min-width: 40px;">#${i + 1}</div>
-          <div style="flex: 1;">
-            <strong style="color: #1e293b;">Point ${point.pointId}</strong>
-            <span style="display: block; font-size: 0.75rem; color: #64748b;">Priority Score: ${point.score}</span>
-            <div style="margin-top: 0.5rem;">${point.drivers.map(d => `<span style="display: inline-block; background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; margin: 2px 4px 2px 0;">${d}</span>`).join('')}</div>
-            ${point.suggestedActions.length > 0 ? `<div style="margin-top: 0.5rem; font-size: 0.8rem; color: #475569;"><strong>Suggested:</strong> ${point.suggestedActions.join(', ')}</div>` : ''}
-            ${point.clusteredPoints && point.clusteredPoints.length > 0 ? `<div style="margin-top: 0.25rem; font-size: 0.75rem; color: #64748b;">+ ${point.clusteredPoints.length} nearby points (management hotspot)</div>` : ''}
-          </div>
-          ${point.location.lat && point.location.lon ? `<button onclick="zoomToBreakpointPoint(${point.location.lat}, ${point.location.lon})" style="padding: 0.5rem 0.75rem; background: #eff6ff; color: #1d4ed8; border: 1px solid #3b82f6; border-radius: 0.375rem; cursor: pointer; font-size: 0.8rem;">📍 View</button>` : ''}
-        </div>`;
-      });
-      container.innerHTML = html;
+    function zoomToZone(lat, lon) {
+      sessionStorage.setItem('zoomToPoint', JSON.stringify({ lat, lon }));
+      window.location.href = 'index.html';
     }
 
     function displayHingeResults(hingeResult, breakpoint, nutrientKey) {
