@@ -369,6 +369,9 @@
         <button class="yield-subtab" data-subtab="buckets" onclick="switchYieldSubtab('buckets')" style="padding: 0.5rem 1rem; border: none; background: #f1f5f9; color: #64748b; border-radius: 0.375rem 0.375rem 0 0; font-weight: 500; cursor: pointer;">
           📈 Yield by Nutrient Level
         </button>
+        <button class="yield-subtab" data-subtab="breakpoint" onclick="switchYieldSubtab('breakpoint')" style="padding: 0.5rem 1rem; border: none; background: #f1f5f9; color: #64748b; border-radius: 0.375rem 0.375rem 0 0; font-weight: 500; cursor: pointer;">
+          📍 Breakpoint Analysis
+        </button>
       </div>
 
       <!-- Single Nutrient Tab Content -->
@@ -547,6 +550,121 @@
           <div class="no-data">Loading yield bucket analysis...</div>
         </div>
       </div><!-- End yieldBucketsTab -->
+
+      <!-- Breakpoint Analysis Tab Content -->
+      <div id="yieldBreakpointTab" class="yield-subtab-content" style="display: none;">
+        <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 0.375rem; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem; color: #92400e;">
+          <strong>Breakpoint Analysis:</strong> Finds the threshold where yield response changes.
+          Below the breakpoint = yield penalty. Above = diminishing returns.
+          <br><small>Uses crop type for penalty threshold: Corn = 5 bu/ac, Soybeans = 2 bu/ac</small>
+        </div>
+
+        <!-- Controls -->
+        <div style="display: flex; align-items: center; gap: 1rem; margin: 1rem 0; flex-wrap: wrap; background: white; padding: 1rem; border-radius: 0.5rem; border: 1px solid #e2e8f0;">
+          <div class="control-group">
+            <label style="font-weight: 500; margin-right: 0.5rem;">Nutrient:</label>
+            <select id="breakpointNutrient" style="padding: 0.5rem 0.75rem; border-radius: 0.375rem; border: 1px solid #cbd5e1;">
+              <option value="Zn">Zinc (Zn)</option>
+              <option value="P">Phosphorus (P)</option>
+              <option value="K">Potassium (K)</option>
+              <option value="pH">pH</option>
+              <option value="OM">Organic Matter (OM)</option>
+            </select>
+          </div>
+
+          <button id="runBreakpointBtn" onclick="runBreakpointAnalysis()" style="padding: 0.75rem 1.5rem; background: #3b82f6; color: white; border: none; border-radius: 0.375rem; font-weight: 600; cursor: pointer; font-size: 0.95rem;">
+            🔍 Find Breakpoint
+          </button>
+
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.5rem 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.375rem;">
+            <input type="checkbox" id="hingeToggle" style="width: 16px; height: 16px;">
+            <span style="font-size: 0.85rem;">Run Hinge-MVR (advanced)</span>
+          </label>
+        </div>
+
+        <!-- Results Section -->
+        <div id="breakpointResults" style="display: none;">
+          <div style="background: white; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 1.5rem;">
+            <h3 style="margin: 0 0 1rem 0; color: #1e293b; font-size: 1.1rem;">Breakpoint Result: <span id="bpNutrientName">Zn</span></h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin: 1rem 0;">
+              <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 0.5rem;">
+                <span style="display: block; font-size: 0.75rem; color: #666; margin-bottom: 0.25rem;">Breakpoint</span>
+                <span id="bpValue" style="display: block; font-size: 1.5rem; font-weight: bold; color: #333;">--</span>
+              </div>
+              <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 0.5rem;">
+                <span style="display: block; font-size: 0.75rem; color: #666; margin-bottom: 0.25rem;">Yield Penalty</span>
+                <span id="bpPenalty" style="display: block; font-size: 1.5rem; font-weight: bold; color: #dc2626;">--</span>
+              </div>
+              <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 0.5rem;">
+                <span style="display: block; font-size: 0.75rem; color: #666; margin-bottom: 0.25rem;">Confidence</span>
+                <span id="bpConfidence" style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.9rem; font-weight: 600;">--</span>
+              </div>
+              <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 0.5rem;">
+                <span style="display: block; font-size: 0.75rem; color: #666; margin-bottom: 0.25rem;">Stability</span>
+                <span id="bpStability" style="display: block; font-size: 1.5rem; font-weight: bold; color: #333;">--</span>
+              </div>
+            </div>
+            <div style="margin: 1rem 0; font-size: 0.9rem; color: #475569;">
+              <p style="margin: 0.5rem 0;"><strong>Below breakpoint:</strong> <span id="bpNBelow">--</span> points, avg yield <span id="bpMeanBelow">--</span> bu/ac</p>
+              <p style="margin: 0.5rem 0;"><strong>Above breakpoint:</strong> <span id="bpNAbove">--</span> points, avg yield <span id="bpMeanAbove">--</span> bu/ac</p>
+            </div>
+            <div id="bpInterpretation" style="background: #e8f4fd; border-left: 4px solid #3b82f6; padding: 1rem; border-radius: 0 0.5rem 0.5rem 0; margin-top: 1rem;"></div>
+          </div>
+
+          <div style="background: white; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 1.5rem;">
+            <h3 style="margin: 0 0 0.5rem 0; color: #1e293b; font-size: 1.1rem;">📍 Top Points to Address</h3>
+            <p style="margin: 0 0 1rem 0; font-size: 0.85rem; color: #64748b;">Highest priority areas based on breakpoint + interaction stacking</p>
+            <div id="topPointsList"></div>
+          </div>
+
+          <div style="background: white; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 1.5rem;">
+            <h3 style="margin: 0 0 1rem 0; color: #1e293b; font-size: 1.1rem;">Point Classification</h3>
+            <div style="display: flex; gap: 1rem; margin: 1rem 0; flex-wrap: wrap;">
+              <span style="background: #fee2e2; color: #991b1b; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 500;">🔴 Below: <span id="countBelow">--</span></span>
+              <span style="background: #fef3c7; color: #92400e; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 500;">🟡 Near: <span id="countNear">--</span></span>
+              <span style="background: #d1fae5; color: #065f46; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 500;">🟢 Above: <span id="countAbove">--</span></span>
+            </div>
+            <details style="margin-top: 1rem;">
+              <summary style="cursor: pointer; font-weight: 500; color: #3b82f6; padding: 0.5rem 0;">View all points below breakpoint</summary>
+              <div style="overflow-x: auto; margin-top: 0.5rem;">
+                <table id="belowPointsTable" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                  <thead>
+                    <tr style="background: #f1f5f9;">
+                      <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e2e8f0;">Point ID</th>
+                      <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #e2e8f0;">Nutrient Value</th>
+                      <th style="padding: 0.75rem; text-align: right; border-bottom: 2px solid #e2e8f0;">Yield</th>
+                      <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e2e8f0;">Flags</th>
+                    </tr>
+                  </thead>
+                  <tbody id="belowPointsBody"></tbody>
+                </table>
+              </div>
+            </details>
+          </div>
+
+          <div id="hingeMVRResults" style="display: none; background: #f3f4f6; border-radius: 0.75rem; padding: 1.5rem; margin-top: 1.5rem;">
+            <h3 style="margin: 0 0 0.5rem 0; color: #1e293b; font-size: 1.1rem;">Hinge-MVR Results</h3>
+            <p style="margin: 0 0 1rem 0; font-size: 0.85rem; color: #64748b;">Linear model using bent-curve transformation at breakpoint</p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; background: white; padding: 1rem; border-radius: 0.5rem;">
+              <p style="margin: 0;"><strong>R²:</strong> <span id="hingeR2" style="font-family: monospace;">--</span></p>
+              <p style="margin: 0;"><strong>Below-breakpoint effect:</strong> <span id="hingeBelowCoef" style="font-family: monospace;">--</span></p>
+              <p style="margin: 0;"><strong>Above-breakpoint effect:</strong> <span id="hingeAboveCoef" style="font-family: monospace;">--</span></p>
+            </div>
+            <div id="hingeInterpretation" style="background: #e8f4fd; border-left: 4px solid #3b82f6; padding: 1rem; border-radius: 0 0.5rem 0.5rem 0; margin-top: 1rem;"></div>
+          </div>
+        </div>
+
+        <div id="noBreakpointMsg" style="display: none; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 0.5rem; padding: 1.5rem; text-align: center;">
+          <p style="margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 600; color: #92400e;">⚠️ No clear breakpoint detected for this nutrient.</p>
+          <p style="margin: 0.5rem 0; font-size: 0.9rem; color: #78350f;">This could mean:</p>
+          <ul style="text-align: left; display: inline-block; margin: 0.5rem 0; font-size: 0.9rem; color: #78350f;">
+            <li>Yield penalty below threshold is less than <span id="minPenaltyDisplay">5</span> bu/ac</li>
+            <li>Not enough data points on one side of potential thresholds</li>
+            <li>Nutrient levels are relatively uniform across the field</li>
+          </ul>
+        </div>
+      </div><!-- End yieldBreakpointTab -->
+
     </div>
 
     <!-- Tab: Spatial Change Analysis -->
@@ -593,8 +711,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.177";
-    const BUILD_DATE = "2026-01-26T10:49:06";
+    const APP_VERSION = "v1.0.178";
+    const BUILD_DATE = "2026-01-27T07:05:41";
 
     // Reference shared data config with analysis-specific additions
     const CONFIG = {
@@ -5190,6 +5308,7 @@
       document.getElementById('yieldSingleTab').style.display = tab === 'single' ? 'block' : 'none';
       document.getElementById('yieldMultiTab').style.display = tab === 'multi' ? 'block' : 'none';
       document.getElementById('yieldBucketsTab').style.display = tab === 'buckets' ? 'block' : 'none';
+      document.getElementById('yieldBreakpointTab').style.display = tab === 'breakpoint' ? 'block' : 'none';
 
       // Initialize tabs when switching to them
       if (tab === 'multi') {
@@ -5197,6 +5316,8 @@
       } else if (tab === 'buckets') {
         initYieldBucketSelectors();
         updateYieldBucketAnalysis();
+      } else if (tab === 'breakpoint') {
+        initBreakpointTab();
       }
     }
 
@@ -6028,6 +6149,217 @@
       report.push(`Report generated: ${new Date().toLocaleString()}`);
 
       return report.join('\n');
+    }
+
+    // ========== BREAKPOINT ANALYSIS ==========
+
+    function initBreakpointTab() {
+      // Initialize the breakpoint tab - nothing to pre-load
+    }
+
+    function runBreakpointAnalysis() {
+      const nutrient = document.getElementById('breakpointNutrient').value;
+      const crop = document.getElementById('yieldCropSelect').value;
+      const minPenalty = crop === 'corn' ? 5 : 2;
+
+      document.getElementById('minPenaltyDisplay').textContent = minPenalty;
+
+      const dataPoints = getYieldDataPoints();
+
+      if (!dataPoints || dataPoints.length < 10) {
+        showNoBreakpointMessage('Insufficient data - need at least 10 points with yield data.');
+        return;
+      }
+
+      const result = Utils.findBreakpointBinning(dataPoints, nutrient, { MIN_PENALTY: minPenalty });
+
+      if (result.breakpoint === null) {
+        showNoBreakpointMessage(result.error || `No threshold meets minimum penalty of ${minPenalty} bu/ac`);
+        return;
+      }
+
+      displayBreakpointResults(result);
+
+      const classified = Utils.classifyByBreakpoint(dataPoints, nutrient, result.breakpoint);
+      displayClassification(classified, nutrient, result.breakpoint);
+
+      const topPoints = Utils.rankPointsToAddress(dataPoints, { breakpoints: { [nutrient]: result } });
+      displayTopPoints(topPoints);
+
+      if (document.getElementById('hingeToggle').checked && result.confidence !== 'Low') {
+        const covariates = ['pH', 'OM', 'P'].filter(c => c !== nutrient);
+        const hingeResult = Utils.runHingeMVR(dataPoints, {
+          primaryNutrientKey: nutrient,
+          breakpoint: result.breakpoint,
+          covariates
+        });
+        displayHingeResults(hingeResult, result.breakpoint, nutrient);
+      } else {
+        document.getElementById('hingeMVRResults').style.display = 'none';
+      }
+    }
+
+    function displayBreakpointResults(result) {
+      document.getElementById('breakpointResults').style.display = 'block';
+      document.getElementById('noBreakpointMsg').style.display = 'none';
+
+      const nutrientNames = { 'Zn': 'Zinc (Zn)', 'P': 'Phosphorus (P)', 'K': 'Potassium (K)', 'pH': 'pH', 'OM': 'Organic Matter' };
+      const units = { 'Zn': 'ppm', 'P': 'ppm', 'K': 'ppm', 'pH': '', 'OM': '%' };
+
+      const unit = units[result.nutrientKey] || '';
+      const unitDisplay = unit ? ` ${unit}` : '';
+
+      document.getElementById('bpNutrientName').textContent = nutrientNames[result.nutrientKey] || result.nutrientKey;
+      document.getElementById('bpValue').textContent = `${result.breakpoint.toFixed(1)}${unitDisplay}`;
+      document.getElementById('bpPenalty').textContent = `${result.penalty.toFixed(1)} bu/ac`;
+
+      const confEl = document.getElementById('bpConfidence');
+      confEl.textContent = result.confidence;
+      const confColors = {
+        'High': { bg: '#d1fae5', color: '#065f46' },
+        'Medium': { bg: '#fef3c7', color: '#92400e' },
+        'Medium-Low': { bg: '#fed7aa', color: '#9a3412' },
+        'Low': { bg: '#fee2e2', color: '#991b1b' }
+      };
+      const confStyle = confColors[result.confidence] || confColors['Medium'];
+      confEl.style.background = confStyle.bg;
+      confEl.style.color = confStyle.color;
+
+      document.getElementById('bpStability').textContent = `${result.stabilityPct.toFixed(0)}%`;
+      document.getElementById('bpNBelow').textContent = result.nBelow;
+      document.getElementById('bpNAbove').textContent = result.nAbove;
+      document.getElementById('bpMeanBelow').textContent = result.meanBelow.toFixed(1);
+      document.getElementById('bpMeanAbove').textContent = result.meanAbove.toFixed(1);
+
+      const nutrientNamesLower = { 'Zn': 'zinc', 'P': 'phosphorus', 'K': 'potassium', 'pH': 'pH', 'OM': 'organic matter' };
+      const name = nutrientNamesLower[result.nutrientKey] || result.nutrientKey;
+
+      let interp = `<p style="margin: 0;"><strong>Interpretation:</strong> `;
+      if (result.confidence === 'High') {
+        interp += `There is <span style="color: #065f46; font-weight: 600;">strong evidence</span> of a yield response threshold at ${result.breakpoint.toFixed(1)}. `;
+        interp += `Points below this ${name} level show an average yield penalty of <span style="color: #dc2626; font-weight: 600;">${result.penalty.toFixed(1)} bu/ac</span>. `;
+        interp += `Consider prioritizing these areas for ${name} management.`;
+      } else if (result.confidence === 'Medium' || result.confidence === 'Medium-Low') {
+        interp += `A likely breakpoint exists at ${result.breakpoint.toFixed(1)}. `;
+        interp += `Points below show <span style="color: #dc2626; font-weight: 600;">${result.penalty.toFixed(1)} bu/ac</span> lower yield on average. `;
+        interp += `Additional years of data would strengthen confidence.`;
+      } else {
+        interp += `A potential breakpoint was detected at ${result.breakpoint.toFixed(1)}, but confidence is limited. Treat as preliminary.`;
+      }
+      interp += `</p>`;
+      document.getElementById('bpInterpretation').innerHTML = interp;
+    }
+
+    function displayClassification(classified, nutrientKey, breakpoint) {
+      const below = classified.filter(p => p.classification === 'BELOW_BREAKPOINT');
+      const near = classified.filter(p => p.classification === 'NEAR_BREAKPOINT');
+      const above = classified.filter(p => p.classification === 'ABOVE_BREAKPOINT');
+
+      document.getElementById('countBelow').textContent = below.length;
+      document.getElementById('countNear').textContent = near.length;
+      document.getElementById('countAbove').textContent = above.length;
+
+      const tbody = document.getElementById('belowPointsBody');
+      if (below.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #64748b; padding: 1rem;">No points below breakpoint</td></tr>';
+        return;
+      }
+
+      below.sort((a, b) => a.nutrientValue - b.nutrientValue);
+      const unit = { 'Zn': 'ppm', 'P': 'ppm', 'K': 'ppm', 'pH': '', 'OM': '%' }[nutrientKey] || '';
+
+      tbody.innerHTML = below.map(p => {
+        const flags = [];
+        const pH = p.pH || p.soil?.pH;
+        const zn = p.Zn || p.soil?.Zn;
+        const phos = p.P || p.soil?.P;
+
+        if (pH && pH > 7) flags.push('High pH');
+        if (zn && phos && (phos / zn) > 12) flags.push('High P:Zn');
+        if (zn && zn < 1.0) flags.push('Very low Zn');
+
+        const pointId = p.sampleId || p.id || `${p.lat?.toFixed(4)},${p.lon?.toFixed(4)}`;
+        const yieldDisplay = p.yieldValue ? p.yieldValue.toFixed(1) : '--';
+        const nutrientDisplay = p.nutrientValue ? p.nutrientValue.toFixed(1) : '--';
+
+        return `<tr style="background: ${flags.length > 0 ? '#fef2f2' : '#fff'};">
+          <td style="padding: 0.5rem; border-bottom: 1px solid #e2e8f0;">${pointId}</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #e2e8f0; text-align: right; font-family: monospace;">${nutrientDisplay}${unit ? ' ' + unit : ''}</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #e2e8f0; text-align: right; font-family: monospace;">${yieldDisplay} bu/ac</td>
+          <td style="padding: 0.5rem; border-bottom: 1px solid #e2e8f0; font-size: 0.75rem;">${flags.map(f => `<span style="background: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 4px; margin-right: 4px;">${f}</span>`).join('')}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function displayTopPoints(topPoints) {
+      const container = document.getElementById('topPointsList');
+
+      if (!topPoints || topPoints.length === 0) {
+        container.innerHTML = '<p style="color: #64748b; font-style: italic;">No high-priority points identified based on current analysis.</p>';
+        return;
+      }
+
+      let html = '';
+      topPoints.slice(0, 3).forEach((point, i) => {
+        html += `<div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; margin-bottom: 0.75rem; background: ${i === 0 ? '#fef2f2' : '#fff'};">
+          <div style="font-size: 1.5rem; font-weight: bold; color: #3b82f6; min-width: 40px;">#${i + 1}</div>
+          <div style="flex: 1;">
+            <strong style="color: #1e293b;">Point ${point.pointId}</strong>
+            <span style="display: block; font-size: 0.75rem; color: #64748b;">Priority Score: ${point.score}</span>
+            <div style="margin-top: 0.5rem;">${point.drivers.map(d => `<span style="display: inline-block; background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; margin: 2px 4px 2px 0;">${d}</span>`).join('')}</div>
+            ${point.suggestedActions.length > 0 ? `<div style="margin-top: 0.5rem; font-size: 0.8rem; color: #475569;"><strong>Suggested:</strong> ${point.suggestedActions.join(', ')}</div>` : ''}
+            ${point.clusteredPoints && point.clusteredPoints.length > 0 ? `<div style="margin-top: 0.25rem; font-size: 0.75rem; color: #64748b;">+ ${point.clusteredPoints.length} nearby points (management hotspot)</div>` : ''}
+          </div>
+          ${point.location.lat && point.location.lon ? `<button onclick="zoomToBreakpointPoint(${point.location.lat}, ${point.location.lon})" style="padding: 0.5rem 0.75rem; background: #eff6ff; color: #1d4ed8; border: 1px solid #3b82f6; border-radius: 0.375rem; cursor: pointer; font-size: 0.8rem;">📍 View</button>` : ''}
+        </div>`;
+      });
+      container.innerHTML = html;
+    }
+
+    function displayHingeResults(hingeResult, breakpoint, nutrientKey) {
+      const container = document.getElementById('hingeMVRResults');
+
+      if (hingeResult.error) {
+        container.style.display = 'block';
+        container.innerHTML = `<h3 style="margin: 0 0 0.5rem 0; color: #1e293b; font-size: 1.1rem;">Hinge-MVR Results</h3><p style="color: #dc2626; margin: 0;">⚠️ ${hingeResult.error}</p>`;
+        return;
+      }
+
+      container.style.display = 'block';
+
+      document.getElementById('hingeR2').textContent = (hingeResult.r2 * 100).toFixed(1) + '%';
+      document.getElementById('hingeBelowCoef').textContent = `${hingeResult.belowCoef.toFixed(2)} bu/ac per unit below`;
+      document.getElementById('hingeAboveCoef').textContent = `${hingeResult.aboveCoef.toFixed(2)} bu/ac per unit above`;
+
+      const nutrientNames = { 'Zn': 'zinc', 'P': 'phosphorus', 'K': 'potassium', 'pH': 'pH', 'OM': 'organic matter' };
+      const name = nutrientNames[nutrientKey] || nutrientKey;
+
+      let interpHtml = `<p style="margin: 0;"><strong>Interpretation:</strong> `;
+      if (hingeResult.r2 > 0.3) {
+        interpHtml += `The hinge model explains <span style="font-weight: 600;">${(hingeResult.r2 * 100).toFixed(0)}%</span> of yield variation. `;
+      } else {
+        interpHtml += `The model shows limited explanatory power (R² = ${(hingeResult.r2 * 100).toFixed(0)}%). `;
+      }
+      if (Math.abs(hingeResult.belowCoef) > Math.abs(hingeResult.aboveCoef)) {
+        interpHtml += `Below the breakpoint, each unit decrease in ${name} is associated with a <span style="color: #dc2626; font-weight: 600;">${Math.abs(hingeResult.belowCoef).toFixed(1)} bu/ac</span> yield reduction. Above the breakpoint, the relationship is weaker, suggesting diminishing returns.`;
+      } else {
+        interpHtml += `The yield response is relatively similar on both sides of the breakpoint.`;
+      }
+      interpHtml += `</p>`;
+      document.getElementById('hingeInterpretation').innerHTML = interpHtml;
+    }
+
+    function showNoBreakpointMessage(message) {
+      document.getElementById('breakpointResults').style.display = 'none';
+      document.getElementById('noBreakpointMsg').style.display = 'block';
+      if (message && !message.includes('less than')) {
+        document.getElementById('noBreakpointMsg').querySelector('p:first-child').innerHTML = `⚠️ ${message}`;
+      }
+    }
+
+    function zoomToBreakpointPoint(lat, lon) {
+      sessionStorage.setItem('zoomToPoint', JSON.stringify({ lat, lon }));
+      window.location.href = 'index.html';
     }
 
     // ========== EXPORT FUNCTIONS ==========

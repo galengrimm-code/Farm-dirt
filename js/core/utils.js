@@ -982,6 +982,464 @@ function getNutrientBehavior(attr) {
   return NUTRIENT_BEHAVIOR[attr] || 'more_is_ok';
 }
 
+// ========== BREAKPOINT ANALYSIS ==========
+
+// Calculate mean of an array
+function mean(arr) {
+  if (!arr || arr.length === 0) return null;
+  const valid = arr.filter(v => v !== null && v !== undefined && !isNaN(v));
+  if (valid.length === 0) return null;
+  return valid.reduce((sum, v) => sum + v, 0) / valid.length;
+}
+
+// Calculate standard deviation of an array
+function std(arr) {
+  if (!arr || arr.length < 2) return null;
+  const m = mean(arr);
+  if (m === null) return null;
+  const valid = arr.filter(v => v !== null && v !== undefined && !isNaN(v));
+  const variance = valid.reduce((sum, v) => sum + Math.pow(v - m, 2), 0) / valid.length;
+  return Math.sqrt(variance);
+}
+
+// Sample without replacement (returns frac% of arr)
+function sampleWithoutReplacement(arr, frac) {
+  if (!arr || arr.length === 0) return [];
+  const n = Math.max(1, Math.round(arr.length * frac));
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, n);
+}
+
+// Stability tolerance by nutrient for breakpoint bootstrap
+const BREAKPOINT_STABILITY_TOL = {
+  Zn: 0.1, Zn_ppm: 0.1,
+  P: 2, P_ppm: 2,
+  K: 10, K_ppm: 10,
+  pH: 0.1,
+  OM: 0.2, OM_pct: 0.2
+};
+
+// Near band tolerance for classification
+const BREAKPOINT_NEAR_BAND = {
+  Zn: 0.1, Zn_ppm: 0.1,
+  P: 2, P_ppm: 2,
+  K: 10, K_ppm: 10,
+  pH: 0.1,
+  OM: 0.2, OM_pct: 0.2
+};
+
+/**
+ * Find data-driven breakpoint using binning approach
+ */
+function findBreakpointBinning(points, nutrientKey, options = {}) {
+  const {
+    MIN_POINTS_PER_SIDE = null,
+    MIN_PENALTY = 5,
+    STABILITY_TOL = BREAKPOINT_STABILITY_TOL[nutrientKey] || 0.5,
+    BOOT_ITER = 50,
+    BOOT_FRAC = 0.8,
+    skipBootstrap = false
+  } = options;
+
+  const getNutrientValue = (p) => {
+    if (p[nutrientKey] !== undefined && p[nutrientKey] !== null && !isNaN(p[nutrientKey])) {
+      return parseFloat(p[nutrientKey]);
+    }
+    if (p.soil && p.soil[nutrientKey] !== undefined && p.soil[nutrientKey] !== null && !isNaN(p.soil[nutrientKey])) {
+      return parseFloat(p.soil[nutrientKey]);
+    }
+    const keyMap = { 'Zn_ppm': 'Zn', 'P_ppm': 'P', 'K_ppm': 'K', 'OM_pct': 'OM' };
+    const altKey = keyMap[nutrientKey];
+    if (altKey && p[altKey] !== undefined && p[altKey] !== null && !isNaN(p[altKey])) {
+      return parseFloat(p[altKey]);
+    }
+    return null;
+  };
+
+  const getYieldValue = (p) => {
+    if (p.avgYield !== undefined && p.avgYield !== null && !isNaN(p.avgYield)) {
+      return parseFloat(p.avgYield);
+    }
+    if (p.yield && p.yield.value !== undefined && p.yield.value !== null && !isNaN(p.yield.value)) {
+      return parseFloat(p.yield.value);
+    }
+    if (p.yieldValue !== undefined && p.yieldValue !== null && !isNaN(p.yieldValue)) {
+      return parseFloat(p.yieldValue);
+    }
+    return null;
+  };
+
+  const validPoints = points.filter(p => {
+    const x = getNutrientValue(p);
+    const y = getYieldValue(p);
+    return x !== null && y !== null;
+  }).map(p => ({ x: getNutrientValue(p), y: getYieldValue(p), point: p }));
+
+  if (validPoints.length < 10) {
+    return {
+      nutrientKey, breakpoint: null, penalty: 0, meanBelow: null, meanAbove: null,
+      nBelow: 0, nAbove: 0, confidence: 'Low', stabilityPct: 0, candidatesTested: 0,
+      error: 'Insufficient data points'
+    };
+  }
+
+  validPoints.sort((a, b) => a.x - b.x);
+  const minPerSide = MIN_POINTS_PER_SIDE || Math.max(5, Math.round(0.15 * validPoints.length));
+  const uniqueX = [...new Set(validPoints.map(p => p.x))].sort((a, b) => a - b);
+
+  let bestT = null, bestPenalty = -Infinity, bestStats = null, candidatesTested = 0;
+
+  for (let i = 1; i < uniqueX.length; i++) {
+    const t = uniqueX[i];
+    const below = validPoints.filter(p => p.x < t);
+    const above = validPoints.filter(p => p.x >= t);
+    if (below.length < minPerSide || above.length < minPerSide) continue;
+    candidatesTested++;
+    const meanBelow = mean(below.map(p => p.y));
+    const meanAbove = mean(above.map(p => p.y));
+    const penalty = meanAbove - meanBelow;
+    if (penalty > bestPenalty && penalty >= MIN_PENALTY) {
+      bestT = t;
+      bestPenalty = penalty;
+      bestStats = { meanBelow, meanAbove, nBelow: below.length, nAbove: above.length };
+    }
+  }
+
+  if (bestT === null) {
+    return {
+      nutrientKey, breakpoint: null, penalty: 0, meanBelow: null, meanAbove: null,
+      nBelow: 0, nAbove: 0, confidence: 'Low', stabilityPct: 0, candidatesTested,
+      error: `No threshold meets minimum penalty of ${MIN_PENALTY} bu/ac`
+    };
+  }
+
+  let stabilityPct = 0;
+  if (!skipBootstrap && bestT !== null) {
+    let nearCount = 0;
+    for (let i = 0; i < BOOT_ITER; i++) {
+      const subset = sampleWithoutReplacement(points, BOOT_FRAC);
+      const bootResult = findBreakpointBinning(subset, nutrientKey, {
+        MIN_POINTS_PER_SIDE: Math.max(3, Math.round(minPerSide * BOOT_FRAC)),
+        MIN_PENALTY, skipBootstrap: true
+      });
+      if (bootResult.breakpoint !== null && Math.abs(bootResult.breakpoint - bestT) <= STABILITY_TOL) {
+        nearCount++;
+      }
+    }
+    stabilityPct = (nearCount / BOOT_ITER) * 100;
+  }
+
+  let confidence = 'Medium';
+  const yearsUsed = validPoints.map(p => p.point.yearsAveraged || p.point.yearsUsed || 1);
+  const avgYears = mean(yearsUsed) || 1;
+  if (avgYears <= 2) confidence = 'Medium-Low';
+  if (bestPenalty >= 2 * MIN_PENALTY && stabilityPct >= 60) {
+    confidence = avgYears <= 2 ? 'Medium' : 'High';
+  }
+  if (bestStats.nBelow < 7 || stabilityPct < 40) confidence = 'Low';
+
+  return {
+    nutrientKey, breakpoint: bestT, penalty: bestPenalty,
+    meanBelow: bestStats.meanBelow, meanAbove: bestStats.meanAbove,
+    nBelow: bestStats.nBelow, nAbove: bestStats.nAbove,
+    confidence, stabilityPct, candidatesTested
+  };
+}
+
+/**
+ * Classify points by their relation to the breakpoint
+ */
+function classifyByBreakpoint(points, nutrientKey, breakpoint, nearBand = null) {
+  if (breakpoint === null || breakpoint === undefined) return [];
+  const band = nearBand || BREAKPOINT_NEAR_BAND[nutrientKey] || Math.abs(breakpoint * 0.1);
+
+  const getNutrientValue = (p) => {
+    if (p[nutrientKey] !== undefined && !isNaN(p[nutrientKey])) return parseFloat(p[nutrientKey]);
+    if (p.soil && p.soil[nutrientKey] !== undefined) return parseFloat(p.soil[nutrientKey]);
+    const keyMap = { 'Zn_ppm': 'Zn', 'P_ppm': 'P', 'K_ppm': 'K', 'OM_pct': 'OM' };
+    const altKey = keyMap[nutrientKey];
+    if (altKey && p[altKey] !== undefined) return parseFloat(p[altKey]);
+    return null;
+  };
+
+  const getYieldValue = (p) => {
+    if (p.avgYield !== undefined) return parseFloat(p.avgYield);
+    if (p.yield && p.yield.value !== undefined) return parseFloat(p.yield.value);
+    if (p.yieldValue !== undefined) return parseFloat(p.yieldValue);
+    return null;
+  };
+
+  return points.map(p => {
+    const value = getNutrientValue(p);
+    const yieldVal = getYieldValue(p);
+    if (value === null) return { ...p, classification: 'UNKNOWN', nutrientValue: null, yieldValue: yieldVal };
+    let classification;
+    if (value < breakpoint - band) classification = 'BELOW_BREAKPOINT';
+    else if (value > breakpoint + band) classification = 'ABOVE_BREAKPOINT';
+    else classification = 'NEAR_BREAKPOINT';
+    return { ...p, classification, nutrientValue: value, yieldValue: yieldVal, distanceFromBreakpoint: value - breakpoint };
+  }).filter(p => p.classification !== 'UNKNOWN');
+}
+
+/**
+ * Rank points to address based on breakpoint analysis and interaction flags
+ */
+function rankPointsToAddress(points, context = {}) {
+  const { breakpoints = {}, fieldMeanYield = null } = context;
+
+  const getYieldValue = (p) => {
+    if (p.avgYield !== undefined) return parseFloat(p.avgYield);
+    if (p.yield && p.yield.value !== undefined) return parseFloat(p.yield.value);
+    return null;
+  };
+
+  const yieldValues = points.map(getYieldValue).filter(v => v !== null);
+  const meanYield = fieldMeanYield || mean(yieldValues) || 0;
+  const criticalLevels = getCriticalLevels();
+
+  const getNutrientValue = (p, key) => {
+    if (p[key] !== undefined && !isNaN(p[key])) return parseFloat(p[key]);
+    if (p.soil && p.soil[key] !== undefined) return parseFloat(p.soil[key]);
+    const keyMap = { 'Zn_ppm': 'Zn', 'P_ppm': 'P', 'K_ppm': 'K', 'OM_pct': 'OM' };
+    const altKey = keyMap[key];
+    if (altKey && p[altKey] !== undefined) return parseFloat(p[altKey]);
+    return null;
+  };
+
+  const scoredPoints = points.map(p => {
+    let score = 0;
+    const drivers = [];
+    const suggestedActions = [];
+
+    const pH = getNutrientValue(p, 'pH');
+    const zn = getNutrientValue(p, 'Zn') || getNutrientValue(p, 'Zn_ppm');
+    const phos = getNutrientValue(p, 'P') || getNutrientValue(p, 'P_ppm');
+    const pot = getNutrientValue(p, 'K') || getNutrientValue(p, 'K_ppm');
+    const yieldVal = getYieldValue(p);
+    const pznRatio = phos && zn ? phos / zn : null;
+
+    const keyNutrients = ['Zn_ppm', 'Zn', 'P_ppm', 'P', 'K_ppm', 'K', 'pH'];
+    for (const key of keyNutrients) {
+      const bp = breakpoints[key];
+      if (!bp || bp.breakpoint === null) continue;
+      const value = getNutrientValue(p, key);
+      if (value === null) continue;
+      const band = BREAKPOINT_NEAR_BAND[key] || Math.abs(bp.breakpoint * 0.1);
+      if (value < bp.breakpoint - band) {
+        score += 3;
+        const nutrientName = key.replace('_ppm', '').replace('_pct', '');
+        drivers.push(`Below ${nutrientName} breakpoint`);
+        suggestedActions.push(`Address ${nutrientName} deficiency`);
+      }
+    }
+
+    const hasStackedInteraction = (
+      (pH > 7 && pznRatio > 12 && zn < 1.5) ||
+      (pH < 5.8 && phos !== null && phos < (criticalLevels.P || 15))
+    );
+
+    if (hasStackedInteraction) {
+      score += 2;
+      if (pH > 7 && pznRatio > 12 && zn < 1.5) {
+        drivers.push('High pH + P:Zn imbalance + low Zn');
+        suggestedActions.push('Consider Zn application, review P strategy');
+      } else {
+        drivers.push('Low pH + low P interaction');
+        suggestedActions.push('Address pH before P application');
+      }
+    }
+
+    if (yieldVal !== null && yieldVal < meanYield) {
+      score += 1;
+      drivers.push('Below field average yield');
+    }
+
+    if (zn !== null && zn < (criticalLevels.Zn || 0.5)) {
+      score += 1;
+      if (!drivers.some(d => d.includes('Zn'))) {
+        drivers.push('Zn below critical');
+        suggestedActions.push('Zn application recommended');
+      }
+    }
+    if (phos !== null && phos < (criticalLevels.P || 15)) {
+      score += 1;
+      if (!drivers.some(d => d.includes('P'))) {
+        drivers.push('P below critical');
+        suggestedActions.push('P application recommended');
+      }
+    }
+    if (pot !== null && pot < (criticalLevels.K || 120)) {
+      score += 1;
+      if (!drivers.some(d => d.includes('K'))) {
+        drivers.push('K below critical');
+        suggestedActions.push('K application recommended');
+      }
+    }
+
+    return {
+      pointId: p.id || p.sampleId || `${p.lat?.toFixed(4)},${p.lon?.toFixed(4)}`,
+      point: p, score, drivers, suggestedActions: [...new Set(suggestedActions)],
+      location: { lat: p.lat, lon: p.lon }
+    };
+  });
+
+  scoredPoints.sort((a, b) => b.score - a.score);
+
+  const SEPARATION_FT = 250;
+  const selected = [];
+
+  for (const point of scoredPoints) {
+    if (point.score === 0) continue;
+    if (!point.location.lat || !point.location.lon) continue;
+    let tooClose = false;
+    for (const sel of selected) {
+      const dist = getDistanceFeet(point.location.lat, point.location.lon, sel.location.lat, sel.location.lon);
+      if (dist < SEPARATION_FT) {
+        tooClose = true;
+        if (selected.length <= 3 && !sel.clusteredPoints) sel.clusteredPoints = [];
+        if (selected.length <= 3 && sel.clusteredPoints) sel.clusteredPoints.push(point.pointId);
+        break;
+      }
+    }
+    if (!tooClose) selected.push(point);
+  }
+
+  return selected.slice(0, 5);
+}
+
+/**
+ * Build hinge feature for a value relative to a breakpoint
+ */
+function buildHingeFeature(x, t) {
+  return { lowPart: Math.max(0, t - x), highPart: Math.max(0, x - t) };
+}
+
+/**
+ * Run hinge-based multivariate regression
+ */
+function runHingeMVR(points, config) {
+  const { primaryNutrientKey, breakpoint, covariates = [] } = config;
+  if (breakpoint === null || breakpoint === undefined) {
+    return { error: 'No breakpoint provided', r2: null };
+  }
+
+  const getNutrientValue = (p, key) => {
+    if (p[key] !== undefined && !isNaN(p[key])) return parseFloat(p[key]);
+    if (p.soil && p.soil[key] !== undefined) return parseFloat(p.soil[key]);
+    const keyMap = { 'Zn_ppm': 'Zn', 'P_ppm': 'P', 'K_ppm': 'K', 'OM_pct': 'OM' };
+    const altKey = keyMap[key];
+    if (altKey && p[altKey] !== undefined) return parseFloat(p[altKey]);
+    return null;
+  };
+
+  const getYieldValue = (p) => {
+    if (p.avgYield !== undefined) return parseFloat(p.avgYield);
+    if (p.yield && p.yield.value !== undefined) return parseFloat(p.yield.value);
+    return null;
+  };
+
+  const validPoints = points.filter(p => {
+    const y = getYieldValue(p);
+    const primary = getNutrientValue(p, primaryNutrientKey);
+    if (y === null || primary === null) return false;
+    for (const cov of covariates) {
+      if (getNutrientValue(p, cov) === null) return false;
+    }
+    return true;
+  });
+
+  if (validPoints.length < 15) {
+    return { error: 'Insufficient data for hinge-MVR', r2: null };
+  }
+
+  const n = validPoints.length;
+  const k = 3 + covariates.length;
+  const X = [], y = [];
+
+  for (const p of validPoints) {
+    const primary = getNutrientValue(p, primaryNutrientKey);
+    const hinge = buildHingeFeature(primary, breakpoint);
+    const row = [1, hinge.lowPart, hinge.highPart];
+    for (const cov of covariates) row.push(getNutrientValue(p, cov));
+    X.push(row);
+    y.push(getYieldValue(p));
+  }
+
+  try {
+    const XtX = [];
+    for (let i = 0; i < k; i++) {
+      XtX[i] = [];
+      for (let j = 0; j < k; j++) {
+        let sum = 0;
+        for (let r = 0; r < n; r++) sum += X[r][i] * X[r][j];
+        XtX[i][j] = sum;
+      }
+    }
+
+    const Xty = [];
+    for (let i = 0; i < k; i++) {
+      let sum = 0;
+      for (let r = 0; r < n; r++) sum += X[r][i] * y[r];
+      Xty[i] = sum;
+    }
+
+    const inv = invertMatrix(XtX);
+    if (!inv) return { error: 'Matrix inversion failed (singular matrix)', r2: null };
+
+    const coeffs = [];
+    for (let i = 0; i < k; i++) {
+      let sum = 0;
+      for (let j = 0; j < k; j++) sum += inv[i][j] * Xty[j];
+      coeffs[i] = sum;
+    }
+
+    const yMean = mean(y);
+    let ssTotal = 0, ssResid = 0;
+    for (let r = 0; r < n; r++) {
+      let predicted = 0;
+      for (let i = 0; i < k; i++) predicted += X[r][i] * coeffs[i];
+      ssTotal += Math.pow(y[r] - yMean, 2);
+      ssResid += Math.pow(y[r] - predicted, 2);
+    }
+    const r2 = ssTotal > 0 ? 1 - ssResid / ssTotal : 0;
+
+    return {
+      r2, intercept: coeffs[0], belowCoef: coeffs[1], aboveCoef: coeffs[2],
+      covariateCoefs: coeffs.slice(3).map((c, i) => ({ name: covariates[i], coef: c })),
+      n: validPoints.length, breakpoint
+    };
+  } catch (e) {
+    return { error: 'Regression calculation failed: ' + e.message, r2: null };
+  }
+}
+
+function invertMatrix(matrix) {
+  const n = matrix.length;
+  const aug = matrix.map((row, i) => {
+    const r = [...row];
+    for (let j = 0; j < n; j++) r.push(i === j ? 1 : 0);
+    return r;
+  });
+
+  for (let i = 0; i < n; i++) {
+    let maxRow = i;
+    for (let k = i + 1; k < n; k++) {
+      if (Math.abs(aug[k][i]) > Math.abs(aug[maxRow][i])) maxRow = k;
+    }
+    [aug[i], aug[maxRow]] = [aug[maxRow], aug[i]];
+    if (Math.abs(aug[i][i]) < 1e-10) return null;
+    const scale = aug[i][i];
+    for (let j = 0; j < 2 * n; j++) aug[i][j] /= scale;
+    for (let k = 0; k < n; k++) {
+      if (k !== i) {
+        const factor = aug[k][i];
+        for (let j = 0; j < 2 * n; j++) aug[k][j] -= factor * aug[i][j];
+      }
+    }
+  }
+  return aug.map(row => row.slice(n));
+}
+
 // ========== EXPORT AS GLOBAL ==========
 window.Utils = {
   // Status/UI
@@ -1036,7 +1494,19 @@ window.Utils = {
 
   // General utilities
   debounce,
-  throttle
+  throttle,
+
+  // Breakpoint analysis
+  mean,
+  std,
+  sampleWithoutReplacement,
+  findBreakpointBinning,
+  classifyByBreakpoint,
+  rankPointsToAddress,
+  buildHingeFeature,
+  runHingeMVR,
+  BREAKPOINT_STABILITY_TOL,
+  BREAKPOINT_NEAR_BAND
 };
 
 })();
