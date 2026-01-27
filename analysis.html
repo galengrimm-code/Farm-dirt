@@ -576,6 +576,12 @@
               <option value="K">Potassium (K)</option>
               <option value="pH">pH</option>
               <option value="OM">Organic Matter (OM)</option>
+              <option value="Mg">Magnesium (Mg)</option>
+              <option value="S">Sulfur (S)</option>
+              <option value="Ca">Calcium (Ca)</option>
+              <option value="Ca_sat">Calcium Sat %</option>
+              <option value="Mg_sat">Magnesium Sat %</option>
+              <option value="K_Sat">Potassium Sat %</option>
             </select>
           </div>
 
@@ -790,8 +796,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.183";
-    const BUILD_DATE = "2026-01-27T08:10:02";
+    const APP_VERSION = "v1.0.184";
+    const BUILD_DATE = "2026-01-27T08:14:26";
 
     // Reference shared data config with analysis-specific additions
     const CONFIG = {
@@ -6270,7 +6276,7 @@
       currentNutrientKey = nutrient;
 
       // Update nutrient label in impact table
-      const nutrientLabels = { 'Zn': 'Zn', 'P': 'P', 'K': 'K', 'pH': 'pH', 'OM': 'OM' };
+      const nutrientLabels = { 'Zn': 'Zn', 'P': 'P', 'K': 'K', 'pH': 'pH', 'OM': 'OM', 'Mg': 'Mg', 'S': 'S', 'Ca': 'Ca', 'Ca_sat': 'Ca%', 'Mg_sat': 'Mg%', 'K_Sat': 'K%' };
       document.getElementById('impactNutrientLabel').textContent = nutrientLabels[nutrient] || nutrient;
 
       // Display layered summaries
@@ -6297,8 +6303,16 @@
       document.getElementById('breakpointResults').style.display = 'block';
       document.getElementById('noBreakpointMsg').style.display = 'none';
 
-      const nutrientNames = { 'Zn': 'Zinc (Zn)', 'P': 'Phosphorus (P)', 'K': 'Potassium (K)', 'pH': 'pH', 'OM': 'Organic Matter' };
-      const units = { 'Zn': 'ppm', 'P': 'ppm', 'K': 'ppm', 'pH': '', 'OM': '%' };
+      const nutrientNames = {
+        'Zn': 'Zinc (Zn)', 'P': 'Phosphorus (P)', 'K': 'Potassium (K)', 'pH': 'pH', 'OM': 'Organic Matter',
+        'Mg': 'Magnesium (Mg)', 'S': 'Sulfur (S)', 'Ca': 'Calcium (Ca)',
+        'Ca_sat': 'Calcium Sat %', 'Mg_sat': 'Magnesium Sat %', 'K_Sat': 'Potassium Sat %'
+      };
+      const units = {
+        'Zn': 'ppm', 'P': 'ppm', 'K': 'ppm', 'pH': '', 'OM': '%',
+        'Mg': 'ppm', 'S': 'ppm', 'Ca': 'ppm',
+        'Ca_sat': '%', 'Mg_sat': '%', 'K_Sat': '%'
+      };
 
       const unit = units[result.nutrientKey] || '';
       const unitDisplay = unit ? ` ${unit}` : '';
@@ -6339,7 +6353,11 @@
       document.getElementById('bpMeanBelow').textContent = result.meanBelow.toFixed(1);
       document.getElementById('bpMeanAbove').textContent = result.meanAbove.toFixed(1);
 
-      const nutrientNamesLower = { 'Zn': 'zinc', 'P': 'phosphorus', 'K': 'potassium', 'pH': 'pH', 'OM': 'organic matter' };
+      const nutrientNamesLower = {
+        'Zn': 'zinc', 'P': 'phosphorus', 'K': 'potassium', 'pH': 'pH', 'OM': 'organic matter',
+        'Mg': 'magnesium', 'S': 'sulfur', 'Ca': 'calcium',
+        'Ca_sat': 'calcium saturation', 'Mg_sat': 'magnesium saturation', 'K_Sat': 'potassium saturation'
+      };
       const name = nutrientNamesLower[result.nutrientKey] || result.nutrientKey;
 
       let interp = `<p style="margin: 0;"><strong>Interpretation:</strong> `;
