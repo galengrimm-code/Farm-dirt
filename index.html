@@ -152,9 +152,9 @@
     @keyframes tempPinPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15); opacity: 0.8; } }
 
     /* Zone highlight marker from breakpoint analysis */
-    .zone-highlight-marker { position: relative; width: 40px; height: 40px; }
-    .zone-highlight-marker::before { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 20px; height: 20px; background: #dc2626; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); z-index: 2; }
-    .zone-highlight-marker::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60px; height: 60px; border: 4px solid #dc2626; border-radius: 50%; animation: zoneRingPulse 1.5s ease-out infinite; z-index: 1; }
+    .zone-highlight-marker { position: relative; width: 80px; height: 80px; }
+    .zone-highlight-dot { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 20px; height: 20px; background: #dc2626; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); z-index: 2; }
+    .zone-highlight-ring { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60px; height: 60px; border: 4px solid #dc2626; border-radius: 50%; animation: zoneRingPulse 1.5s ease-out infinite; z-index: 1; }
     @keyframes zoneRingPulse { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; } }
 
     .backup-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 0.25rem 1rem; font-size: 0.7rem; color: #64748b; text-align: center; z-index: 900; }
@@ -470,8 +470,8 @@
 
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.184";
-    const BUILD_DATE = "2026-01-27T08:14:26";
+    const APP_VERSION = "v1.0.185";
+    const BUILD_DATE = "2026-01-27T08:17:57";
 
     // ========== CONFIG ==========
     // Reference shared data config and add app-specific config
@@ -1704,8 +1704,9 @@
             // Add pulsing highlight marker
             const highlightIcon = L.divIcon({
               className: 'zone-highlight-marker',
-              iconSize: [40, 40],
-              iconAnchor: [20, 20]
+              html: '<div class="zone-highlight-ring"></div><div class="zone-highlight-dot"></div>',
+              iconSize: [80, 80],
+              iconAnchor: [40, 40]
             });
             const highlightMarker = L.marker([lat, lon], { icon: highlightIcon, zIndexOffset: 1000 }).addTo(map);
             // Remove marker after 8 seconds
