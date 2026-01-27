@@ -464,8 +464,8 @@
 
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.180";
-    const BUILD_DATE = "2026-01-27T07:51:59";
+    const APP_VERSION = "v1.0.181";
+    const BUILD_DATE = "2026-01-27T07:59:22";
 
     // ========== CONFIG ==========
     // Reference shared data config and add app-specific config
@@ -1687,6 +1687,20 @@
       initMap();
       setupEventListeners();
       updateZoomIndicator(); // Initialize zoom indicator
+
+      // Check for zoomToPoint from breakpoint analysis
+      const zoomTarget = sessionStorage.getItem('zoomToPoint');
+      if (zoomTarget) {
+        try {
+          const { lat, lon } = JSON.parse(zoomTarget);
+          if (lat && lon) {
+            map.setView([lat, lon], 17);
+          }
+        } catch (e) {
+          console.warn('Error parsing zoomToPoint:', e);
+        }
+        sessionStorage.removeItem('zoomToPoint');
+      }
       updateActiveOperationIndicator(); // Show active client/farm indicator
 
       // Force View mode on mobile (Compare is desktop-only)
