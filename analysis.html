@@ -548,9 +548,8 @@
               <p>Import yield maps on the <a href="import.html">Import page</a> to see correlations.</p>
             </div>
           </div>
-        </div>
 
-      <!-- Scatter Plot Section -->
+        <!-- Scatter Plot Section -->
       <div id="scatterSection" class="yc-scatter-section">
         <div class="yc-scatter-header">
           <h3 id="scatterTitle">Scatter Plot: Nutrient vs Yield</h3>
@@ -700,18 +699,18 @@
         </div>
 
         <!-- Filters -->
-        <div class="controls-bar" style="margin-bottom: 1rem;">
-          <div class="control-group">
-            <label>Field</label>
-            <select id="bucketFieldSelect" onchange="updateYieldBucketAnalysis()"></select>
+        <div class="yc-filter-bar">
+          <div class="yc-filter-group">
+            <label class="yc-filter-label">Field</label>
+            <select id="bucketFieldSelect" class="yc-filter-select" onchange="updateYieldBucketAnalysis()"></select>
           </div>
-          <div class="control-group">
-            <label>Yield Year</label>
-            <select id="bucketYieldYearSelect" onchange="updateYieldBucketAnalysis()"></select>
+          <div class="yc-filter-group">
+            <label class="yc-filter-label">Yield Year</label>
+            <select id="bucketYieldYearSelect" class="yc-filter-select" onchange="updateYieldBucketAnalysis()"></select>
           </div>
-          <div class="control-group">
-            <label>Crop</label>
-            <select id="bucketCropSelect" onchange="updateYieldBucketAnalysis()">
+          <div class="yc-filter-group">
+            <label class="yc-filter-label">Crop</label>
+            <select id="bucketCropSelect" class="yc-filter-select" onchange="updateYieldBucketAnalysis()">
               <option value="all">All Crops</option>
               <option value="corn">Corn</option>
               <option value="soybeans">Soybeans</option>
@@ -725,18 +724,13 @@
       </div><!-- End yieldBucketsTab -->
 
       <!-- Breakpoint Analysis Tab Content -->
-      <div id="yieldBreakpointTab" class="yield-subtab-content" style="display: none;">
+      <div id="yieldBreakpointTab" class="yc-subtab-content" style="display: none;">
         <!-- Section Intro -->
         <div class="yc-section-intro">
-          <div class="yc-section-icon">
-            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-            </svg>
-          </div>
-          <div class="yc-section-text">
-            <strong>Find the critical threshold where yield response changes.</strong>
-            Below the breakpoint = yield penalty from deficiency. Above = diminishing returns on fertilizer investment.
-            Uses crop-specific penalty thresholds (Corn: 5 bu/ac, Soybeans: 2 bu/ac).
+          <div class="yc-intro-icon">📊</div>
+          <div class="yc-intro-text">
+            <h3>Breakpoint Analysis</h3>
+            <p>Find the critical threshold where yield response changes. Below the breakpoint = yield penalty from deficiency. Above = diminishing returns on fertilizer investment. Uses crop-specific thresholds (Corn: 5 bu/ac, Soybeans: 2 bu/ac).</p>
           </div>
         </div>
 
@@ -972,8 +966,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.187";
-    const BUILD_DATE = "2026-01-27T09:49:12";
+    const APP_VERSION = "v1.0.188";
+    const BUILD_DATE = "2026-01-27T09:54:57";
 
     // Reference shared data config with analysis-specific additions
     const CONFIG = {
