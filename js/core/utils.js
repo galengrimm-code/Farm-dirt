@@ -1440,6 +1440,838 @@ function invertMatrix(matrix) {
   return aug.map(row => row.slice(n));
 }
 
+// ========== MULTI-METHOD BREAKPOINT FRAMEWORK ==========
+
+/**
+ * Create a standardized nutrient finding object
+ * All analysis modes (absolute, mixed-method, percentile) return this format
+ */
+function createNutrientFinding(params) {
+  return {
+    nutrient: params.nutrient,
+    mode: params.mode || 'absolute',
+    status: params.status || 'ok',
+    severity: params.severity || 0,
+    confidence: params.confidence || 'medium',
+    explanation: params.explanation || '',
+    acres_affected: params.acres_affected || 0,
+    estimated_yield_risk: params.estimated_yield_risk || null,
+    details: params.details || {}
+  };
+}
+
+/**
+ * Convert severity (0-100) to status
+ */
+function severityToStatus(severity) {
+  if (severity >= 70) return 'action';
+  if (severity >= 40) return 'watch';
+  return 'ok';
+}
+
+/**
+ * Get extractant from point (checks multiple locations)
+ */
+function getExtractant(point) {
+  return point.meta?.extractant || point.extractant || 'Unknown';
+}
+
+/**
+ * Group points by extractant method
+ */
+function groupByExtractant(points) {
+  const groups = {};
+  points.forEach(p => {
+    const ext = getExtractant(p);
+    if (!groups[ext]) groups[ext] = [];
+    groups[ext].push(p);
+  });
+  return groups;
+}
+
+/**
+ * Percentile-based yield response analysis
+ * Method-agnostic - works regardless of extractant
+ * Answers "where to act" not "what ppm is right"
+ */
+function percentileAnalysis(points, nutrientKey, options = {}) {
+  const bins = options.bins || [0.20, 0.80];  // Bottom 20%, Middle 60%, Top 20%
+  const acresPerPoint = options.acresPerPoint || 2.5;
+  const minPenalty = options.minPenalty || 5;
+
+  const getNutrientValue = (p) => {
+    if (p.soil?.[nutrientKey] != null) return parseFloat(p.soil[nutrientKey]);
+    if (p[nutrientKey] != null) return parseFloat(p[nutrientKey]);
+    const keyMap = { 'Zn_ppm': 'Zn', 'P_ppm': 'P', 'K_ppm': 'K', 'OM_pct': 'OM' };
+    const altKey = keyMap[nutrientKey];
+    if (altKey && p.soil?.[altKey] != null) return parseFloat(p.soil[altKey]);
+    if (altKey && p[altKey] != null) return parseFloat(p[altKey]);
+    return null;
+  };
+
+  const getYieldValue = (p) => {
+    if (p.yield?.value != null) return parseFloat(p.yield.value);
+    if (p.avgYield != null) return parseFloat(p.avgYield);
+    if (p.yieldValue != null) return parseFloat(p.yieldValue);
+    if (typeof p.yield === 'number') return p.yield;
+    return null;
+  };
+
+  // Filter valid points
+  const valid = points.filter(p => {
+    const nv = getNutrientValue(p);
+    const yv = getYieldValue(p);
+    return nv != null && yv != null;
+  });
+
+  if (valid.length < 15) {
+    return createNutrientFinding({
+      nutrient: nutrientKey,
+      mode: 'percentile',
+      status: 'ok',
+      severity: 0,
+      confidence: 'low',
+      explanation: `Insufficient data for percentile analysis (${valid.length} points)`,
+      details: { reason: 'insufficient_data' }
+    });
+  }
+
+  // Sort by nutrient value
+  const sorted = [...valid].sort((a, b) =>
+    getNutrientValue(a) - getNutrientValue(b)
+  );
+
+  const n = sorted.length;
+  const lowCutoff = Math.floor(n * bins[0]);
+  const highCutoff = Math.floor(n * bins[1]);
+
+  const bottom = sorted.slice(0, lowCutoff);
+  const middle = sorted.slice(lowCutoff, highCutoff);
+  const top = sorted.slice(highCutoff);
+
+  // Calculate yields
+  const avgYieldBottom = mean(bottom.map(getYieldValue));
+  const avgYieldMiddle = mean(middle.map(getYieldValue));
+  const avgYieldTop = mean(top.map(getYieldValue));
+  const fieldAvg = mean(sorted.map(getYieldValue));
+
+  // Calculate nutrient values at bin boundaries
+  const bottomMaxValue = getNutrientValue(bottom[bottom.length - 1]);
+  const topMinValue = getNutrientValue(top[0]);
+
+  // Penalty = difference between top and bottom
+  const penalty = avgYieldTop - avgYieldBottom;
+  const hasResponse = penalty >= minPenalty;
+
+  // Calculate severity (0-100)
+  let severity = 0;
+  if (hasResponse) {
+    severity = Math.min(100, Math.round((penalty / minPenalty) * 30 + 40));
+  }
+
+  // Determine confidence
+  let confidence = 'medium';
+  if (bottom.length >= 10 && penalty >= minPenalty * 2) {
+    confidence = 'high';
+  } else if (bottom.length < 7 || penalty < minPenalty) {
+    confidence = 'low';
+  }
+
+  const acresAffected = bottom.length * acresPerPoint;
+
+  return createNutrientFinding({
+    nutrient: nutrientKey,
+    mode: 'percentile',
+    status: hasResponse ? severityToStatus(severity) : 'ok',
+    severity: severity,
+    confidence: confidence,
+    explanation: hasResponse
+      ? `Bottom 20% ${nutrientKey} zones (<${bottomMaxValue?.toFixed(1)}) average ${(avgYieldBottom - fieldAvg).toFixed(1)} bu/ac vs field mean`
+      : `No clear yield response by ${nutrientKey} percentile ranking`,
+    acres_affected: acresAffected,
+    estimated_yield_risk: hasResponse ? penalty : null,
+    details: {
+      bins: {
+        bottom: {
+          count: bottom.length,
+          maxValue: bottomMaxValue,
+          avgYield: avgYieldBottom,
+          vsFieldAvg: avgYieldBottom - fieldAvg
+        },
+        middle: {
+          count: middle.length,
+          avgYield: avgYieldMiddle,
+          vsFieldAvg: avgYieldMiddle - fieldAvg
+        },
+        top: {
+          count: top.length,
+          minValue: topMinValue,
+          avgYield: avgYieldTop,
+          vsFieldAvg: avgYieldTop - fieldAvg
+        }
+      },
+      fieldAvg: fieldAvg,
+      penalty: penalty
+    }
+  });
+}
+
+/**
+ * Calculate severity from breakpoint result
+ */
+function calculateBreakpointSeverity(result, minPenalty = 5) {
+  let severity = 0;
+
+  if (result.penalty >= 20) severity = 80;
+  else if (result.penalty >= 15) severity = 70;
+  else if (result.penalty >= 10) severity = 60;
+  else if (result.penalty >= minPenalty) severity = 50;
+  else severity = 30;
+
+  // Adjust by confidence
+  if (result.confidence === 'High') severity += 10;
+  if (result.confidence === 'Low') severity -= 15;
+
+  // Adjust by stability
+  if (result.stabilityPct >= 80) severity += 5;
+  if (result.stabilityPct < 50) severity -= 10;
+
+  return Math.max(0, Math.min(100, severity));
+}
+
+/**
+ * Smart breakpoint analysis that handles:
+ * 1. Same method (ideal) - run true breakpoint
+ * 2. Mixed methods - run per method, aggregate findings
+ * 3. Unknown method - fall back to percentile mode
+ */
+function smartBreakpointAnalysis(points, nutrientKey, options = {}) {
+  const acresPerPoint = options.acresPerPoint || 2.5;
+  const minPenalty = options.minPenalty || 5;
+
+  // Group by extractant
+  const groups = groupByExtractant(points);
+  const methods = Object.keys(groups);
+
+  // Case 1: All unknown - use percentile mode
+  if (methods.length === 1 && methods[0] === 'Unknown') {
+    const result = percentileAnalysis(points, nutrientKey, options);
+    result.explanation = `[Percentile Mode - extractant unknown] ${result.explanation}`;
+    return result;
+  }
+
+  // Case 2: Single known method - use absolute breakpoint
+  const knownMethods = methods.filter(m => m !== 'Unknown');
+  if (knownMethods.length === 1) {
+    const methodPoints = [...groups[knownMethods[0]]];
+
+    // Add unknown points if they exist (assume same method)
+    if (groups['Unknown']) {
+      methodPoints.push(...groups['Unknown']);
+    }
+
+    const result = findBreakpointBinning(methodPoints, nutrientKey, options);
+
+    if (result.breakpoint === null) {
+      // Fall back to percentile
+      return percentileAnalysis(points, nutrientKey, options);
+    }
+
+    const severity = calculateBreakpointSeverity(result, minPenalty);
+
+    return createNutrientFinding({
+      nutrient: nutrientKey,
+      mode: 'absolute',
+      status: severityToStatus(severity),
+      severity: severity,
+      confidence: result.confidence.toLowerCase(),
+      explanation: `Breakpoint at ${result.breakpoint.toFixed(1)} with ${result.penalty.toFixed(1)} bu/ac penalty below`,
+      acres_affected: result.nBelow * acresPerPoint,
+      estimated_yield_risk: result.penalty,
+      details: {
+        breakpoint: result.breakpoint,
+        penalty: result.penalty,
+        nBelow: result.nBelow,
+        nAbove: result.nAbove,
+        meanBelow: result.meanBelow,
+        meanAbove: result.meanAbove,
+        extractant: knownMethods[0],
+        stabilityPct: result.stabilityPct
+      }
+    });
+  }
+
+  // Case 3: Mixed methods - run per method, aggregate
+  const findings = [];
+
+  knownMethods.forEach(method => {
+    const methodPoints = groups[method];
+    if (methodPoints.length < 10) return;  // Skip if too few
+
+    const result = findBreakpointBinning(methodPoints, nutrientKey, {
+      ...options,
+      BOOT_ITER: 30  // Fewer iterations for speed
+    });
+
+    if (result.breakpoint !== null) {
+      findings.push({
+        method,
+        breakpoint: result.breakpoint,
+        penalty: result.penalty,
+        nPoints: methodPoints.length,
+        confidence: result.confidence,
+        stabilityPct: result.stabilityPct
+      });
+    }
+  });
+
+  if (findings.length === 0) {
+    // No breakpoints found - fall back to percentile
+    return percentileAnalysis(points, nutrientKey, options);
+  }
+
+  // Aggregate findings (weighted by point count and stability)
+  const totalPoints = findings.reduce((sum, f) => sum + f.nPoints, 0);
+  const weightedPenalty = findings.reduce((sum, f) =>
+    sum + (f.penalty * f.nPoints / totalPoints), 0
+  );
+
+  // Check consistency - are findings in agreement?
+  const penaltyRange = Math.max(...findings.map(f => f.penalty)) -
+                       Math.min(...findings.map(f => f.penalty));
+  const consistent = penaltyRange < minPenalty;
+
+  // Calculate overall severity
+  const severity = Math.min(100, Math.round((weightedPenalty / minPenalty) * 30 + 40));
+
+  // Confidence based on consistency
+  let confidence = 'medium';
+  if (consistent && findings.length >= 2) {
+    confidence = 'high';
+  } else if (!consistent) {
+    confidence = 'low';
+  }
+
+  return createNutrientFinding({
+    nutrient: nutrientKey,
+    mode: 'mixed-method',
+    status: severityToStatus(severity),
+    severity: severity,
+    confidence: confidence,
+    explanation: consistent
+      ? `Consistent yield response across ${findings.length} test methods. Avg penalty: ${weightedPenalty.toFixed(1)} bu/ac`
+      : `Mixed results across test methods. Weighted avg penalty: ${weightedPenalty.toFixed(1)} bu/ac`,
+    acres_affected: null,  // Can't aggregate acres across methods reliably
+    estimated_yield_risk: weightedPenalty,
+    details: {
+      methods_analyzed: findings.length,
+      findings_by_method: findings,
+      consistent: consistent
+    }
+  });
+}
+
+// ========== CEC SEVERITY MODIFIERS ==========
+
+/**
+ * CEC buckets for context-dependent interpretation
+ */
+function getCECBucket(cec) {
+  if (cec == null) return 'unknown';
+  if (cec < 10) return 'low';
+  if (cec <= 20) return 'medium';
+  return 'high';
+}
+
+/**
+ * Adjust severity based on CEC context
+ * Low K on low CEC = more severe
+ * High Mg on high CEC = less severe
+ */
+function adjustSeverityByCEC(baseSeverity, nutrient, cecBucket, nutrientStatus) {
+  let adjustment = 0;
+
+  if (cecBucket === 'unknown') return baseSeverity;
+
+  // K adjustments
+  if (nutrient === 'K_ppm' || nutrient === 'pct_K' || nutrient === 'K') {
+    if (nutrientStatus === 'low' && cecBucket === 'low') {
+      adjustment = +15;  // Low K on low CEC = bigger problem
+    } else if (nutrientStatus === 'low' && cecBucket === 'high') {
+      adjustment = -5;   // Low K on high CEC = somewhat buffered
+    }
+  }
+
+  // Mg adjustments
+  if (nutrient === 'Mg_ppm' || nutrient === 'pct_Mg' || nutrient === 'Mg') {
+    if (nutrientStatus === 'high' && cecBucket === 'high') {
+      adjustment = -10;  // High Mg on high CEC = less concerning
+    } else if (nutrientStatus === 'high' && cecBucket === 'low') {
+      adjustment = +10;  // High Mg on low CEC = more concerning
+    }
+  }
+
+  // P adjustments
+  if (nutrient === 'P_ppm' || nutrient === 'P') {
+    if (nutrientStatus === 'low' && cecBucket === 'low') {
+      adjustment = +10;  // Low P on low CEC = lower buffer
+    }
+  }
+
+  return Math.max(0, Math.min(100, baseSeverity + adjustment));
+}
+
+/**
+ * Get average CEC for a set of points
+ */
+function getAvgCEC(points) {
+  const cecs = points
+    .map(p => p.soil?.CEC ?? p.CEC)
+    .filter(c => c != null);
+
+  if (cecs.length === 0) return null;
+  return mean(cecs);
+}
+
+// ========== MAGNESIUM TWO-SIDED ANALYSIS ==========
+
+/**
+ * Magnesium analysis with two-sided thresholds
+ * Both low Mg AND high Mg are problems
+ */
+function analyzeMagnesium(points, options = {}) {
+  const acresPerPoint = options.acresPerPoint || 2.5;
+
+  // Thresholds (can be customized via options)
+  const thresholds = {
+    Mg_ppm: {
+      low: options.mgLow || 50,
+      optimalLow: options.mgOptLow || 100,
+      optimalHigh: options.mgOptHigh || 300,
+      high: options.mgHigh || 400
+    },
+    pct_Mg: {
+      low: options.pctMgLow || 5,
+      optimalLow: options.pctMgOptLow || 10,
+      optimalHigh: options.pctMgOptHigh || 15,
+      high: options.pctMgHigh || 20
+    }
+  };
+
+  // Helper to get value from point
+  const getValue = (p, key) => {
+    if (p.soil?.[key] != null) return parseFloat(p.soil[key]);
+    if (p[key] != null) return parseFloat(p[key]);
+    // Try alternate keys
+    if (key === 'pct_Mg' && p.soil?.Mg_sat != null) return parseFloat(p.soil.Mg_sat);
+    if (key === 'pct_Mg' && p.Mg_sat != null) return parseFloat(p.Mg_sat);
+    return null;
+  };
+
+  const getYieldValue = (p) => {
+    if (p.yield?.value != null) return parseFloat(p.yield.value);
+    if (p.avgYield != null) return parseFloat(p.avgYield);
+    if (typeof p.yield === 'number') return p.yield;
+    return null;
+  };
+
+  // Use %Mg if available, otherwise Mg_ppm
+  const usePercent = points.some(p => getValue(p, 'pct_Mg') != null);
+  const nutrientKey = usePercent ? 'pct_Mg' : 'Mg_ppm';
+  const thresh = thresholds[nutrientKey];
+
+  // Classify points
+  const classified = points.map(p => {
+    const value = getValue(p, nutrientKey);
+    const yieldVal = getYieldValue(p);
+
+    if (value == null) return null;
+
+    let category, severity;
+    if (value < thresh.low) {
+      category = 'very_low';
+      severity = 80 + (thresh.low - value) / thresh.low * 20;
+    } else if (value < thresh.optimalLow) {
+      category = 'low';
+      severity = 40 + (thresh.optimalLow - value) / (thresh.optimalLow - thresh.low) * 40;
+    } else if (value <= thresh.optimalHigh) {
+      category = 'optimal';
+      severity = 0;
+    } else if (value <= thresh.high) {
+      category = 'high';
+      severity = 40 + (value - thresh.optimalHigh) / (thresh.high - thresh.optimalHigh) * 40;
+    } else {
+      category = 'very_high';
+      severity = 80 + Math.min(20, (value - thresh.high) / thresh.high * 20);
+    }
+
+    return {
+      ...p,
+      mgValue: value,
+      yield: yieldVal,
+      category,
+      severity: Math.min(100, severity)
+    };
+  }).filter(p => p !== null);
+
+  // Group by category
+  const groups = {
+    very_low: classified.filter(p => p.category === 'very_low'),
+    low: classified.filter(p => p.category === 'low'),
+    optimal: classified.filter(p => p.category === 'optimal'),
+    high: classified.filter(p => p.category === 'high'),
+    very_high: classified.filter(p => p.category === 'very_high')
+  };
+
+  // Calculate yields by category
+  const yieldByCategory = {};
+  Object.keys(groups).forEach(cat => {
+    if (groups[cat].length > 0) {
+      const yields = groups[cat].map(p => p.yield).filter(y => y != null);
+      yieldByCategory[cat] = {
+        count: groups[cat].length,
+        avgYield: yields.length > 0 ? mean(yields) : null,
+        avgMg: mean(groups[cat].map(p => p.mgValue))
+      };
+    }
+  });
+
+  // Determine primary issue
+  const lowCount = groups.very_low.length + groups.low.length;
+  const highCount = groups.very_high.length + groups.high.length;
+  const optimalYield = yieldByCategory.optimal?.avgYield ||
+    mean(classified.filter(p => p.yield != null).map(p => p.yield));
+
+  let primaryIssue = 'none';
+  let explanation = '';
+  let severity = 0;
+  let acresAffected = 0;
+  let yieldRisk = null;
+
+  if (lowCount > highCount && lowCount > 0) {
+    primaryIssue = 'low_mg';
+    const lowPoints = [...groups.very_low, ...groups.low].filter(p => p.yield != null);
+    const lowYield = lowPoints.length > 0 ? mean(lowPoints.map(p => p.yield)) : null;
+    const penalty = (optimalYield && lowYield) ? optimalYield - lowYield : 0;
+    severity = Math.round(mean([...groups.very_low, ...groups.low].map(p => p.severity)));
+    acresAffected = lowCount * acresPerPoint;
+    yieldRisk = penalty > 0 ? penalty : null;
+    explanation = `Low Mg detected in ${lowCount} points (${acresAffected.toFixed(0)} acres). Avg yield ${penalty > 0 ? penalty.toFixed(1) + ' bu/ac below' : 'similar to'} optimal Mg zones.`;
+  } else if (highCount > lowCount && highCount > 0) {
+    primaryIssue = 'high_mg';
+    const highPoints = [...groups.very_high, ...groups.high].filter(p => p.yield != null);
+    const highYield = highPoints.length > 0 ? mean(highPoints.map(p => p.yield)) : null;
+    const penalty = (optimalYield && highYield) ? optimalYield - highYield : 0;
+    severity = Math.round(mean([...groups.very_high, ...groups.high].map(p => p.severity)));
+    acresAffected = highCount * acresPerPoint;
+    yieldRisk = penalty > 0 ? penalty : null;
+    explanation = `High Mg detected in ${highCount} points (${acresAffected.toFixed(0)} acres). May indicate tight soils or K suppression. ${penalty > 0 ? `Yield ${penalty.toFixed(1)} bu/ac below optimal.` : ''}`;
+  } else if (lowCount > 0 || highCount > 0) {
+    primaryIssue = 'mixed';
+    severity = 40;
+    explanation = `Mixed Mg issues: ${lowCount} points low, ${highCount} points high.`;
+  } else {
+    explanation = 'Magnesium levels are within optimal range.';
+  }
+
+  // Check K:Mg ratio for high Mg situations
+  let kMgWarning = null;
+  if (primaryIssue === 'high_mg' || primaryIssue === 'mixed') {
+    const highMgPoints = [...groups.very_high, ...groups.high];
+    const kMgRatios = highMgPoints
+      .filter(p => {
+        const k = p.soil?.K_ppm ?? p.soil?.K ?? p.K_ppm ?? p.K;
+        const mg = p.soil?.Mg_ppm ?? p.soil?.Mg ?? p.Mg_ppm ?? p.Mg;
+        return k != null && mg != null && mg > 0;
+      })
+      .map(p => {
+        const k = p.soil?.K_ppm ?? p.soil?.K ?? p.K_ppm ?? p.K;
+        const mg = p.soil?.Mg_ppm ?? p.soil?.Mg ?? p.Mg_ppm ?? p.Mg;
+        return k / mg;
+      });
+
+    if (kMgRatios.length > 0) {
+      const avgKMg = mean(kMgRatios);
+      if (avgKMg < 0.2) {
+        kMgWarning = `Low K:Mg ratio (${avgKMg.toFixed(2)}) in high-Mg zones suggests K availability may be suppressed.`;
+        severity = Math.min(100, severity + 15);
+      }
+    }
+  }
+
+  return createNutrientFinding({
+    nutrient: nutrientKey,
+    mode: 'absolute',
+    status: severityToStatus(severity),
+    severity: severity,
+    confidence: classified.length >= 20 ? 'high' : 'medium',
+    explanation: kMgWarning ? `${explanation} ${kMgWarning}` : explanation,
+    acres_affected: acresAffected,
+    estimated_yield_risk: yieldRisk,
+    details: {
+      primaryIssue,
+      thresholds: thresh,
+      yieldByCategory,
+      groups: {
+        veryLow: groups.very_low.length,
+        low: groups.low.length,
+        optimal: groups.optimal.length,
+        high: groups.high.length,
+        veryHigh: groups.very_high.length
+      },
+      kMgWarning
+    }
+  });
+}
+
+// ========== BASE SATURATION ANALYSIS ==========
+
+/**
+ * Get explanation for base saturation flag
+ */
+function getBaseSatExplanation(flag, count, pct) {
+  const explanations = {
+    'K_very_low': `Very low %K in ${count} points (${pct}%) - K availability severely limited`,
+    'K_low': `Low %K in ${count} points (${pct}%) - K availability may limit yield`,
+    'K_high': `High %K in ${count} points (${pct}%) - potential antagonism with Mg/Ca`,
+    'Mg_very_low': `Very low %Mg in ${count} points (${pct}%) - Mg deficiency risk`,
+    'Mg_low': `Low %Mg in ${count} points (${pct}%) - monitor Mg status`,
+    'Mg_high': `High %Mg in ${count} points (${pct}%) - may suppress K uptake, tight soils`,
+    'Mg_elevated': `Elevated %Mg in ${count} points (${pct}%) - watch K:Mg balance`,
+    'K_suppressed_by_Mg': `K likely suppressed by high Mg in ${count} points (${pct}%)`,
+    'Mg_K_imbalance': `Mg:K imbalance in ${count} points (${pct}%) - address K first`
+  };
+  return explanations[flag] || `${flag}: ${count} points`;
+}
+
+/**
+ * Base saturation interaction analysis
+ * Flags issues with %K, %Mg balance
+ */
+function analyzeBaseSaturation(points, options = {}) {
+  const thresholds = {
+    pct_K: { low: 2.0, optLow: 2.5, optHigh: 5.0, high: 7.0 },
+    pct_Mg: { low: 5.0, optLow: 10.0, optHigh: 15.0, high: 20.0 },
+    pct_Ca: { low: 55, optLow: 65, optHigh: 75, high: 85 }
+  };
+
+  const getValue = (p, key) => {
+    if (p.soil?.[key] != null) return parseFloat(p.soil[key]);
+    if (p[key] != null) return parseFloat(p[key]);
+    // Try alternate keys
+    const altKeys = { 'pct_K': 'K_Sat', 'pct_Mg': 'Mg_sat', 'pct_Ca': 'Ca_sat' };
+    const alt = altKeys[key];
+    if (alt && p.soil?.[alt] != null) return parseFloat(p.soil[alt]);
+    if (alt && p[alt] != null) return parseFloat(p[alt]);
+    return null;
+  };
+
+  const findings = [];
+
+  // Check each point for base sat issues
+  const issues = points.map(p => {
+    const pctK = getValue(p, 'pct_K');
+    const pctMg = getValue(p, 'pct_Mg');
+    const pctCa = getValue(p, 'pct_Ca');
+    const flags = [];
+
+    if (pctK != null) {
+      if (pctK < thresholds.pct_K.low) flags.push('K_very_low');
+      else if (pctK < thresholds.pct_K.optLow) flags.push('K_low');
+      else if (pctK > thresholds.pct_K.high) flags.push('K_high');
+    }
+
+    if (pctMg != null) {
+      if (pctMg < thresholds.pct_Mg.low) flags.push('Mg_very_low');
+      else if (pctMg < thresholds.pct_Mg.optLow) flags.push('Mg_low');
+      else if (pctMg > thresholds.pct_Mg.high) flags.push('Mg_high');
+      else if (pctMg > thresholds.pct_Mg.optHigh) flags.push('Mg_elevated');
+    }
+
+    // K:Mg interaction
+    if (pctK != null && pctMg != null && pctMg > 0) {
+      const kMgRatio = pctK / pctMg;
+      if (kMgRatio < 0.15) flags.push('K_suppressed_by_Mg');
+      if (pctMg > 15 && pctK < 3) flags.push('Mg_K_imbalance');
+    }
+
+    return { point: p, flags };
+  }).filter(p => p.flags.length > 0);
+
+  // Summarize
+  const flagCounts = {};
+  issues.forEach(i => {
+    i.flags.forEach(f => {
+      flagCounts[f] = (flagCounts[f] || 0) + 1;
+    });
+  });
+
+  // Build summary findings
+  Object.keys(flagCounts).forEach(flag => {
+    const count = flagCounts[flag];
+    const pct = ((count / points.length) * 100).toFixed(0);
+
+    findings.push({
+      flag,
+      count,
+      pctOfField: pct,
+      explanation: getBaseSatExplanation(flag, count, pct)
+    });
+  });
+
+  return {
+    totalPoints: points.length,
+    pointsWithIssues: issues.length,
+    findings: findings.sort((a, b) => b.count - a.count)
+  };
+}
+
+// ========== SULFUR ANALYSIS ==========
+
+/**
+ * Sulfur analysis - only run if data present
+ * Treat like P/Zn (low-is-bad, breakpoint-responsive)
+ */
+function analyzeSulfur(points, options = {}) {
+  // Check if S data exists
+  const hasS = points.some(p =>
+    p.soil?.S_ppm != null || p.soil?.SO4_S != null || p.soil?.S != null ||
+    p.S_ppm != null || p.SO4_S != null || p.S != null
+  );
+
+  if (!hasS) {
+    return null;  // Don't infer if not available
+  }
+
+  // Determine which key to use
+  let nutrientKey = 'S_ppm';
+  if (points.some(p => p.soil?.S_ppm != null || p.S_ppm != null)) {
+    nutrientKey = 'S_ppm';
+  } else if (points.some(p => p.soil?.SO4_S != null || p.SO4_S != null)) {
+    nutrientKey = 'SO4_S';
+  } else if (points.some(p => p.soil?.S != null || p.S != null)) {
+    nutrientKey = 'S';
+  }
+
+  // Run standard breakpoint analysis
+  return smartBreakpointAnalysis(points, nutrientKey, {
+    ...options,
+    minPenalty: options.minPenalty || 3  // Lower threshold for S
+  });
+}
+
+// ========== MASTER ANALYSIS FUNCTION ==========
+
+/**
+ * Generate analysis summary from findings
+ */
+function generateAnalysisSummary(findings) {
+  const actionItems = [];
+  const watchItems = [];
+
+  Object.entries(findings).forEach(([key, finding]) => {
+    if (!finding || key === 'baseSaturation') return;
+
+    if (finding.status === 'action') {
+      actionItems.push({
+        nutrient: key,
+        severity: finding.severity,
+        explanation: finding.explanation
+      });
+    } else if (finding.status === 'watch') {
+      watchItems.push({
+        nutrient: key,
+        severity: finding.severity,
+        explanation: finding.explanation
+      });
+    }
+  });
+
+  return {
+    actionItems: actionItems.sort((a, b) => b.severity - a.severity),
+    watchItems: watchItems.sort((a, b) => b.severity - a.severity),
+    totalActionable: actionItems.length,
+    totalWatch: watchItems.length
+  };
+}
+
+/**
+ * Run complete nutrient analysis suite
+ * Returns standardized findings for all nutrients
+ */
+function runFullNutrientAnalysis(points, options = {}) {
+  const findings = {};
+  const crop = options.crop || 'corn';
+  const minPenalty = crop === 'corn' ? 5 : 2;
+
+  // Get average CEC for context
+  const avgCEC = getAvgCEC(points);
+  const cecBucket = getCECBucket(avgCEC);
+
+  // Core nutrients with breakpoint analysis
+  const coreNutrients = ['P_ppm', 'K_ppm', 'Zn_ppm', 'pH'];
+
+  coreNutrients.forEach(nutrient => {
+    const result = smartBreakpointAnalysis(points, nutrient, {
+      ...options,
+      minPenalty
+    });
+
+    // Adjust severity by CEC if applicable
+    if (result && cecBucket !== 'unknown') {
+      const nutrientStatus = result.status === 'action' ? 'low' : 'ok';
+      result.severity = adjustSeverityByCEC(
+        result.severity,
+        nutrient,
+        cecBucket,
+        nutrientStatus
+      );
+      result.status = severityToStatus(result.severity);
+      result.details.cecBucket = cecBucket;
+      result.details.cecAdjusted = true;
+    }
+
+    findings[nutrient] = result;
+  });
+
+  // Magnesium (two-sided)
+  findings['Mg'] = analyzeMagnesium(points, options);
+
+  // Base saturation
+  findings['baseSaturation'] = analyzeBaseSaturation(points, options);
+
+  // Sulfur (if present)
+  const sResult = analyzeSulfur(points, options);
+  if (sResult) {
+    findings['S'] = sResult;
+  }
+
+  // OM (more_is_ok behavior)
+  findings['OM_pct'] = smartBreakpointAnalysis(points, 'OM_pct', {
+    ...options,
+    minPenalty: minPenalty * 0.5  // Lower threshold for OM
+  });
+
+  return {
+    crop,
+    cecContext: { avg: avgCEC, bucket: cecBucket },
+    findings,
+    summary: generateAnalysisSummary(findings)
+  };
+}
+
+/**
+ * Get tooltip text explaining the analysis mode
+ */
+function getModeTooltip(mode) {
+  const tooltips = {
+    'absolute': 'All samples used the same test method. Breakpoint is directly comparable to standard thresholds.',
+    'mixed-method': 'Multiple test methods detected. Results aggregated from separate analyses.',
+    'percentile': 'Test method unknown or mixed. Analysis based on relative ranking within field.'
+  };
+  return tooltips[mode] || '';
+}
+
 // ========== EXPORT AS GLOBAL ==========
 window.Utils = {
   // Status/UI
@@ -1506,7 +2338,31 @@ window.Utils = {
   buildHingeFeature,
   runHingeMVR,
   BREAKPOINT_STABILITY_TOL,
-  BREAKPOINT_NEAR_BAND
+  BREAKPOINT_NEAR_BAND,
+
+  // Multi-method breakpoint framework
+  createNutrientFinding,
+  severityToStatus,
+  getExtractant,
+  groupByExtractant,
+  percentileAnalysis,
+  smartBreakpointAnalysis,
+  calculateBreakpointSeverity,
+
+  // CEC modifiers
+  getCECBucket,
+  adjustSeverityByCEC,
+  getAvgCEC,
+
+  // Specialized nutrient analysis
+  analyzeMagnesium,
+  analyzeBaseSaturation,
+  analyzeSulfur,
+
+  // Master analysis
+  runFullNutrientAnalysis,
+  generateAnalysisSummary,
+  getModeTooltip
 };
 
 })();

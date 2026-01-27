@@ -118,6 +118,13 @@
       .tab { text-align: center; }
     }
     .backup-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 0.25rem 1rem; font-size: 0.7rem; color: #64748b; text-align: center; z-index: 900; }
+
+    /* Analysis Mode Badges */
+    .analysis-mode-badge { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 500; cursor: help; }
+    .analysis-mode-badge .mode-icon { font-size: 0.85rem; }
+    .mode-absolute { background: #d1fae5; color: #065f46; }
+    .mode-mixed-method { background: #fef3c7; color: #92400e; }
+    .mode-percentile { background: #e0e7ff; color: #3730a3; }
   </style>
 </head>
 <body>
@@ -585,7 +592,13 @@
         <!-- Results Section -->
         <div id="breakpointResults" style="display: none;">
           <div style="background: white; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 1.5rem;">
-            <h3 style="margin: 0 0 1rem 0; color: #1e293b; font-size: 1.1rem;">Breakpoint Result: <span id="bpNutrientName">Zn</span></h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+              <h3 style="margin: 0; color: #1e293b; font-size: 1.1rem;">Breakpoint Result: <span id="bpNutrientName">Zn</span></h3>
+              <div id="analysisModeIndicator" class="analysis-mode-badge mode-absolute" title="">
+                <span class="mode-icon"></span>
+                <span class="mode-label"></span>
+              </div>
+            </div>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin: 1rem 0;">
               <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 0.5rem;">
                 <span style="display: block; font-size: 0.75rem; color: #666; margin-bottom: 0.25rem;">Breakpoint</span>
@@ -777,8 +790,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.181";
-    const BUILD_DATE = "2026-01-27T07:59:22";
+    const APP_VERSION = "v1.0.182";
+    const BUILD_DATE = "2026-01-27T08:04:09";
 
     // Reference shared data config with analysis-specific additions
     const CONFIG = {
@@ -6293,6 +6306,20 @@
       document.getElementById('bpNutrientName').textContent = nutrientNames[result.nutrientKey] || result.nutrientKey;
       document.getElementById('bpValue').textContent = `${result.breakpoint.toFixed(1)}${unitDisplay}`;
       document.getElementById('bpPenalty').textContent = `${result.penalty.toFixed(1)} bu/ac`;
+
+      // Update mode indicator
+      const mode = result.mode || 'absolute';
+      const modeLabels = {
+        'absolute': { icon: '✓', label: 'Direct Breakpoint', tooltip: 'All samples used the same test method. Breakpoint is directly comparable to standard thresholds.' },
+        'mixed-method': { icon: '⚠️', label: 'Mixed Methods', tooltip: 'Multiple test methods detected. Results aggregated from separate analyses.' },
+        'percentile': { icon: '📊', label: 'Percentile Mode', tooltip: 'Test method unknown or mixed. Analysis based on relative ranking within field.' }
+      };
+      const modeInfo = modeLabels[mode] || modeLabels['absolute'];
+      const modeEl = document.getElementById('analysisModeIndicator');
+      modeEl.className = `analysis-mode-badge mode-${mode}`;
+      modeEl.title = modeInfo.tooltip;
+      modeEl.querySelector('.mode-icon').textContent = modeInfo.icon;
+      modeEl.querySelector('.mode-label').textContent = modeInfo.label;
 
       const confEl = document.getElementById('bpConfidence');
       confEl.textContent = result.confidence;
