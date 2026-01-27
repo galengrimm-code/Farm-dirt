@@ -125,6 +125,134 @@
     .mode-absolute { background: #d1fae5; color: #065f46; }
     .mode-mixed-method { background: #fef3c7; color: #92400e; }
     .mode-percentile { background: #e0e7ff; color: #3730a3; }
+
+    /* ================================
+       YIELD CORRELATION DASHBOARD
+       Clean, modern styling
+       ================================ */
+    :root {
+      --yc-primary: #3b82f6;
+      --yc-primary-dark: #2563eb;
+      --yc-success: #22c55e;
+      --yc-warning: #f59e0b;
+      --yc-danger: #ef4444;
+      --yc-radius-sm: 6px;
+      --yc-radius-md: 10px;
+      --yc-radius-lg: 14px;
+      --yc-shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+      --yc-shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    /* Dashboard Header */
+    .yc-dashboard-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 16px; }
+    .yc-header-title h2 { margin: 0; font-size: 24px; font-weight: 700; color: #1e293b; }
+    .yc-header-subtitle { margin: 4px 0 0 0; font-size: 14px; color: #64748b; }
+    .yc-export-btn { display: flex; align-items: center; gap: 8px; background: var(--yc-primary); color: white; border: none; padding: 10px 18px; border-radius: var(--yc-radius-md); font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+    .yc-export-btn:hover { background: var(--yc-primary-dark); }
+
+    /* Filter Bar */
+    .yc-filter-bar { display: flex; flex-wrap: wrap; gap: 16px; background: white; padding: 18px 20px; border-radius: var(--yc-radius-lg); box-shadow: var(--yc-shadow-sm); margin-bottom: 16px; align-items: flex-end; }
+    .yc-filter-group { display: flex; flex-direction: column; gap: 6px; }
+    .yc-filter-group label { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px; }
+    .yc-filter-group select { padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: var(--yc-radius-sm); font-size: 14px; color: #334155; background: white; min-width: 150px; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
+    .yc-filter-group select:hover { border-color: #cbd5e1; }
+    .yc-filter-group select:focus { outline: none; border-color: var(--yc-primary); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+    .yc-filter-checkbox { display: flex; align-items: center; gap: 8px; padding: 9px 0; }
+    .yc-checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #334155; cursor: pointer; }
+    .yc-checkbox-label input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--yc-primary); }
+    .yc-run-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--yc-primary); color: white; border: none; border-radius: var(--yc-radius-sm); font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s; }
+    .yc-run-btn:hover { background: var(--yc-primary-dark); }
+    .yc-run-btn svg { flex-shrink: 0; }
+    .yc-info-tip { cursor: help; font-size: 12px; opacity: 0.6; }
+
+    /* Data Context Banner */
+    .yc-context-banner { display: flex; gap: 20px; background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%); border: 1px solid #fde047; border-radius: var(--yc-radius-md); padding: 12px 18px; margin-bottom: 20px; flex-wrap: wrap; }
+    .yc-context-item { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #713f12; }
+    .yc-context-icon { font-size: 16px; }
+
+    /* Analysis Tabs */
+    .yc-analysis-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+    @media (max-width: 900px) { .yc-analysis-tabs { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 500px) { .yc-analysis-tabs { grid-template-columns: 1fr; } }
+    .yc-tab-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 14px 16px; background: white; border: 2px solid #e2e8f0; border-radius: var(--yc-radius-md); cursor: pointer; transition: all 0.2s; text-align: left; }
+    .yc-tab-btn:hover { border-color: #cbd5e1; background: #f8fafc; }
+    .yc-tab-btn.active { border-color: var(--yc-primary); background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); }
+    .yc-tab-icon { font-size: 22px; margin-bottom: 2px; }
+    .yc-tab-label { font-size: 14px; font-weight: 600; color: #1e293b; }
+    .yc-tab-desc { font-size: 11px; color: #64748b; line-height: 1.3; }
+    .yc-tab-btn.active .yc-tab-label { color: var(--yc-primary-dark); }
+
+    /* Tab Content Container */
+    .yc-tab-container { background: #f1f5f9; border-radius: var(--yc-radius-lg); padding: 20px; min-height: 300px; }
+    .yc-subtab-content { display: none; }
+    .yc-subtab-content.active { display: block; }
+
+    /* Section Intro */
+    .yc-section-intro { display: flex; gap: 14px; background: white; border-radius: var(--yc-radius-md); padding: 16px 18px; margin-bottom: 20px; box-shadow: var(--yc-shadow-sm); }
+    .yc-intro-icon { font-size: 32px; }
+    .yc-intro-text h3 { margin: 0 0 4px 0; font-size: 16px; color: #1e293b; }
+    .yc-intro-text p { margin: 0; font-size: 13px; color: #475569; line-height: 1.5; }
+
+    /* Correlation Grid */
+    .yc-correlation-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+
+    /* Correlation Card */
+    .yc-correlation-card { background: white; border-radius: var(--yc-radius-md); box-shadow: var(--yc-shadow-sm); overflow: hidden; transition: box-shadow 0.2s, transform 0.2s; }
+    .yc-correlation-card:hover { box-shadow: var(--yc-shadow-md); transform: translateY(-2px); }
+    .yc-card-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #f1f5f9; }
+    .yc-nutrient-name { font-size: 15px; font-weight: 600; color: #1e293b; }
+    .yc-corr-badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .yc-corr-badge.positive { background: #dcfce7; color: #166534; }
+    .yc-corr-badge.negative { background: #fee2e2; color: #991b1b; }
+    .yc-corr-badge.neutral { background: #f1f5f9; color: #475569; }
+    .yc-card-body { padding: 14px 16px; }
+    .yc-r-squared { margin-bottom: 10px; }
+    .yc-r2-row { display: flex; align-items: baseline; gap: 8px; }
+    .yc-r2-label { font-size: 11px; color: #64748b; }
+    .yc-r2-value { font-size: 18px; font-weight: 700; color: #1e293b; }
+    .yc-r2-bar { height: 5px; background: #e2e8f0; border-radius: 3px; margin-top: 6px; overflow: hidden; }
+    .yc-r2-fill { height: 100%; background: var(--yc-primary); border-radius: 3px; transition: width 0.3s; }
+    .yc-interp { display: flex; align-items: center; gap: 8px; }
+    .yc-interp-badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+    .yc-interp-badge.strong { background: #dcfce7; color: #166534; }
+    .yc-interp-badge.moderate { background: #fef3c7; color: #92400e; }
+    .yc-interp-badge.weak { background: #f1f5f9; color: #64748b; }
+    .yc-interp-text { font-size: 11px; color: #64748b; }
+    .yc-card-footer { padding: 10px 16px; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+    .yc-scatter-btn { width: 100%; padding: 7px 12px; background: transparent; border: 1px solid #cbd5e1; border-radius: var(--yc-radius-sm); font-size: 12px; color: #475569; cursor: pointer; transition: all 0.2s; }
+    .yc-scatter-btn:hover { background: white; border-color: var(--yc-primary); color: var(--yc-primary); }
+
+    /* Scatter Section */
+    .yc-scatter-section { background: white; border-radius: var(--yc-radius-md); padding: 20px; margin-top: 20px; box-shadow: var(--yc-shadow-sm); }
+    .yc-scatter-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+    .yc-scatter-header h3 { margin: 0; font-size: 16px; color: #1e293b; }
+    .yc-scatter-controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .yc-scatter-controls .yc-filter-group { flex-direction: row; align-items: center; gap: 6px; }
+    .yc-scatter-controls .yc-filter-group label { font-size: 12px; text-transform: none; }
+    .yc-scatter-controls select { padding: 6px 10px; min-width: 120px; font-size: 13px; }
+    .yc-icon-btn { padding: 6px 10px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: var(--yc-radius-sm); font-size: 12px; cursor: pointer; transition: background 0.2s; }
+    .yc-icon-btn:hover { background: #e2e8f0; }
+    .yc-scatter-container { height: 350px; margin-bottom: 12px; }
+    .yc-scatter-insights { background: #f8fafc; border-radius: var(--yc-radius-sm); padding: 10px 14px; }
+    .yc-insight-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #475569; }
+
+    /* Empty State */
+    .yc-empty-state { text-align: center; padding: 50px 20px; }
+    .yc-empty-icon { font-size: 56px; margin-bottom: 12px; opacity: 0.5; }
+    .yc-empty-state h3 { margin: 0 0 6px 0; font-size: 18px; color: #334155; }
+    .yc-empty-state p { margin: 0; font-size: 14px; color: #64748b; }
+    .yc-empty-state a { color: var(--yc-primary); text-decoration: none; }
+    .yc-empty-state a:hover { text-decoration: underline; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .yc-dashboard-header { flex-direction: column; }
+      .yc-filter-bar { flex-direction: column; }
+      .yc-filter-group { width: 100%; }
+      .yc-filter-group select { width: 100%; }
+      .yc-context-banner { flex-direction: column; gap: 10px; }
+      .yc-scatter-header { flex-direction: column; align-items: flex-start; }
+    }
   </style>
 </head>
 <body>
@@ -229,8 +357,20 @@
 
     <!-- Tab 4: Yield Correlation -->
     <div id="yield" class="tab-content">
-      <div class="controls-bar">
-        <div class="control-group">
+      <!-- Dashboard Header -->
+      <div class="yc-dashboard-header">
+        <div class="yc-header-title">
+          <h2>🌾 Yield Correlation</h2>
+          <p class="yc-header-subtitle">Discover how soil nutrients impact your yields</p>
+        </div>
+        <button onclick="exportYieldCorrelation()" class="yc-export-btn">
+          <span>📄</span> Export Report
+        </button>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="yc-filter-bar">
+        <div class="yc-filter-group">
           <label>Crop</label>
           <select id="yieldCropSelect">
             <option value="corn">🌽 Corn</option>
@@ -238,28 +378,29 @@
             <option value="amylose">🍚 Amylose</option>
           </select>
         </div>
-        <div class="control-group">
-          <label>Yield Year <span onclick="toggleYieldYearInfo()" style="cursor: pointer; font-size: 0.9rem; color: #3b82f6;" title="Learn about yield year options">ℹ️</span></label>
+        <div class="yc-filter-group">
+          <label>Yield Year <span onclick="toggleYieldYearInfo()" class="yc-info-tip" title="Learn about yield year options">ℹ️</span></label>
           <select id="yieldYearSelect" onchange="updateYieldYearDescription()"></select>
         </div>
-        <div class="control-group">
+        <div class="yc-filter-group">
           <label>Soil Sample Year</label>
           <select id="soilYearSelect">
             <option value="recent">Most Recent</option>
           </select>
         </div>
-        <div class="control-group">
+        <div class="yc-filter-group">
           <label>Field</label>
           <select id="yieldFieldSelect">
             <option value="all">All Fields</option>
           </select>
         </div>
-        <div class="control-group" style="display: flex; align-items: center; gap: 0.5rem;">
-          <input type="checkbox" id="yieldNormalizeToggle" style="width: 18px; height: 18px; cursor: pointer;" title="Convert yield to % of field average to isolate nutrient effect from field productivity">
-          <label style="margin: 0; white-space: nowrap;">Normalize by Field</label>
-          <span onclick="toggleNormalizeInfo()" style="cursor: pointer; font-size: 1rem; color: #3b82f6; margin-left: -0.25rem;" title="Learn about normalization">ℹ️</span>
+        <div class="yc-filter-checkbox">
+          <label class="yc-checkbox-label">
+            <input type="checkbox" id="yieldNormalizeToggle" title="Convert yield to % of field average to isolate nutrient effect from field productivity">
+            <span>Normalize by Field</span>
+            <span onclick="toggleNormalizeInfo()" class="yc-info-tip" title="Learn about normalization">ℹ️</span>
+          </label>
         </div>
-        <button onclick="exportYieldCorrelation()" class="export-btn">📄 Export Report</button>
       </div>
 
       <!-- Yield Year Description (shows based on selection) -->
@@ -365,45 +506,62 @@
         </div>
       </div>
 
-      <!-- Sub-tabs for Yield Correlation -->
-      <div class="yield-subtabs" style="display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem;">
-        <button class="yield-subtab active" data-subtab="single" onclick="switchYieldSubtab('single')" style="padding: 0.5rem 1rem; border: none; background: #3b82f6; color: white; border-radius: 0.375rem 0.375rem 0 0; font-weight: 500; cursor: pointer;">
-          📊 Individual Correlations
+      <!-- Analysis Tabs -->
+      <div class="yc-analysis-tabs">
+        <button class="yc-tab-btn active" data-subtab="single" onclick="switchYieldSubtab('single')">
+          <span class="yc-tab-icon">📊</span>
+          <span class="yc-tab-label">Individual Correlations</span>
+          <span class="yc-tab-desc">How each nutrient relates to yield</span>
         </button>
-        <button class="yield-subtab" data-subtab="multi" onclick="switchYieldSubtab('multi')" style="padding: 0.5rem 1rem; border: none; background: #f1f5f9; color: #64748b; border-radius: 0.375rem 0.375rem 0 0; font-weight: 500; cursor: pointer;">
-          🔬 Multivariate Regression
+        <button class="yc-tab-btn" data-subtab="multi" onclick="switchYieldSubtab('multi')">
+          <span class="yc-tab-icon">🔬</span>
+          <span class="yc-tab-label">Multivariate Regression</span>
+          <span class="yc-tab-desc">Combined effect of all nutrients</span>
         </button>
-        <button class="yield-subtab" data-subtab="buckets" onclick="switchYieldSubtab('buckets')" style="padding: 0.5rem 1rem; border: none; background: #f1f5f9; color: #64748b; border-radius: 0.375rem 0.375rem 0 0; font-weight: 500; cursor: pointer;">
-          📈 Yield by Nutrient Level
+        <button class="yc-tab-btn" data-subtab="buckets" onclick="switchYieldSubtab('buckets')">
+          <span class="yc-tab-icon">📈</span>
+          <span class="yc-tab-label">Yield by Nutrient Level</span>
+          <span class="yc-tab-desc">Average yield at low/medium/high</span>
         </button>
-        <button class="yield-subtab" data-subtab="breakpoint" onclick="switchYieldSubtab('breakpoint')" style="padding: 0.5rem 1rem; border: none; background: #f1f5f9; color: #64748b; border-radius: 0.375rem 0.375rem 0 0; font-weight: 500; cursor: pointer;">
-          📍 Breakpoint Analysis
+        <button class="yc-tab-btn" data-subtab="breakpoint" onclick="switchYieldSubtab('breakpoint')">
+          <span class="yc-tab-icon">🎯</span>
+          <span class="yc-tab-label">Breakpoint Analysis</span>
+          <span class="yc-tab-desc">Find yield-limiting thresholds</span>
         </button>
       </div>
 
-      <!-- Single Nutrient Tab Content -->
-      <div id="yieldSingleTab" class="yield-subtab-content">
-        <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 0.375rem; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem; color: #166534;">
-          <strong>Individual Correlations:</strong> Analyzes each nutrient separately. Shows how each nutrient relates to yield independently - useful for exploring individual relationships.
+      <!-- Tab Content Container -->
+      <div class="yc-tab-container">
+        <!-- Single Nutrient Tab Content -->
+        <div id="yieldSingleTab" class="yc-subtab-content active">
+          <div class="yc-section-intro">
+            <div class="yc-intro-icon">📊</div>
+            <div class="yc-intro-text">
+              <h3>Individual Correlations</h3>
+              <p>See how each nutrient independently relates to yield. Higher R² = stronger relationship. Positive correlation means more nutrient = more yield.</p>
+            </div>
+          </div>
+          <div id="yieldContent">
+            <div class="yc-empty-state">
+              <div class="yc-empty-icon">📊</div>
+              <h3>No Yield Data Available</h3>
+              <p>Import yield maps on the <a href="import.html">Import page</a> to see correlations.</p>
+            </div>
+          </div>
         </div>
-        <div id="yieldContent">
-        <div class="no-data">No yield data available. Import yield maps on the Import page to see correlations.</div>
-      </div>
 
       <!-- Scatter Plot Section -->
-      <div id="scatterSection" style="margin-top: 1.5rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
-          <div style="display: flex; align-items: center; gap: 1rem;">
-            <h3 id="scatterTitle" style="margin: 0; color: #1e293b;">Scatter Plot: Nutrient vs Yield</h3>
-            <button onclick="toggleScatterAxes()" id="swapAxesBtn" style="padding: 0.375rem 0.75rem; border-radius: 0.375rem; border: 1px solid #3b82f6; background: #eff6ff; color: #1d4ed8; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
-              <span style="font-size: 1rem;">⇄</span> Swap Axes
-            </button>
-          </div>
-          <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-            <div>
-              <label style="margin-right: 0.5rem;">Nutrient:</label>
-              <select id="scatterNutrientSelect" onchange="drawScatterPlot()" style="padding: 0.375rem 0.75rem; border-radius: 0.375rem; border: 1px solid #cbd5e1;"></select>
+      <div id="scatterSection" class="yc-scatter-section">
+        <div class="yc-scatter-header">
+          <h3 id="scatterTitle">Scatter Plot: Nutrient vs Yield</h3>
+          <div class="yc-scatter-controls">
+            <div class="yc-filter-group" style="flex-direction: row; align-items: center;">
+              <label style="font-size: 12px; text-transform: none;">Nutrient:</label>
+              <select id="scatterNutrientSelect" onchange="drawScatterPlot()"></select>
             </div>
+            <button onclick="toggleScatterAxes()" id="swapAxesBtn" class="yc-icon-btn">
+              ⇄ Swap Axes
+            </button>
             <div style="display: flex; align-items: center; gap: 0.5rem;">
               <label>Yield Threshold:</label>
               <input type="range" id="yieldThresholdSlider" min="100" max="400" value="200" step="10" onchange="updateThresholdDisplay(); drawScatterPlot();" style="width: 120px;">
@@ -445,9 +603,13 @@
       </div><!-- End yieldSingleTab -->
 
       <!-- Multivariate Model Tab Content -->
-      <div id="yieldMultiTab" class="yield-subtab-content" style="display: none;">
-        <div style="background: #eff6ff; border: 1px solid #93c5fd; border-radius: 0.375rem; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem; color: #1e40af;">
-          <strong>Multivariate Regression:</strong> Analyzes all nutrients together. Shows which nutrients significantly affect yield <em>after controlling for the others</em> - answers "What matters when everything is considered?"
+      <div id="yieldMultiTab" class="yc-subtab-content" style="display: none;">
+        <div class="yc-section-intro">
+          <div class="yc-intro-icon">🔬</div>
+          <div class="yc-intro-text">
+            <h3>Multivariate Regression</h3>
+            <p>Analyzes all nutrients together. Shows which nutrients significantly affect yield <em>after controlling for the others</em> - answers "What matters when everything is considered?"</p>
+          </div>
         </div>
 
         <!-- Variable Selection -->
@@ -528,9 +690,13 @@
       </div><!-- End yieldMultiTab -->
 
       <!-- Yield by Nutrient Level Tab Content -->
-      <div id="yieldBucketsTab" class="yield-subtab-content" style="display: none;">
-        <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 0.375rem; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem; color: #92400e;">
-          <strong>Yield by Nutrient Level:</strong> Groups soil samples into Low, Medium, and High categories for each nutrient, then shows the average yield for each group. Helps identify which nutrient levels are associated with the best yields.
+      <div id="yieldBucketsTab" class="yc-subtab-content" style="display: none;">
+        <div class="yc-section-intro">
+          <div class="yc-intro-icon">📈</div>
+          <div class="yc-intro-text">
+            <h3>Yield by Nutrient Level</h3>
+            <p>Groups soil samples into Low, Medium, and High categories for each nutrient, then shows the average yield for each group. Helps identify which nutrient levels are associated with the best yields.</p>
+          </div>
         </div>
 
         <!-- Filters -->
@@ -560,17 +726,25 @@
 
       <!-- Breakpoint Analysis Tab Content -->
       <div id="yieldBreakpointTab" class="yield-subtab-content" style="display: none;">
-        <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 0.375rem; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem; color: #92400e;">
-          <strong>Breakpoint Analysis:</strong> Finds the threshold where yield response changes.
-          Below the breakpoint = yield penalty. Above = diminishing returns.
-          <br><small>Uses crop type for penalty threshold: Corn = 5 bu/ac, Soybeans = 2 bu/ac</small>
+        <!-- Section Intro -->
+        <div class="yc-section-intro">
+          <div class="yc-section-icon">
+            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+          </div>
+          <div class="yc-section-text">
+            <strong>Find the critical threshold where yield response changes.</strong>
+            Below the breakpoint = yield penalty from deficiency. Above = diminishing returns on fertilizer investment.
+            Uses crop-specific penalty thresholds (Corn: 5 bu/ac, Soybeans: 2 bu/ac).
+          </div>
         </div>
 
         <!-- Controls -->
-        <div style="display: flex; align-items: center; gap: 1rem; margin: 1rem 0; flex-wrap: wrap; background: white; padding: 1rem; border-radius: 0.5rem; border: 1px solid #e2e8f0;">
-          <div class="control-group">
-            <label style="font-weight: 500; margin-right: 0.5rem;">Nutrient:</label>
-            <select id="breakpointNutrient" style="padding: 0.5rem 0.75rem; border-radius: 0.375rem; border: 1px solid #cbd5e1;">
+        <div class="yc-filter-bar" style="margin-top: 16px;">
+          <div class="yc-filter-group">
+            <label class="yc-filter-label">Nutrient</label>
+            <select id="breakpointNutrient" class="yc-filter-select">
               <option value="Zn">Zinc (Zn)</option>
               <option value="P">Phosphorus (P)</option>
               <option value="K">Potassium (K)</option>
@@ -584,13 +758,16 @@
             </select>
           </div>
 
-          <button id="runBreakpointBtn" onclick="runBreakpointAnalysis()" style="padding: 0.75rem 1.5rem; background: #3b82f6; color: white; border: none; border-radius: 0.375rem; font-weight: 600; cursor: pointer; font-size: 0.95rem;">
-            🔍 Find Breakpoint
+          <button id="runBreakpointBtn" onclick="runBreakpointAnalysis()" class="yc-run-btn">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            Find Breakpoint
           </button>
 
-          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.5rem 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.375rem;">
-            <input type="checkbox" id="hingeToggle" style="width: 16px; height: 16px;">
-            <span style="font-size: 0.85rem;">Run Hinge-MVR (advanced)</span>
+          <label class="yc-checkbox-label">
+            <input type="checkbox" id="hingeToggle">
+            <span>Run Hinge-MVR (advanced)</span>
           </label>
         </div>
 
@@ -795,8 +972,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.186";
-    const BUILD_DATE = "2026-01-27T08:25:20";
+    const APP_VERSION = "v1.0.187";
+    const BUILD_DATE = "2026-01-27T09:49:12";
 
     // Reference shared data config with analysis-specific additions
     const CONFIG = {
@@ -5375,24 +5552,31 @@
 
     // Switch between yield correlation sub-tabs
     function switchYieldSubtab(tab) {
-      // Update tab buttons
-      document.querySelectorAll('.yield-subtab').forEach(btn => {
+      // Update tab buttons (new yc-tab-btn style)
+      document.querySelectorAll('.yc-tab-btn').forEach(btn => {
         if (btn.dataset.subtab === tab) {
-          btn.style.background = '#3b82f6';
-          btn.style.color = 'white';
           btn.classList.add('active');
         } else {
-          btn.style.background = '#f1f5f9';
-          btn.style.color = '#64748b';
           btn.classList.remove('active');
         }
       });
 
-      // Show/hide content
-      document.getElementById('yieldSingleTab').style.display = tab === 'single' ? 'block' : 'none';
-      document.getElementById('yieldMultiTab').style.display = tab === 'multi' ? 'block' : 'none';
-      document.getElementById('yieldBucketsTab').style.display = tab === 'buckets' ? 'block' : 'none';
-      document.getElementById('yieldBreakpointTab').style.display = tab === 'breakpoint' ? 'block' : 'none';
+      // Show/hide content using the new class structure
+      const tabs = ['yieldSingleTab', 'yieldMultiTab', 'yieldBucketsTab', 'yieldBreakpointTab'];
+      const tabMap = { 'single': 'yieldSingleTab', 'multi': 'yieldMultiTab', 'buckets': 'yieldBucketsTab', 'breakpoint': 'yieldBreakpointTab' };
+
+      tabs.forEach(tabId => {
+        const el = document.getElementById(tabId);
+        if (el) {
+          if (tabId === tabMap[tab]) {
+            el.style.display = 'block';
+            el.classList.add('active');
+          } else {
+            el.style.display = 'none';
+            el.classList.remove('active');
+          }
+        }
+      });
 
       // Initialize tabs when switching to them
       if (tab === 'multi') {
