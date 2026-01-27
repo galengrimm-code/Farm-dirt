@@ -4,6 +4,15 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 
 ---
 
+## [v1.0.77] - January 27, 2026
+
+### Privacy Policy Visibility (Google OAuth Review)
+- **Prominent footer**: New site footer with large button-style links for Privacy Policy and Terms of Service
+- **Header privacy link**: Added underlined Privacy Policy link in the header area
+- **Google reviewer friendly**: Made legal links impossible to miss for OAuth app verification
+
+---
+
 ## [v1.0.76] - January 26, 2026
 
 ### Sample Site Logging
@@ -471,6 +480,7 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| v1.0.77 | Jan 27, 2026 | Prominent privacy policy footer and header link for Google OAuth review |
 | v1.0.76 | Jan 26, 2026 | Sample site editing, multi-select types, CV explanations, 5-Trigger enhancements |
 | v1.0.75 | Jan 24, 2026 | OM agronomic recommendations, Sheets sync fix, Sample Site modal |
 | v1.0.74 | Jan 23, 2026 | Field Trends insights (P:Zn, OM, Zn), Methodology page, pH default |
