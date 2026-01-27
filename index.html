@@ -151,6 +151,12 @@
     .temp-pin-marker { width: 28px; height: 28px; background: #7c3aed; border-radius: 50%; border: 3px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.35); animation: tempPinPulse 1.5s ease-in-out infinite; }
     @keyframes tempPinPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15); opacity: 0.8; } }
 
+    /* Zone highlight marker from breakpoint analysis */
+    .zone-highlight-marker { position: relative; width: 40px; height: 40px; }
+    .zone-highlight-marker::before { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 20px; height: 20px; background: #dc2626; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); z-index: 2; }
+    .zone-highlight-marker::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60px; height: 60px; border: 4px solid #dc2626; border-radius: 50%; animation: zoneRingPulse 1.5s ease-out infinite; z-index: 1; }
+    @keyframes zoneRingPulse { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; } }
+
     .backup-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 0.25rem 1rem; font-size: 0.7rem; color: #64748b; text-align: center; z-index: 900; }
     @media (max-width: 639px) { .backup-footer { bottom: 50px; } }
   </style>
@@ -464,8 +470,8 @@
 
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.182";
-    const BUILD_DATE = "2026-01-27T08:04:09";
+    const APP_VERSION = "v1.0.183";
+    const BUILD_DATE = "2026-01-27T08:10:02";
 
     // ========== CONFIG ==========
     // Reference shared data config and add app-specific config
@@ -1695,6 +1701,17 @@
           const { lat, lon } = JSON.parse(zoomTarget);
           if (lat && lon) {
             map.setView([lat, lon], 17);
+            // Add pulsing highlight marker
+            const highlightIcon = L.divIcon({
+              className: 'zone-highlight-marker',
+              iconSize: [40, 40],
+              iconAnchor: [20, 20]
+            });
+            const highlightMarker = L.marker([lat, lon], { icon: highlightIcon, zIndexOffset: 1000 }).addTo(map);
+            // Remove marker after 8 seconds
+            setTimeout(() => {
+              map.removeLayer(highlightMarker);
+            }, 8000);
           }
         } catch (e) {
           console.warn('Error parsing zoomToPoint:', e);
