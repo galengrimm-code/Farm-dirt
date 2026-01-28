@@ -1199,8 +1199,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.191";
-    const BUILD_DATE = "2026-01-27T12:58:17";
+    const APP_VERSION = "v1.0.192";
+    const BUILD_DATE = "2026-01-28T06:25:39";
 
     // Reference shared data config with import-specific additions
     const CONFIG = {
@@ -1399,7 +1399,6 @@
       if (!name || !name.trim()) return;
 
       const newClientId = DataCore.generateId('cli');
-      const newFarmId = DataCore.generateId('frm');
 
       clientsData.push({
         id: newClientId,
@@ -1407,24 +1406,14 @@
         createdAt: new Date().toISOString()
       });
 
-      farmsData.push({
-        id: newFarmId,
-        clientId: newClientId,
-        name: name.trim() + ' Farm',
-        isDefault: true,
-        createdAt: new Date().toISOString()
-      });
-
       saveClientsData();
-      saveFarmsData();
       populateBoundaryClientFarmSelectors();
 
       // Select the new client
       document.getElementById('boundaryClientSelect').value = newClientId;
       updateBoundaryFarmDropdown();
-      document.getElementById('boundaryFarmSelect').value = newFarmId;
 
-      showStatus(`Client "${name.trim()}" created`, true);
+      showStatus(`Client "${name.trim()}" created - now add a farm`, true);
     }
 
     // Quick add farm from import page
@@ -4471,6 +4460,43 @@
           }
         } catch (e) { console.warn('Could not load Samples:', e); }
 
+        // Load Settings
+        let loadedSettings = 0;
+        try {
+          const settingsRes = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: CONFIG.SHEET_ID, range: 'Settings!A2:D100'
+          });
+          if (settingsRes.result.values && settingsRes.result.values.length > 0) {
+            const newSettings = {};
+            settingsRes.result.values.forEach(row => {
+              if (row[0]) {
+                newSettings[row[0]] = { min: parseFloat(row[1]) || null, target: parseFloat(row[2]) || null, max: parseFloat(row[3]) || null };
+                loadedSettings++;
+              }
+            });
+            localStorage.setItem('soilSettings', JSON.stringify(newSettings));
+            console.log('[Sheets] Loaded', loadedSettings, 'settings');
+          }
+        } catch (e) { console.warn('Could not load Settings:', e); }
+
+        // Load Sample Sites
+        let loadedSampleSites = 0;
+        try {
+          const sitesRes = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: CONFIG.SHEET_ID, range: 'SampleSites!A2:J1000'
+          });
+          if (sitesRes.result.values && sitesRes.result.values.length > 0) {
+            const sampleSitesData = sitesRes.result.values.map(row => ({
+              SiteID: row[0] || '', Type: row[1] || '', Client: row[2] || '', Farm: row[3] || '',
+              Field: row[4] || '', Lat: parseFloat(row[5]) || 0, Lon: parseFloat(row[6]) || 0,
+              Notes: row[7] || '', Active: row[8] === 'TRUE' || row[8] === true, CreatedAt: row[9] || ''
+            })).filter(s => s.SiteID && s.Lat && s.Lon);
+            loadedSampleSites = sampleSitesData.length;
+            localStorage.setItem('sampleSitesData', JSON.stringify(sampleSitesData));
+            console.log('[Sheets] Loaded', loadedSampleSites, 'sample sites');
+          }
+        } catch (e) { console.warn('Could not load Sample Sites:', e); }
+
         // Save to local storage/IndexedDB
         await saveLocalData();
         await saveToIndexedDB();
@@ -4480,7 +4506,7 @@
         refreshFieldTable();
         populateBoundaryClientFarmSelectors();
 
-        showStatus(`✓ Loaded from Sheets: ${loadedClients} clients, ${loadedFarms} farms, ${loadedFields} fields, ${loadedSamples} samples`, true);
+        showStatus(`✓ Loaded from Sheets: ${loadedClients} clients, ${loadedFarms} farms, ${loadedFields} fields, ${loadedSamples} samples, ${loadedSettings} settings, ${loadedSampleSites} sample sites`, true);
       } catch (e) {
         showStatus('Load error: ' + e.message, false);
         console.error(e);

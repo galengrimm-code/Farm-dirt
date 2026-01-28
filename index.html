@@ -487,8 +487,8 @@
 
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.191";
-    const BUILD_DATE = "2026-01-27T12:58:17";
+    const APP_VERSION = "v1.0.192";
+    const BUILD_DATE = "2026-01-28T06:25:39";
 
     // ========== CONFIG ==========
     // Reference shared data config and add app-specific config
@@ -2249,6 +2249,35 @@
 
       try {
         console.log('Attempting public load from sheet ID:', CONFIG.SHEET_ID);
+
+        // Load Clients
+        try {
+          const clientsRes = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: CONFIG.SHEET_ID, range: 'Clients!A2:D1000'
+          });
+          if (clientsRes.result.values && clientsRes.result.values.length > 0) {
+            clientsData = clientsRes.result.values.map(row => ({
+              id: row[0] || '', name: row[1] || '', createdAt: row[2] || '', updatedAt: row[3] || ''
+            })).filter(c => c.id && c.name);
+            localStorage.setItem('clientsData', JSON.stringify(clientsData));
+            console.log('[Sheets] Loaded', clientsData.length, 'clients');
+          }
+        } catch (e) { console.warn('Could not load Clients:', e); }
+
+        // Load Farms
+        try {
+          const farmsRes = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: CONFIG.SHEET_ID, range: 'Farms!A2:E1000'
+          });
+          if (farmsRes.result.values && farmsRes.result.values.length > 0) {
+            farmsData = farmsRes.result.values.map(row => ({
+              id: row[0] || '', clientId: row[1] || '', name: row[2] || '', createdAt: row[3] || '', updatedAt: row[4] || ''
+            })).filter(f => f.id && f.name);
+            localStorage.setItem('farmsData', JSON.stringify(farmsData));
+            console.log('[Sheets] Loaded', farmsData.length, 'farms');
+          }
+        } catch (e) { console.warn('Could not load Farms:', e); }
+
         const fields = await SheetsAPI.getFields();
         // Build new boundaries object before replacing (avoid race condition)
         // Store full field data including farmId for auto-fill in sample site modal
@@ -2281,7 +2310,7 @@
           displaySampleSiteMarkers();
         } catch (e) { console.log('Sample sites not loaded:', e); }
 
-        Utils.showStatus(`Loaded ${sampleData.length} samples, ${Object.keys(fieldBoundaries).length} fields`, true);
+        Utils.showStatus(`Loaded ${clientsData.length} clients, ${farmsData.length} farms, ${Object.keys(fieldBoundaries).length} fields, ${sampleData.length} samples`, true);
 
         // Restore saved OAuth token for edit capabilities (if available)
         if (SheetsAPI.restoreSavedToken()) {
@@ -2323,6 +2352,35 @@
 
       const doLoad = async () => {
         console.log('Attempting to load from sheet ID:', CONFIG.SHEET_ID);
+
+        // Load Clients
+        try {
+          const clientsRes = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: CONFIG.SHEET_ID, range: 'Clients!A2:D1000'
+          });
+          if (clientsRes.result.values && clientsRes.result.values.length > 0) {
+            clientsData = clientsRes.result.values.map(row => ({
+              id: row[0] || '', name: row[1] || '', createdAt: row[2] || '', updatedAt: row[3] || ''
+            })).filter(c => c.id && c.name);
+            localStorage.setItem('clientsData', JSON.stringify(clientsData));
+            console.log('[Sheets] Loaded', clientsData.length, 'clients');
+          }
+        } catch (e) { console.warn('Could not load Clients:', e); }
+
+        // Load Farms
+        try {
+          const farmsRes = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: CONFIG.SHEET_ID, range: 'Farms!A2:E1000'
+          });
+          if (farmsRes.result.values && farmsRes.result.values.length > 0) {
+            farmsData = farmsRes.result.values.map(row => ({
+              id: row[0] || '', clientId: row[1] || '', name: row[2] || '', createdAt: row[3] || '', updatedAt: row[4] || ''
+            })).filter(f => f.id && f.name);
+            localStorage.setItem('farmsData', JSON.stringify(farmsData));
+            console.log('[Sheets] Loaded', farmsData.length, 'farms');
+          }
+        } catch (e) { console.warn('Could not load Farms:', e); }
+
         const fields = await SheetsAPI.getFields();
         // Build new boundaries object before replacing (avoid race condition)
         // Store full field data including farmId for auto-fill in sample site modal
@@ -2355,7 +2413,7 @@
           displaySampleSiteMarkers();
         } catch (e) { console.log('Sample sites not loaded:', e); }
 
-        Utils.showStatus(`✓ Loaded ${sampleData.length} samples, ${Object.keys(fieldBoundaries).length} fields`, true);
+        Utils.showStatus(`✓ Loaded ${clientsData.length} clients, ${farmsData.length} farms, ${Object.keys(fieldBoundaries).length} fields, ${sampleData.length} samples`, true);
       };
 
       try {
@@ -2372,7 +2430,7 @@
           Utils.showStatus('Refreshing authentication...', true);
           try {
             await SheetsAPI.refreshTokenAndRetry(doLoad);
-            Utils.showStatus(`✓ Loaded ${sampleData.length} samples, ${Object.keys(fieldBoundaries).length} fields`, true);
+            Utils.showStatus(`✓ Loaded ${clientsData.length} clients, ${farmsData.length} farms, ${Object.keys(fieldBoundaries).length} fields, ${sampleData.length} samples`, true);
             return;
           } catch (retryError) {
             console.error('Retry after refresh failed:', retryError);

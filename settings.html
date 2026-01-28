@@ -412,8 +412,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.191";
-    const BUILD_DATE = "2026-01-27T12:58:17";
+    const APP_VERSION = "v1.0.192";
+    const BUILD_DATE = "2026-01-28T06:25:39";
 
     // Reference shared data config
     const CONFIG = {
@@ -553,6 +553,31 @@
     async function loadBoundariesFromIndexedDB() {
       const data = await DataCore.loadFromIndexedDB();
       return data ? data.boundaries : null;
+    }
+
+    async function loadSamplesFromIndexedDB() {
+      const data = await DataCore.loadFromIndexedDB();
+      return data ? data.samples : null;
+    }
+
+    // Load samples from localStorage or IndexedDB
+    async function loadSampleData() {
+      try {
+        // Check IndexedDB first if flagged
+        if (localStorage.getItem('usingIndexedDB') === 'true') {
+          const idbSamples = await loadSamplesFromIndexedDB();
+          if (idbSamples && idbSamples.length > 0) {
+            console.log('Loaded samples from IndexedDB:', idbSamples.length);
+            return idbSamples;
+          }
+        }
+        // Fallback to localStorage
+        const saved = localStorage.getItem('soilSamples');
+        return saved ? JSON.parse(saved) : [];
+      } catch (e) {
+        console.error('Error loading samples:', e);
+        return [];
+      }
     }
 
     // Load field boundaries from localStorage or IndexedDB
@@ -735,7 +760,7 @@
       await loadFieldBoundaries();
       updateActiveClientSelector();
       updateActiveFarmSelector();
-      updateActiveOperationStats();
+      await updateActiveOperationStats();
       renderClientsTable();
     }
 
@@ -773,12 +798,12 @@
     }
 
     // Update the stats display showing field/sample counts
-    function updateActiveOperationStats() {
+    async function updateActiveOperationStats() {
       const container = document.getElementById('activeOperationStats');
       if (!container) return;
 
       const activeFields = getActiveFields();
-      const sampleData = JSON.parse(localStorage.getItem('soilSamples') || '[]');
+      const sampleData = await loadSampleData();
 
       // Count samples in active fields
       const activeSamples = sampleData.filter(s => activeFields.includes(s.field));
@@ -803,22 +828,22 @@
     }
 
     // Handle client dropdown change
-    function onActiveClientChange() {
+    async function onActiveClientChange() {
       const select = document.getElementById('activeClientSelect');
       activeClientId = select.value;
       activeFarmId = 'all'; // Reset farm when client changes
       saveActiveSelection();
       updateActiveFarmSelector();
-      updateActiveOperationStats();
+      await updateActiveOperationStats();
       showStatus('Active client updated', true);
     }
 
     // Handle farm dropdown change
-    function onActiveFarmChange() {
+    async function onActiveFarmChange() {
       const select = document.getElementById('activeFarmSelect');
       activeFarmId = select.value;
       saveActiveSelection();
-      updateActiveOperationStats();
+      await updateActiveOperationStats();
       showStatus('Active farm updated', true);
     }
 
