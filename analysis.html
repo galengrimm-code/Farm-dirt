@@ -739,17 +739,9 @@
           <div class="yc-filter-group">
             <label class="yc-filter-label">Nutrient</label>
             <select id="breakpointNutrient" class="yc-filter-select">
-              <option value="Zn">Zinc (Zn)</option>
-              <option value="P">Phosphorus (P)</option>
-              <option value="K">Potassium (K)</option>
-              <option value="pH">pH</option>
-              <option value="OM">Organic Matter (OM)</option>
-              <option value="S">Sulfur (S)</option>
-              <option value="CEC">CEC</option>
-              <option value="Ca_sat">Calcium Sat %</option>
-              <option value="Mg_sat">Magnesium Sat %</option>
-              <option value="K_Sat">Potassium Sat %</option>
+              <option value="">Loading...</option>
             </select>
+            <span id="breakpointNutrientCount" style="font-size: 0.7rem; color: #64748b; margin-left: 0.5rem;"></span>
           </div>
 
           <button id="runBreakpointBtn" onclick="runBreakpointAnalysis()" class="yc-run-btn">
@@ -787,12 +779,12 @@
               <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 0.5rem;">
                 <span style="display: block; font-size: 0.75rem; color: #666; margin-bottom: 0.25rem;">Confidence</span>
                 <span id="bpConfidence" style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.9rem; font-weight: 600;">--</span>
-                <span style="display: block; font-size: 0.65rem; color: #94a3b8; margin-top: 0.5rem; line-height: 1.3;">High = act on it<br>Medium = verify first<br>Low = preliminary</span>
+                <span style="display: block; font-size: 0.6rem; color: #94a3b8; margin-top: 0.5rem; line-height: 1.4;">Based on penalty size, stability %, sample count, and years of data. High = strong evidence, Medium = likely real, Low = needs more data.</span>
               </div>
               <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 0.5rem;">
                 <span style="display: block; font-size: 0.75rem; color: #666; margin-bottom: 0.25rem;">Stability</span>
                 <span id="bpStability" style="display: block; font-size: 1.5rem; font-weight: bold; color: #333;">--</span>
-                <span style="display: block; font-size: 0.65rem; color: #94a3b8; margin-top: 0.25rem; line-height: 1.3;">Consistency across<br>data subsets</span>
+                <span style="display: block; font-size: 0.6rem; color: #94a3b8; margin-top: 0.25rem; line-height: 1.4;">Bootstrap test: how often does the breakpoint land in the same range when we resample your data? Higher % = more reliable.</span>
               </div>
             </div>
             <div style="margin: 1rem 0; font-size: 0.9rem; color: #475569;">
@@ -6421,7 +6413,50 @@
     // ========== BREAKPOINT ANALYSIS ==========
 
     function initBreakpointTab() {
-      // Initialize the breakpoint tab - nothing to pre-load
+      // Populate nutrient dropdown with only nutrients that have sufficient data
+      const dataPoints = getYieldDataPoints();
+      const select = document.getElementById('breakpointNutrient');
+      const countSpan = document.getElementById('breakpointNutrientCount');
+
+      if (!dataPoints || dataPoints.length < 10) {
+        select.innerHTML = '<option value="">Need yield data first</option>';
+        countSpan.textContent = '';
+        return;
+      }
+
+      const allNutrients = [
+        { key: 'Zn', name: 'Zinc (Zn)' },
+        { key: 'P', name: 'Phosphorus (P)' },
+        { key: 'K', name: 'Potassium (K)' },
+        { key: 'pH', name: 'pH' },
+        { key: 'OM', name: 'Organic Matter (OM)' },
+        { key: 'S', name: 'Sulfur (S)' },
+        { key: 'CEC', name: 'CEC' },
+        { key: 'Ca_sat', name: 'Calcium Sat %' },
+        { key: 'Mg_sat', name: 'Magnesium Sat %' },
+        { key: 'K_Sat', name: 'Potassium Sat %' }
+      ];
+
+      // Check which nutrients have enough data points (at least 10 with both yield and nutrient value)
+      const nutrientsWithData = allNutrients.filter(n => {
+        const validPoints = dataPoints.filter(p => {
+          const val = parseFloat(p[n.key]);
+          return !isNaN(val) && val > 0;
+        });
+        return validPoints.length >= 10;
+      });
+
+      if (nutrientsWithData.length === 0) {
+        select.innerHTML = '<option value="">No nutrients with sufficient data</option>';
+        countSpan.textContent = '';
+        return;
+      }
+
+      select.innerHTML = nutrientsWithData.map(n =>
+        `<option value="${n.key}">${n.name}</option>`
+      ).join('');
+
+      countSpan.textContent = `(${nutrientsWithData.length} available)`;
     }
 
     // Store classified data globally for filtering
