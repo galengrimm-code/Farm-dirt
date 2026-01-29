@@ -793,6 +793,11 @@
                 <span id="bpStability" style="display: block; font-size: 1.5rem; font-weight: bold; color: #333;">--</span>
               </div>
             </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem; color: #64748b;">
+              <strong style="color: #475569;">Understanding the metrics:</strong>
+              <span style="margin-left: 0.5rem;"><strong>Confidence</strong> = How reliable is this breakpoint? Based on yield penalty size, data consistency, and years of data. High = act on it, Medium = likely real but verify, Low = preliminary.</span>
+              <span style="margin-left: 0.5rem;"><strong>Stability</strong> = How consistent is this breakpoint across random subsets of your data? Higher % = more robust finding.</span>
+            </div>
             <div style="margin: 1rem 0; font-size: 0.9rem; color: #475569;">
               <p style="margin: 0.5rem 0;"><strong>Below breakpoint:</strong> <span id="bpNBelow">--</span> points, avg yield <span id="bpMeanBelow">--</span> bu/ac</p>
               <p style="margin: 0.5rem 0;"><strong>Above breakpoint:</strong> <span id="bpNAbove">--</span> points, avg yield <span id="bpMeanAbove">--</span> bu/ac</p>
@@ -5445,7 +5450,7 @@
         const formatYield = (bucket) => {
           if (bucket.avgYield === null) return '<span style="color: #9ca3af;">-</span>';
           const pct = r.totalSamples > 0 ? ((bucket.count / r.totalSamples) * 100).toFixed(0) : 0;
-          return `<strong>${bucket.avgYield.toFixed(1)}</strong> <span style="color: #64748b; font-size: 0.75rem;">bu/ac</span><br><span style="color: #64748b; font-size: 0.7rem;">n=${bucket.count} (${pct}%)</span>`;
+          return `<strong>${bucket.avgYield.toFixed(1)}</strong> <span style="color: #64748b; font-size: 0.75rem;">bu/ac</span><br><span style="color: #64748b; font-size: 0.7rem;">${bucket.count} samples (${pct}%)</span>`;
         };
 
         const impactColor = r.yieldDiff !== null ? (r.yieldDiff > 0 ? '#166534' : '#991b1b') : '#64748b';
