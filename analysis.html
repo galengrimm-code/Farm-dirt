@@ -569,13 +569,24 @@
             </div>
           </div>
         </div>
-        <!-- Outlier Filter -->
+        <!-- Outlier Filter & X-Axis Zoom -->
         <div style="margin-bottom: 0.75rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
           <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.375rem 0.75rem; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 0.375rem;">
             <input type="checkbox" id="hideOutliersCheckbox" checked onchange="drawScatterPlot();" style="width: 16px; height: 16px;">
             <span style="font-size: 0.85rem; color: #991b1b; font-weight: 500;">Hide outliers</span>
           </label>
           <span id="outlierFilterInfo" style="font-size: 0.8rem; color: #dc2626;"></span>
+          <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0.75rem; background: #eff6ff; border: 1px solid #93c5fd; border-radius: 0.375rem;">
+            <label style="font-size: 0.85rem; color: #1e40af; font-weight: 500;">X-Axis Zoom:</label>
+            <select id="xAxisZoomSelect" onchange="drawScatterPlot();" style="padding: 0.25rem; border-radius: 0.25rem; border: 1px solid #93c5fd; font-size: 0.8rem;">
+              <option value="100">Full range</option>
+              <option value="95">0-95th percentile</option>
+              <option value="90" selected>0-90th percentile</option>
+              <option value="85">0-85th percentile</option>
+              <option value="80">0-80th percentile</option>
+            </select>
+            <span id="xAxisZoomInfo" style="font-size: 0.75rem; color: #3b82f6;"></span>
+          </div>
         </div>
         <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
           <div style="flex: 1; min-width: 600px;">
@@ -4798,10 +4809,35 @@
       // When flipped: X = Yield, Y = Nutrient
       const xValues = scatterAxesFlipped ? yieldValues : nutrientValues;
       const yValues = scatterAxesFlipped ? nutrientValues : yieldValues;
-      const xMin = Math.min(...xValues);
-      const xMax = Math.max(...xValues);
+
+      // Full data range (used for trend line calculation)
+      const xMinFull = Math.min(...xValues);
+      const xMaxFull = Math.max(...xValues);
       const yMin = Math.min(...yValues);
       const yMax = Math.max(...yValues);
+
+      // X-axis zoom - calculate percentile for display range
+      const xAxisZoom = parseInt(document.getElementById('xAxisZoomSelect').value) || 100;
+      let xMin = xMinFull;
+      let xMax = xMaxFull;
+      let pointsOutsideZoom = 0;
+
+      if (xAxisZoom < 100) {
+        const sortedX = [...xValues].sort((a, b) => a - b);
+        const percentileIndex = Math.floor(sortedX.length * (xAxisZoom / 100));
+        xMax = sortedX[Math.min(percentileIndex, sortedX.length - 1)];
+        // Add small padding to max
+        xMax = xMax + (xMax - xMin) * 0.02;
+        pointsOutsideZoom = xValues.filter(x => x > xMax).length;
+      }
+
+      // Update zoom info
+      const zoomInfoEl = document.getElementById('xAxisZoomInfo');
+      if (pointsOutsideZoom > 0) {
+        zoomInfoEl.textContent = `(${pointsOutsideZoom} points beyond view)`;
+      } else {
+        zoomInfoEl.textContent = '';
+      }
 
       // Labels for axes - check if normalized
       const normalizeByField = document.getElementById('yieldNormalizeToggle').checked;
@@ -4863,6 +4899,12 @@
         ctx.lineTo(x, canvas.height - padding.bottom);
         ctx.stroke();
       }
+
+      // Set up clipping region for plot area (so zoomed-out points don't draw outside)
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(padding.left, padding.top, plotWidth, plotHeight);
+      ctx.clip();
 
       // Draw confidence bands (95% CI)
       if (n > 5 && ssX > 0) {
@@ -4985,6 +5027,9 @@
         ctx.lineTo(xScale(xMax), yScale(y2));
         ctx.stroke();
       }
+
+      // Restore canvas state (remove clipping)
+      ctx.restore();
 
       // Draw axis labels
       ctx.fillStyle = '#64748b';
