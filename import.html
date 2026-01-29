@@ -188,8 +188,8 @@
       <h3>🔬 Import Soil Samples</h3>
       <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
         <div class="form-group">
-          <label>Sample Year <span style="font-weight: 400; font-size: 0.75rem; color: #dc2626;">(required)</span></label>
-          <input type="text" id="sampleYear" placeholder="e.g., 2024" style="width: 120px; border: 2px solid #dc2626; background: #fef2f2;" required>
+          <label>Sample Year <span id="yearRequiredLabel" style="font-weight: 400; font-size: 0.75rem; color: #dc2626;">(required for shapefiles)</span></label>
+          <input type="text" id="sampleYear" placeholder="e.g., 2024" style="width: 120px; border: 2px solid #dc2626; background: #fef2f2;">
         </div>
         <div class="form-group">
           <label>Sample Depth <span style="font-weight: 400; font-size: 0.75rem; color: #166534;">(default: 6")</span></label>
@@ -764,7 +764,7 @@
                 </div>
               </div>
               <div class="csv-mapping-field">
-                <label style="font-size: 0.8rem; font-weight: 500;">Sample Year <span style="font-weight: 400; color: #64748b;">← CSV column:</span></label>
+                <label style="font-size: 0.8rem; font-weight: 500;">Sample Year <span style="font-weight: 400; color: #166534;">(reads from CSV)</span> <span style="font-weight: 400; color: #64748b;">← CSV column:</span></label>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                   <select id="csvMapYear" class="csv-map-select" style="flex: 1;" onchange="updateCsvPreview('Year')"></select>
                   <span id="csvPreviewYear" class="shp-preview-values"></span>
@@ -5743,7 +5743,9 @@
         lat: document.getElementById('csvMapLat').value,
         lon: document.getElementById('csvMapLon').value,
         sampleId: document.getElementById('csvMapSampleId').value,
-        field: document.getElementById('csvMapField').value
+        field: document.getElementById('csvMapField').value,
+        year: document.getElementById('csvMapYear').value,
+        depth: document.getElementById('csvMapDepth').value
       };
 
       const nutrients = ['pH', 'Buffer_pH', 'P', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts'];
@@ -5798,30 +5800,71 @@
         warnings.push(`⚠️ ${missingLatLon} rows have missing or invalid coordinates and will be skipped`);
       }
 
+      // Check if year mapping exists
+      const hasYearMapping = csvMappings.year && csvMappings.year.trim() !== '';
+      const formYearValue = document.getElementById('sampleYear').value.trim();
+      if (!hasYearMapping && !formYearValue) {
+        warnings.push(`⚠️ No Year column mapped and Sample Year field is empty - please map a Year column or enter a year above`);
+      } else if (hasYearMapping) {
+        // Count rows with valid years
+        let missingYears = 0;
+        csvParsedData.forEach(row => {
+          const yearVal = row[csvMappings.year];
+          if (!yearVal) {
+            missingYears++;
+          } else {
+            const parsed = parseInt(yearVal);
+            if (isNaN(parsed) || parsed < 1900 || parsed > 2100) {
+              // Try to extract 4-digit year
+              const match = String(yearVal).match(/\d{4}/);
+              if (!match) missingYears++;
+            }
+          }
+        });
+        if (missingYears > 0 && !formYearValue) {
+          warnings.push(`⚠️ ${missingYears} rows have missing/invalid year values and will be skipped (enter a Sample Year above to use as fallback)`);
+        } else if (missingYears > 0) {
+          warnings.push(`ℹ️ ${missingYears} rows have missing/invalid year values - will use "${formYearValue}" as fallback`);
+        }
+      }
+
       const warningsDiv = document.getElementById('csvPreviewWarnings');
       if (warnings.length > 0) {
         warningsDiv.innerHTML = warnings.map(w =>
-          `<div style="padding: 0.5rem; background: #fef3c7; border: 1px solid #fcd34d; border-radius: 0.25rem; margin-bottom: 0.5rem; font-size: 0.85rem; color: #92400e;">${w}</div>`
+          `<div style="padding: 0.5rem; background: ${w.startsWith('ℹ️') ? '#eff6ff; border: 1px solid #93c5fd;' : '#fef3c7; border: 1px solid #fcd34d;'} border-radius: 0.25rem; margin-bottom: 0.5rem; font-size: 0.85rem; color: ${w.startsWith('ℹ️') ? '#1e40af' : '#92400e'};">${w}</div>`
         ).join('');
       } else {
-        warningsDiv.innerHTML = `<div style="padding: 0.5rem; background: #dcfce7; border: 1px solid #22c55e; border-radius: 0.25rem; font-size: 0.85rem; color: #166534;">✓ All rows have valid coordinates</div>`;
+        warningsDiv.innerHTML = `<div style="padding: 0.5rem; background: #dcfce7; border: 1px solid #22c55e; border-radius: 0.25rem; font-size: 0.85rem; color: #166534;">✓ All rows have valid coordinates${hasYearMapping ? ' and years' : ''}</div>`;
       }
     }
 
     // Perform the CSV import
     async function csvImportConfirm() {
-      // Validate required year
+      // Check if year is mapped from CSV
+      const hasYearMapping = csvMappings.year && csvMappings.year.trim() !== '';
+
+      // Only require form year if no CSV year mapping
       const yearInput = document.getElementById('sampleYear').value.trim();
-      if (!yearInput) {
-        showStatus('Sample Year is required', false);
-        document.getElementById('sampleYear').focus();
-        return;
-      }
-      const year = parseInt(yearInput);
-      if (isNaN(year) || year < 1900 || year > 2100) {
-        showStatus('Please enter a valid year (e.g., 2024)', false);
-        document.getElementById('sampleYear').focus();
-        return;
+      let fallbackYear = null;
+
+      if (!hasYearMapping) {
+        if (!yearInput) {
+          showStatus('Sample Year is required (no year column mapped from CSV)', false);
+          document.getElementById('sampleYear').focus();
+          return;
+        }
+        fallbackYear = parseInt(yearInput);
+        if (isNaN(fallbackYear) || fallbackYear < 1900 || fallbackYear > 2100) {
+          showStatus('Please enter a valid year (e.g., 2024)', false);
+          document.getElementById('sampleYear').focus();
+          return;
+        }
+      } else if (yearInput) {
+        // If year is provided in form, use it as fallback for rows without year
+        fallbackYear = parseInt(yearInput);
+        if (isNaN(fallbackYear) || fallbackYear < 1900 || fallbackYear > 2100) {
+          fallbackYear = null;
+        }
       }
 
       // Save mapping if requested
@@ -5848,14 +5891,41 @@
           return;
         }
 
+        // Get year from CSV column if mapped, otherwise use fallback
+        let sampleYear = fallbackYear;
+        if (hasYearMapping && row[csvMappings.year]) {
+          const csvYear = parseInt(row[csvMappings.year]);
+          if (!isNaN(csvYear) && csvYear >= 1900 && csvYear <= 2100) {
+            sampleYear = csvYear;
+          } else {
+            // Try to extract 4-digit year from string
+            const yearMatch = String(row[csvMappings.year]).match(/\d{4}/);
+            if (yearMatch) {
+              sampleYear = parseInt(yearMatch[0]);
+            }
+          }
+        }
+
+        // Get depth from CSV column if mapped, otherwise use form value
+        let sampleDepth = depth;
+        if (csvMappings.depth && row[csvMappings.depth]) {
+          sampleDepth = row[csvMappings.depth];
+        }
+
         const sample = {
           lat: lat,
           lon: lon,
-          year: year,
-          depth: depth,
+          year: sampleYear,
+          depth: sampleDepth,
           sampleId: csvMappings.sampleId ? (row[csvMappings.sampleId] || `S${idx + 1}`) : `S${idx + 1}`,
           field: csvMappings.field ? (row[csvMappings.field] || 'Unknown') : 'Unknown'
         };
+
+        // Skip samples without a valid year
+        if (!sampleYear) {
+          skipped++;
+          return;
+        }
 
         // Add nutrient values
         const nutrients = ['pH', 'Buffer_pH', 'P', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts'];
@@ -5872,7 +5942,7 @@
       });
 
       if (samples.length === 0) {
-        showStatus('No valid samples to import', false);
+        showStatus('No valid samples to import. Check that rows have valid coordinates and year values.', false);
         return;
       }
 

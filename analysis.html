@@ -5444,7 +5444,8 @@
       results.forEach((r, idx) => {
         const formatYield = (bucket) => {
           if (bucket.avgYield === null) return '<span style="color: #9ca3af;">-</span>';
-          return `<strong>${bucket.avgYield.toFixed(1)}</strong> <span style="color: #64748b; font-size: 0.75rem;">bu/ac</span><br><span style="color: #64748b; font-size: 0.7rem;">(n=${bucket.count})</span>`;
+          const pct = r.totalSamples > 0 ? ((bucket.count / r.totalSamples) * 100).toFixed(0) : 0;
+          return `<strong>${bucket.avgYield.toFixed(1)}</strong> <span style="color: #64748b; font-size: 0.75rem;">bu/ac</span><br><span style="color: #64748b; font-size: 0.7rem;">n=${bucket.count} (${pct}%)</span>`;
         };
 
         const impactColor = r.yieldDiff !== null ? (r.yieldDiff > 0 ? '#166534' : '#991b1b') : '#64748b';
