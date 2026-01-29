@@ -787,16 +787,13 @@
               <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 0.5rem;">
                 <span style="display: block; font-size: 0.75rem; color: #666; margin-bottom: 0.25rem;">Confidence</span>
                 <span id="bpConfidence" style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.9rem; font-weight: 600;">--</span>
+                <span style="display: block; font-size: 0.65rem; color: #94a3b8; margin-top: 0.5rem; line-height: 1.3;">High = act on it<br>Medium = verify first<br>Low = preliminary</span>
               </div>
               <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 0.5rem;">
                 <span style="display: block; font-size: 0.75rem; color: #666; margin-bottom: 0.25rem;">Stability</span>
                 <span id="bpStability" style="display: block; font-size: 1.5rem; font-weight: bold; color: #333;">--</span>
+                <span style="display: block; font-size: 0.65rem; color: #94a3b8; margin-top: 0.25rem; line-height: 1.3;">Consistency across<br>data subsets</span>
               </div>
-            </div>
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem; color: #64748b;">
-              <strong style="color: #475569;">Understanding the metrics:</strong>
-              <span style="margin-left: 0.5rem;"><strong>Confidence</strong> = How reliable is this breakpoint? Based on yield penalty size, data consistency, and years of data. High = act on it, Medium = likely real but verify, Low = preliminary.</span>
-              <span style="margin-left: 0.5rem;"><strong>Stability</strong> = How consistent is this breakpoint across random subsets of your data? Higher % = more robust finding.</span>
             </div>
             <div style="margin: 1rem 0; font-size: 0.9rem; color: #475569;">
               <p style="margin: 0.5rem 0;"><strong>Below breakpoint:</strong> <span id="bpNBelow">--</span> points, avg yield <span id="bpMeanBelow">--</span> bu/ac</p>
