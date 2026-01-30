@@ -318,6 +318,16 @@
           <input type="file" id="yieldFiles" multiple accept=".shp,.dbf,.prj,.shx,.zip">
           <small>Batch upload supported: select up to 250 ZIPs or .shp/.dbf pairs at once (auto-matched by name)</small>
         </div>
+        <div id="quickYieldColumnSection" style="display: none; margin-top: 0.5rem;">
+          <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 0.5rem; padding: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+              <label style="margin: 0; font-weight: 500; white-space: nowrap;">Yield Column:</label>
+              <select id="quickYieldColumn" style="flex: 1; min-width: 150px; max-width: 300px;" onchange="updateQuickYieldPreview()"></select>
+              <span id="quickYieldPreview" style="color: #64748b; font-size: 0.85rem;"></span>
+            </div>
+            <small id="quickYieldColumnStatus" style="color: #16a34a; display: block; margin-top: 0.25rem;"></small>
+          </div>
+        </div>
         <button class="button" id="uploadYieldBtn" style="background: #f59e0b; color: white;">Upload Yield Data</button>
       </div>
 
@@ -1456,6 +1466,7 @@
       document.getElementById('uploadBoundaryBtn').addEventListener('click', uploadBoundaries);
       document.getElementById('uploadSampleBtn').addEventListener('click', uploadSamples);
       document.getElementById('uploadYieldBtn').addEventListener('click', uploadYield);
+      document.getElementById('yieldFiles').addEventListener('change', onQuickYieldFilesChange);
       document.getElementById('loadFromSheetsBtn').addEventListener('click', loadFromSheets);
       document.getElementById('syncToSheetsBtn').addEventListener('click', syncToSheets);
       document.getElementById('clearSamplesBtn').addEventListener('click', clearSamples);
@@ -2540,6 +2551,194 @@
       fieldName: ['FieldName', 'Field', 'FIELD', 'Farm', 'FARM', 'Field_Name', 'Grower', 'Client']
     };
 
+    // State for quick yield column selection
+    let quickYieldColumns = {
+      fields: [],
+      sampleValues: {},
+      selectedField: null
+    };
+
+    // Handle file selection for quick yield import - detect columns
+    async function onQuickYieldFilesChange() {
+      const fileInput = document.getElementById('yieldFiles');
+      const files = fileInput.files;
+      const section = document.getElementById('quickYieldColumnSection');
+      const select = document.getElementById('quickYieldColumn');
+      const preview = document.getElementById('quickYieldPreview');
+      const status = document.getElementById('quickYieldColumnStatus');
+
+      if (!files.length) {
+        section.style.display = 'none';
+        quickYieldColumns = { fields: [], sampleValues: {}, selectedField: null };
+        return;
+      }
+
+      try {
+        // Find first shapefile to peek at columns
+        const zipFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.zip'));
+        const shpFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.shp'));
+        const dbfFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.dbf'));
+
+        let columns = [];
+        let sampleValues = {};
+
+        if (zipFiles.length > 0) {
+          // Peek into first ZIP
+          const result = await peekYieldColumnsFromZip(zipFiles[0]);
+          columns = result.fields;
+          sampleValues = result.sampleValues;
+        } else if (shpFiles.length > 0 && dbfFiles.length > 0) {
+          // Peek at first shp/dbf pair
+          const baseName = shpFiles[0].name.toLowerCase().replace('.shp', '');
+          const dbfFile = dbfFiles.find(f => f.name.toLowerCase().replace('.dbf', '') === baseName);
+          if (dbfFile) {
+            const dbfBuffer = await dbfFile.arrayBuffer();
+            const result = peekYieldColumnsFromDbf(dbfBuffer);
+            columns = result.fields;
+            sampleValues = result.sampleValues;
+          }
+        }
+
+        if (columns.length === 0) {
+          section.style.display = 'none';
+          return;
+        }
+
+        quickYieldColumns.fields = columns;
+        quickYieldColumns.sampleValues = sampleValues;
+
+        // Populate dropdown
+        select.innerHTML = columns.map(f => `<option value="${f}">${f}</option>`).join('');
+
+        // Auto-detect best match
+        let matched = null;
+        const aliases = YIELD_FIELD_ALIASES.yield;
+        for (const alias of aliases) {
+          const found = columns.find(f => f.toLowerCase() === alias.toLowerCase());
+          if (found) { matched = found; break; }
+        }
+        if (!matched) {
+          for (const alias of aliases) {
+            const found = columns.find(f => f.toLowerCase().includes(alias.toLowerCase()));
+            if (found) { matched = found; break; }
+          }
+        }
+
+        if (matched) {
+          select.value = matched;
+          quickYieldColumns.selectedField = matched;
+          status.innerHTML = `<span style="color: #16a34a;">✓ Auto-detected: ${matched}</span>`;
+        } else {
+          quickYieldColumns.selectedField = columns[0];
+          status.innerHTML = `<span style="color: #f59e0b;">⚠️ Could not auto-detect. Please select yield column.</span>`;
+        }
+
+        updateQuickYieldPreview();
+        section.style.display = 'block';
+
+      } catch (err) {
+        console.warn('Error peeking at columns:', err);
+        section.style.display = 'none';
+      }
+    }
+
+    // Peek at columns from ZIP file
+    async function peekYieldColumnsFromZip(zipFile) {
+      const JSZip = window.JSZip || (await loadJSZip());
+      const zip = await JSZip.loadAsync(zipFile);
+
+      let dbfData = null;
+      for (const [name, file] of Object.entries(zip.files)) {
+        if (file.dir) continue;
+        if (name.toLowerCase().endsWith('.dbf')) {
+          dbfData = await file.async('arraybuffer');
+          break;
+        }
+      }
+
+      if (!dbfData) return { fields: [], sampleValues: {} };
+      return peekYieldColumnsFromDbf(dbfData);
+    }
+
+    // Peek at columns from DBF buffer
+    function peekYieldColumnsFromDbf(dbfBuffer) {
+      const fields = [];
+      const sampleValues = {};
+
+      const dbfView = new DataView(dbfBuffer);
+      const numRecords = dbfView.getUint32(4, true);
+      const headerSize = dbfView.getUint16(8, true);
+      const recordSize = dbfView.getUint16(10, true);
+
+      const bytesToString = (buffer, start, length) => {
+        const bytes = new Uint8Array(buffer.slice(start, start + length));
+        let str = '';
+        for (let i = 0; i < bytes.length; i++) {
+          if (bytes[i] === 0) break;
+          str += String.fromCharCode(bytes[i]);
+        }
+        return str.trim();
+      };
+
+      // Parse field descriptors
+      const fieldDefs = [];
+      let offset = 32;
+      while (offset < headerSize - 1) {
+        const fieldName = bytesToString(dbfBuffer, offset, 11);
+        if (!fieldName) break;
+        const fieldType = String.fromCharCode(dbfView.getUint8(offset + 11));
+        const fieldLen = dbfView.getUint8(offset + 16);
+        fieldDefs.push({ name: fieldName, type: fieldType, length: fieldLen });
+        fields.push(fieldName);
+        offset += 32;
+      }
+
+      // Read first few records for sample values
+      let dbfOffset = headerSize;
+      const samples = {};
+      fields.forEach(f => samples[f] = []);
+
+      for (let i = 0; i < Math.min(5, numRecords); i++) {
+        dbfOffset++; // Skip deletion flag
+        let fieldOffset = 0;
+
+        for (const field of fieldDefs) {
+          const rawValue = bytesToString(dbfBuffer, dbfOffset + fieldOffset, field.length);
+          if (rawValue && samples[field.name].length < 3) {
+            if (field.type === 'N' || field.type === 'F') {
+              const num = parseFloat(rawValue);
+              if (!isNaN(num)) samples[field.name].push(num.toFixed(1));
+            } else {
+              samples[field.name].push(rawValue.substring(0, 15));
+            }
+          }
+          fieldOffset += field.length;
+        }
+        dbfOffset += recordSize - 1;
+      }
+
+      for (const f of fields) {
+        sampleValues[f] = samples[f].join(', ');
+      }
+
+      return { fields, sampleValues };
+    }
+
+    // Update preview when column selection changes
+    function updateQuickYieldPreview() {
+      const select = document.getElementById('quickYieldColumn');
+      const preview = document.getElementById('quickYieldPreview');
+      const selectedField = select.value;
+
+      quickYieldColumns.selectedField = selectedField;
+
+      if (selectedField && quickYieldColumns.sampleValues[selectedField]) {
+        preview.textContent = 'Sample: ' + quickYieldColumns.sampleValues[selectedField];
+      } else {
+        preview.textContent = '';
+      }
+    }
+
     // State for raw yield import
     let rawYieldData = {
       rawPoints: [],        // All parsed points before cleaning
@@ -3241,6 +3440,9 @@
       if (!files.length) { showStatus('Please select yield file(s)', false); return; }
       if (!yieldCrop) { showStatus('Please select a crop type before importing', false); return; }
 
+      // Get user-selected yield column (if available)
+      const selectedYieldColumn = quickYieldColumns.selectedField || null;
+
       statusEl.innerHTML = '<span style="color: #3b82f6;">⏳ Processing yield data...</span>';
 
       try {
@@ -3281,7 +3483,7 @@
             try {
               statusEl.innerHTML = `<span style="color: #3b82f6;">⏳ Processing file ${i + 1} of ${totalFiles}: ${zipFile.name}<br><small>${totalPointsLoaded.toLocaleString()} points loaded so far</small></span>`;
               await breathe(); // Let UI update
-              const result = await parseYieldFromZip(zipFile);
+              const result = await parseYieldFromZip(zipFile, selectedYieldColumn);
               addPoints(result.points);
               if (result.detectedYear && !detectedYear) {
                 detectedYear = result.detectedYear;
@@ -3299,7 +3501,7 @@
 
         } else if (zipFiles.length === 1) {
           // Single ZIP file
-          const result = await parseYieldFromZip(zipFiles[0]);
+          const result = await parseYieldFromZip(zipFiles[0], selectedYieldColumn);
           addPoints(result.points);
           detectedYear = result.detectedYear;
           filesProcessed = 1;
@@ -3331,7 +3533,7 @@
               await breathe(); // Let UI update
               const shpBuffer = await shpFile.arrayBuffer();
               const dbfBuffer = await dbfFile.arrayBuffer();
-              const result = parseYieldShapefile(shpBuffer, dbfBuffer);
+              const result = parseYieldShapefile(shpBuffer, dbfBuffer, selectedYieldColumn);
               addPoints(result.points);
               if (result.detectedYear && !detectedYear) {
                 detectedYear = result.detectedYear;
@@ -3349,7 +3551,7 @@
 
         } else {
           // Single shapefile (loose files)
-          const result = await parseYieldFromShapefiles(files);
+          const result = await parseYieldFromShapefiles(files, selectedYieldColumn);
           addPoints(result.points);
           detectedYear = result.detectedYear;
           filesProcessed = 1;
@@ -3495,44 +3697,48 @@
 
         fileInput.value = '';
 
+        // Reset column selector
+        document.getElementById('quickYieldColumnSection').style.display = 'none';
+        quickYieldColumns = { fields: [], sampleValues: {}, selectedField: null };
+
       } catch (e) {
         console.error('Yield upload error:', e);
         statusEl.innerHTML = `<span style="color: #ef4444;">❌ Error: ${e.message}</span>`;
       }
     }
     
-    async function parseYieldFromZip(zipFile) {
+    async function parseYieldFromZip(zipFile, overrideYieldField = null) {
       const JSZip = window.JSZip || (await loadJSZip());
       const zip = await JSZip.loadAsync(zipFile);
-      
+
       let shpFile, dbfFile;
       for (const [name, file] of Object.entries(zip.files)) {
         const lower = name.toLowerCase();
         if (lower.endsWith('.shp')) shpFile = file;
         if (lower.endsWith('.dbf')) dbfFile = file;
       }
-      
+
       if (!shpFile || !dbfFile) throw new Error('ZIP must contain .shp and .dbf files');
-      
+
       const shpBuffer = await shpFile.async('arraybuffer');
       const dbfBuffer = await dbfFile.async('arraybuffer');
-      
-      return parseYieldShapefile(shpBuffer, dbfBuffer);
+
+      return parseYieldShapefile(shpBuffer, dbfBuffer, overrideYieldField);
     }
-    
-    async function parseYieldFromShapefiles(files) {
+
+    async function parseYieldFromShapefiles(files, overrideYieldField = null) {
       const fileMap = {};
       for (const f of files) {
         const ext = f.name.split('.').pop().toLowerCase();
         fileMap[ext] = await f.arrayBuffer();
       }
-      
+
       if (!fileMap.shp || !fileMap.dbf) throw new Error('Need both .shp and .dbf files');
-      
-      return parseYieldShapefile(fileMap.shp, fileMap.dbf);
+
+      return parseYieldShapefile(fileMap.shp, fileMap.dbf, overrideYieldField);
     }
-    
-    function parseYieldShapefile(shpBuffer, dbfBuffer) {
+
+    function parseYieldShapefile(shpBuffer, dbfBuffer, overrideYieldField = null) {
       const points = [];
       
       // Parse DBF for attributes
@@ -3564,12 +3770,23 @@
         offset += 32;
       }
       
-      // Find yield field - common names from JD and Climate
-      const yieldFieldNames = ['VRYIELDVO', 'Yld_Vol_Dr', 'YLD_VOL_DR', 'YIELD', 'DryYield', 'Dry_Yield', 'YldVolDry', 'YldMassDry', 'VRYIELDMA', 'Yld_Mass_D'];
-      let yieldField = fields.find(f => yieldFieldNames.includes(f.name));
+      // Find yield field - use override if provided, otherwise auto-detect
+      let yieldField = null;
+      if (overrideYieldField) {
+        yieldField = fields.find(f => f.name === overrideYieldField);
+        if (!yieldField) {
+          console.warn('Override field not found:', overrideYieldField, 'Available:', fields.map(f => f.name));
+        }
+      }
+
       if (!yieldField) {
-        // Try partial match
-        yieldField = fields.find(f => f.name.toLowerCase().includes('yield') || f.name.toLowerCase().includes('yld'));
+        // Auto-detect - common names from JD and Climate
+        const yieldFieldNames = ['VRYIELDVO', 'Yld_Vol_Dr', 'YLD_VOL_DR', 'YIELD', 'DryYield', 'Dry_Yield', 'YldVolDry', 'YldMassDry', 'VRYIELDMA', 'Yld_Mass_D'];
+        yieldField = fields.find(f => yieldFieldNames.includes(f.name));
+        if (!yieldField) {
+          // Try partial match
+          yieldField = fields.find(f => f.name.toLowerCase().includes('yield') || f.name.toLowerCase().includes('yld'));
+        }
       }
 
       if (!yieldField) {
