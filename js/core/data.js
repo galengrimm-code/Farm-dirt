@@ -563,6 +563,9 @@ function handlePickerSelection(data) {
     localStorage.setItem('googleSheetId', sheetId);
     localStorage.setItem('googleSheetName', sheetName);
 
+    // Mark as authorized with new scope
+    localStorage.setItem('pickerAuthorized', 'true');
+
     // Update URL for bookmarking
     const newUrl = new URL(window.location.href);
     newUrl.searchParams.set('sheet', sheetId);
@@ -576,6 +579,12 @@ function handlePickerSelection(data) {
       pickerCallback({ cancelled: true });
     }
   }
+}
+
+function needsMigration() {
+  const savedSheetId = localStorage.getItem('googleSheetId');
+  const hasReauthorized = localStorage.getItem('pickerAuthorized');
+  return savedSheetId && !hasReauthorized;
 }
 
 async function createNewSheet(operationName) {
@@ -614,6 +623,9 @@ async function createNewSheet(operationName) {
   // Save connection
   localStorage.setItem('googleSheetId', sheetId);
   localStorage.setItem('googleSheetName', sheetName);
+
+  // Mark as authorized with new scope
+  localStorage.setItem('pickerAuthorized', 'true');
 
   // Update URL
   const newUrl = new URL(window.location.href);
@@ -696,7 +708,8 @@ window.DataCore = {
 
   // Google Picker
   openSheetPicker,
-  createNewSheet
+  createNewSheet,
+  needsMigration
 };
 
 })();

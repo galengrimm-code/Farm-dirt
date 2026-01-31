@@ -158,6 +158,25 @@
       <h3>☁️ Google Sheets Connection</h3>
       <p style="color: #64748b; margin-bottom: 1rem; font-size: 0.875rem;">Connect to a Google Sheet to sync your data across devices and share with your team.</p>
 
+      <!-- Migration state (shown when user needs to re-authorize) -->
+      <div id="migrationState" style="display: none;">
+        <div style="padding: 1rem; background: #fef3c7; border: 1px solid #fcd34d; border-radius: 0.5rem; margin-bottom: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span style="font-size: 1.25rem;">🔄</span>
+            <strong style="color: #92400e;">Quick Update Required</strong>
+          </div>
+          <p style="margin: 0 0 0.75rem 0; color: #92400e; font-size: 0.875rem;">
+            We've improved how the app connects to Google Sheets for better security. Please re-select your sheet to continue.
+          </p>
+          <p style="margin: 0; color: #a16207; font-size: 0.8125rem;">
+            Your data is safe - this just re-authorizes access.
+          </p>
+        </div>
+        <button class="button primary" onclick="handleMigration()" style="width: 100%;">
+          📊 Select My Sheet
+        </button>
+      </div>
+
       <!-- Connected state (shown when sheet is connected) -->
       <div id="connectedState" style="display: none;">
         <div style="padding: 1rem; background: #f0fdf4; border: 1px solid #86efac; border-radius: 0.5rem; margin-bottom: 1rem;">
@@ -1581,22 +1600,44 @@
     function updateConnectionStatusIndicator() {
       const sheetId = localStorage.getItem('googleSheetId');
       const sheetName = localStorage.getItem('googleSheetName');
+      const migrationState = document.getElementById('migrationState');
       const connectedState = document.getElementById('connectedState');
       const setupState = document.getElementById('setupState');
       const statusEl = document.getElementById('connectionStatus');
 
-      if (sheetId) {
+      // Hide all states first
+      migrationState.style.display = 'none';
+      connectedState.style.display = 'none';
+      setupState.style.display = 'none';
+      statusEl.innerHTML = '';
+
+      if (DataCore.needsMigration()) {
+        // Show migration prompt for users with old-style connection
+        migrationState.style.display = 'block';
+      } else if (sheetId) {
         // Show connected state
         connectedState.style.display = 'block';
-        setupState.style.display = 'none';
         document.getElementById('connectedSheetName').textContent = sheetName || `Sheet ID: ${sheetId.substring(0, 20)}...`;
-        statusEl.innerHTML = '';
       } else {
         // Show setup state
-        connectedState.style.display = 'none';
         setupState.style.display = 'block';
-        statusEl.innerHTML = '';
       }
+    }
+
+    function handleMigration() {
+      const statusEl = document.getElementById('connectionStatus');
+      statusEl.innerHTML = '<span style="color: #3b82f6;">🔄 Opening Google Drive picker...</span>';
+
+      DataCore.openSheetPicker((result) => {
+        if (result.success) {
+          showStatus(`Re-connected to: ${result.sheetName}`, true);
+          updateConnectionStatusIndicator();
+        } else if (result.cancelled) {
+          statusEl.innerHTML = '';
+        } else if (result.error) {
+          statusEl.innerHTML = `<span style="color: #ef4444;">❌ ${result.error}</span>`;
+        }
+      });
     }
 
     function handleSelectExisting() {
