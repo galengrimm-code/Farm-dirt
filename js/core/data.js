@@ -521,27 +521,53 @@ function isNewUser() {
 
 // ========== GOOGLE PICKER ==========
 let pickerCallback = null;
+let pendingPickerAfterSignIn = false;
 
 function openSheetPicker(callback) {
   pickerCallback = callback;
-  if (!SheetsAPI.isSignedIn) {
-    SheetsAPI.signIn().then(() => {
-      // Wait a moment for token to be set
-      setTimeout(showPicker, 500);
-    });
+
+  // Check if we have a valid token
+  const token = gapi.client.getToken();
+  if (token && token.access_token) {
+    console.log('[Picker] Have token, showing picker');
+    showPicker();
     return;
   }
-  showPicker();
+
+  // Need to sign in first - set flag and trigger sign-in
+  console.log('[Picker] No token, requesting sign-in first');
+  pendingPickerAfterSignIn = true;
+
+  // Store the original callback so we can restore it
+  const originalOnSignInChange = SheetsAPI.onSignInChange;
+  SheetsAPI.onSignInChange = (isSignedIn) => {
+    // Call original handler
+    originalOnSignInChange(isSignedIn);
+
+    // If sign-in succeeded and we have a pending picker request
+    if (isSignedIn && pendingPickerAfterSignIn) {
+      pendingPickerAfterSignIn = false;
+      SheetsAPI.onSignInChange = originalOnSignInChange; // Restore
+      console.log('[Picker] Sign-in complete, now showing picker');
+      // Small delay to ensure token is fully set
+      setTimeout(showPicker, 100);
+    }
+  };
+
+  SheetsAPI.signIn();
 }
 
 function showPicker() {
-  const accessToken = gapi.client.getToken()?.access_token;
+  const token = gapi.client.getToken();
+  const accessToken = token?.access_token;
+
   if (!accessToken) {
     console.error('[Picker] No access token available');
-    if (pickerCallback) pickerCallback({ error: 'No access token' });
+    if (pickerCallback) pickerCallback({ error: 'Please sign in with Google first' });
     return;
   }
 
+  console.log('[Picker] Building picker with token');
   const picker = new google.picker.PickerBuilder()
     .setTitle('Select your Google Sheet')
     .addView(google.picker.ViewId.SPREADSHEETS)
@@ -588,12 +614,18 @@ function needsMigration() {
 }
 
 async function createNewSheet(operationName) {
-  if (!SheetsAPI.isSignedIn) {
+  // Check if we have a valid token
+  const token = gapi.client.getToken();
+  if (!token || !token.access_token) {
+    console.log('[CreateSheet] No token, requesting sign-in first');
     await new Promise((resolve) => {
       const originalCallback = SheetsAPI.onSignInChange;
       SheetsAPI.onSignInChange = (isSignedIn) => {
         originalCallback(isSignedIn);
-        if (isSignedIn) resolve();
+        if (isSignedIn) {
+          SheetsAPI.onSignInChange = originalCallback; // Restore
+          resolve();
+        }
       };
       SheetsAPI.signIn();
     });
