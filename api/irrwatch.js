@@ -20,8 +20,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing path parameter' });
     }
 
-    // Build the target URL
-    const targetUrl = `${IRRWATCH_BASE}${path}`;
+    // Build the target URL - encode path segments properly for spaces/special chars
+    // Split path, encode each segment, rejoin
+    const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+    const targetUrl = `${IRRWATCH_BASE}${encodedPath}`;
 
     // Forward the request with redirect following enabled
     const fetchOptions = {
