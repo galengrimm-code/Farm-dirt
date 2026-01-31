@@ -822,57 +822,56 @@
     }
 
     async function handleCreateNewSheet() {
-      const statusEl = document.getElementById('createSheetStatus');
-      statusEl.textContent = 'Creating your sheet...';
-      statusEl.style.color = '#3b82f6';
+      // Hide the modal so sign-in popup isn't blocked
+      hideWelcomeScreen();
+      Utils.showStatus('Creating your sheet...', true);
 
       try {
         const result = await DataCore.createNewSheet('Farm-Dirt');
-        hideWelcomeScreen();
         Utils.showStatus(`Created: ${result.sheetName}`, true);
         setTimeout(() => window.location.reload(), 500);
       } catch (error) {
         console.error('Create sheet failed:', error);
-        statusEl.textContent = 'Failed to create sheet: ' + (error.message || 'Unknown error');
-        statusEl.style.color = '#ef4444';
+        showWelcomeScreen();
+        document.getElementById('createSheetStatus').textContent = 'Failed: ' + (error.message || 'Unknown error');
+        document.getElementById('createSheetStatus').style.color = '#ef4444';
       }
     }
 
     function handleSelectExistingSheet() {
-      const statusEl = document.getElementById('createSheetStatus');
-      statusEl.textContent = 'Opening Google Drive...';
-      statusEl.style.color = '#3b82f6';
+      // Hide the modal so the picker isn't blocked
+      hideWelcomeScreen();
 
       DataCore.openSheetPicker((result) => {
         if (result.success) {
-          hideWelcomeScreen();
           Utils.showStatus(`Connected to: ${result.sheetName}`, true);
           setTimeout(() => window.location.reload(), 500);
         } else if (result.cancelled) {
-          statusEl.textContent = 'Creates a new sheet with all tabs set up automatically';
-          statusEl.style.color = '#64748b';
+          // Show welcome screen again if cancelled
+          showWelcomeScreen();
         } else if (result.error) {
-          statusEl.textContent = 'Error: ' + result.error;
-          statusEl.style.color = '#ef4444';
+          showWelcomeScreen();
+          document.getElementById('createSheetStatus').textContent = 'Error: ' + result.error;
+          document.getElementById('createSheetStatus').style.color = '#ef4444';
         }
       });
     }
 
     function handleMigrationReauth() {
-      const statusEl = document.getElementById('migrationStatus');
-      statusEl.textContent = 'Opening Google Drive...';
-      statusEl.style.color = '#3b82f6';
+      // Hide the modal so the picker isn't blocked
+      hideMigrationScreen();
 
       DataCore.openSheetPicker((result) => {
         if (result.success) {
-          hideMigrationScreen();
           Utils.showStatus(`Re-connected to: ${result.sheetName}`, true);
           setTimeout(() => window.location.reload(), 500);
         } else if (result.cancelled) {
-          statusEl.textContent = '';
+          // Show migration screen again if cancelled
+          showMigrationScreen();
         } else if (result.error) {
-          statusEl.textContent = 'Error: ' + result.error;
-          statusEl.style.color = '#ef4444';
+          showMigrationScreen();
+          document.getElementById('migrationStatus').textContent = 'Error: ' + result.error;
+          document.getElementById('migrationStatus').style.color = '#ef4444';
         }
       });
     }
