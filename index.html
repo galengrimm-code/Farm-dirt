@@ -834,6 +834,13 @@
         return dateB.localeCompare(dateA);
       });
 
+      // Load field name mappings
+      let fieldMappings = {};
+      try {
+        const saved = localStorage.getItem('irrwatch_fieldMappings');
+        fieldMappings = saved ? JSON.parse(saved) : {};
+      } catch (e) {}
+
       // Group by field name for most recent reading
       const latestByField = {};
       sortedByDate.forEach(record => {
@@ -846,9 +853,17 @@
       console.log('[NDVI] Rendering', Object.keys(latestByField).length, 'fields');
 
       // Render each field with NDVI color
-      Object.entries(latestByField).forEach(([fieldName, record]) => {
-        const polys = getFieldBoundaryCoords(fieldName);
-        if (!polys) return;
+      let matchedCount = 0, unmatchedCount = 0;
+      Object.entries(latestByField).forEach(([irrwatchName, record]) => {
+        // Use mapping if available, otherwise try direct match
+        const localName = fieldMappings[irrwatchName] || irrwatchName;
+        const polys = getFieldBoundaryCoords(localName);
+        if (!polys) {
+          unmatchedCount++;
+          console.log('[NDVI] No boundary match for:', irrwatchName, '→', localName);
+          return;
+        }
+        matchedCount++;
 
         const ndvi = record.ndvi ?? record.vegetation_cover ?? null;
         const color = getNdviColor(ndvi);
@@ -867,8 +882,11 @@
           const dateText = record.date || record.Date || 'Unknown date';
           const vegCover = record.vegetation_cover ? (record.vegetation_cover * 100).toFixed(0) + '%' : null;
 
-          let tooltipHtml = `<strong>${fieldName}</strong><br>`;
-          tooltipHtml += `<span style="color: ${color};">NDVI: ${ndviText}</span>`;
+          let tooltipHtml = `<strong>${localName}</strong>`;
+          if (irrwatchName !== localName) {
+            tooltipHtml += `<br><small style="color: #94a3b8;">IrrWatch: ${irrwatchName}</small>`;
+          }
+          tooltipHtml += `<br><span style="color: ${color};">NDVI: ${ndviText}</span>`;
           if (vegCover && vegCover !== ndviText) {
             tooltipHtml += `<br>Vegetation Cover: ${vegCover}`;
           }
@@ -878,6 +896,13 @@
           ndviLayers.push(poly);
         });
       });
+
+      console.log(`[NDVI] Matched: ${matchedCount}, Unmatched: ${unmatchedCount}`);
+      if (unmatchedCount > 0 && matchedCount === 0) {
+        Utils.showStatus(`No field matches found. Go to Import → IrrWatch → Field Name Mapping to link fields.`, false);
+      } else if (unmatchedCount > 0) {
+        Utils.showStatus(`NDVI: ${matchedCount} fields displayed, ${unmatchedCount} unmatched`, true);
+      }
 
       // Update legend for NDVI mode
       const legendText = document.getElementById('legendText');

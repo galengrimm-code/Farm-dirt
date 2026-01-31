@@ -515,6 +515,24 @@
         <div style="margin-top: 0.75rem;">
           <button class="button" id="clearIrrWatchBtn" style="background: #fecaca; color: #991b1b; border: 1px solid #fca5a5;">🗑️ Clear All NDVI Data</button>
         </div>
+
+        <!-- Field Name Mapping -->
+        <div style="margin-top: 1rem; border: 1px solid #fed7aa; border-radius: 0.5rem; overflow: hidden;">
+          <div id="fieldMappingHeader" onclick="toggleFieldMapping()" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #fff7ed; cursor: pointer;">
+            <span style="font-size: 0.875rem; color: #9a3412;"><strong>🔗 Field Name Mapping</strong> <span id="fieldMappingCount" style="color: #64748b;">(0 mapped)</span></span>
+            <span id="fieldMappingArrow" style="color: #9a3412;">▼</span>
+          </div>
+          <div id="fieldMappingBody" style="display: none; padding: 0.75rem; background: white;">
+            <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.75rem;">Link IrrWatch field names to your local boundaries for NDVI display on the map.</p>
+            <div id="fieldMappingList" style="max-height: 250px; overflow-y: auto;">
+              <p style="color: #94a3b8; font-size: 0.85rem; text-align: center; padding: 1rem;">Fetch NDVI data first to see IrrWatch fields</p>
+            </div>
+            <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0; display: flex; gap: 0.5rem;">
+              <button type="button" onclick="autoMatchFields()" style="padding: 0.4rem 0.75rem; font-size: 0.8rem; background: #3b82f6; color: white; border: none; border-radius: 0.25rem; cursor: pointer;">🔄 Auto-Match</button>
+              <button type="button" onclick="clearFieldMappings()" style="padding: 0.4rem 0.75rem; font-size: 0.8rem; background: #e2e8f0; border: none; border-radius: 0.25rem; cursor: pointer;">Clear All</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1684,6 +1702,153 @@
     }
     window.clearNdviFields = clearNdviFields;
 
+    // ========== FIELD NAME MAPPING ==========
+
+    // Get saved field mappings
+    function getFieldMappings() {
+      try {
+        const saved = localStorage.getItem('irrwatch_fieldMappings');
+        return saved ? JSON.parse(saved) : {};
+      } catch (e) {
+        return {};
+      }
+    }
+
+    // Save field mappings
+    function saveFieldMappings(mappings) {
+      localStorage.setItem('irrwatch_fieldMappings', JSON.stringify(mappings));
+      updateFieldMappingCount();
+    }
+
+    // Update mapping count display
+    function updateFieldMappingCount() {
+      const mappings = getFieldMappings();
+      const count = Object.keys(mappings).filter(k => mappings[k]).length;
+      const countEl = document.getElementById('fieldMappingCount');
+      if (countEl) countEl.textContent = `(${count} mapped)`;
+    }
+
+    // Toggle field mapping visibility
+    function toggleFieldMapping() {
+      const body = document.getElementById('fieldMappingBody');
+      const arrow = document.getElementById('fieldMappingArrow');
+      if (body.style.display === 'none') {
+        body.style.display = 'block';
+        arrow.textContent = '▲';
+        renderFieldMappingUI();
+      } else {
+        body.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    }
+    window.toggleFieldMapping = toggleFieldMapping;
+
+    // Get list of local boundary names
+    function getLocalBoundaryNames() {
+      const boundaries = DataCore.loadFieldBoundaries();
+      return Object.keys(boundaries).sort();
+    }
+
+    // Render field mapping UI
+    async function renderFieldMappingUI() {
+      const container = document.getElementById('fieldMappingList');
+      const irrwatchData = await DataCore.loadIrrWatchDataFromIndexedDB() || [];
+
+      if (irrwatchData.length === 0) {
+        container.innerHTML = '<p style="color: #94a3b8; font-size: 0.85rem; text-align: center; padding: 1rem;">Fetch NDVI data first to see IrrWatch fields</p>';
+        return;
+      }
+
+      // Get unique IrrWatch field names
+      const irrwatchFields = [...new Set(irrwatchData.map(d => d.name || d.field_name || d.fieldName).filter(Boolean))].sort();
+      const localBoundaries = getLocalBoundaryNames();
+      const mappings = getFieldMappings();
+
+      let html = '<div style="display: flex; flex-direction: column; gap: 0.5rem;">';
+
+      irrwatchFields.forEach(irrField => {
+        const currentMapping = mappings[irrField] || '';
+        html += `
+          <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #f8fafc; border-radius: 0.375rem;">
+            <span style="flex: 1; font-size: 0.85rem; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${irrField}">${irrField}</span>
+            <span style="color: #94a3b8;">→</span>
+            <select onchange="updateFieldMapping('${irrField.replace(/'/g, "\\'")}', this.value)" style="flex: 1; padding: 0.35rem; font-size: 0.8rem; border: 1px solid #e2e8f0; border-radius: 0.25rem;">
+              <option value="">-- Not mapped --</option>
+              ${localBoundaries.map(b => `<option value="${b}" ${currentMapping === b ? 'selected' : ''}>${b}</option>`).join('')}
+            </select>
+          </div>
+        `;
+      });
+
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    // Update a single field mapping
+    function updateFieldMapping(irrwatchField, localField) {
+      const mappings = getFieldMappings();
+      if (localField) {
+        mappings[irrwatchField] = localField;
+      } else {
+        delete mappings[irrwatchField];
+      }
+      saveFieldMappings(mappings);
+    }
+    window.updateFieldMapping = updateFieldMapping;
+
+    // Auto-match fields by fuzzy name matching
+    function autoMatchFields() {
+      const irrwatchData = [];
+      DataCore.loadIrrWatchDataFromIndexedDB().then(data => {
+        const irrwatchFields = [...new Set((data || []).map(d => d.name || d.field_name || d.fieldName).filter(Boolean))];
+        const localBoundaries = getLocalBoundaryNames();
+        const mappings = getFieldMappings();
+
+        let matched = 0;
+        irrwatchFields.forEach(irrField => {
+          if (mappings[irrField]) return; // Already mapped
+
+          // Try exact match first
+          if (localBoundaries.includes(irrField)) {
+            mappings[irrField] = irrField;
+            matched++;
+            return;
+          }
+
+          // Try case-insensitive match
+          const lowerIrr = irrField.toLowerCase();
+          const exactMatch = localBoundaries.find(b => b.toLowerCase() === lowerIrr);
+          if (exactMatch) {
+            mappings[irrField] = exactMatch;
+            matched++;
+            return;
+          }
+
+          // Try partial match (contains)
+          const partialMatch = localBoundaries.find(b =>
+            b.toLowerCase().includes(lowerIrr) || lowerIrr.includes(b.toLowerCase())
+          );
+          if (partialMatch) {
+            mappings[irrField] = partialMatch;
+            matched++;
+          }
+        });
+
+        saveFieldMappings(mappings);
+        renderFieldMappingUI();
+        showStatus(`Auto-matched ${matched} fields`, true);
+      });
+    }
+    window.autoMatchFields = autoMatchFields;
+
+    // Clear all field mappings
+    function clearFieldMappings() {
+      saveFieldMappings({});
+      renderFieldMappingUI();
+      showStatus('Field mappings cleared', true);
+    }
+    window.clearFieldMappings = clearFieldMappings;
+
     function updateIrrWatchImportUI() {
       const section = document.getElementById('irrwatchImportSection');
       const notConfigured = document.getElementById('irrwatchNotConfigured');
@@ -1904,6 +2069,7 @@
       populateBoundaryClientFarmSelectors(); // Initialize client/farm dropdowns
       updateIrrWatchImportUI(); // Initialize IrrWatch UI
       initializeFieldSelector(); // Initialize NDVI field selector
+      updateFieldMappingCount(); // Initialize field mapping count
       try { await SheetsAPI.init(); SheetsAPI.onSignInChange = handleSignInChange; handleSignInChange(SheetsAPI.isSignedIn); } catch (e) { console.warn(e); }
       document.getElementById('uploadBoundaryBtn').addEventListener('click', uploadBoundaries);
       document.getElementById('uploadSampleBtn').addEventListener('click', uploadSamples);
