@@ -966,6 +966,103 @@ stabilityPct = nearCount / 50 × 100
             <span>Breakpoint Analysis Tab</span>
           </div>
         </div>
+
+        <div class="calc-box">
+          <h3>Multivariate Regression (MVR)</h3>
+          <h4>What it measures</h4>
+          <p>The combined effect of multiple soil nutrients on yield, accounting for the influence of each variable while controlling for others.</p>
+
+          <h4>Algorithm (Ordinary Least Squares)</h4>
+          <div class="formula">
+<span class="comment">// Multiple linear regression model:</span>
+Yield = β₀ + β₁×P + β₂×K + β₃×OM + β₄×pH + ... + ε
+
+<span class="comment">// Solve using matrix algebra:</span>
+β = (X'X)⁻¹ × X'Y
+
+<span class="comment">// Where:</span>
+X = matrix of nutrient values (with intercept column of 1s)
+Y = vector of yield values
+β = vector of coefficients (slopes for each nutrient)
+          </div>
+
+          <h4>Key Statistics</h4>
+          <table class="threshold-table">
+            <tr><th>Statistic</th><th>What it tells you</th></tr>
+            <tr><td>R² (R-squared)</td><td>% of yield variation explained by the model (higher = better fit)</td></tr>
+            <tr><td>Adjusted R²</td><td>R² adjusted for number of variables (penalizes overfitting)</td></tr>
+            <tr><td>Coefficient (β)</td><td>Expected yield change per 1-unit increase in nutrient</td></tr>
+            <tr><td>p-value</td><td>Probability coefficient is zero (< 0.05 = statistically significant)</td></tr>
+            <tr><td>VIF</td><td>Variance Inflation Factor - detects collinearity (> 5 = concern)</td></tr>
+          </table>
+
+          <h4>Collinearity Check (VIF)</h4>
+          <div class="formula">
+<span class="comment">// For each variable Xj, regress it against all other variables:</span>
+Xj = α₀ + α₁×X₁ + ... + αₖ×Xₖ
+
+<span class="comment">// Calculate R² of this auxiliary regression:</span>
+VIF_j = 1 / (1 - R²_j)
+
+<span class="comment">// VIF > 5: moderate collinearity</span>
+<span class="comment">// VIF > 10: severe collinearity - consider removing variable</span>
+          </div>
+
+          <div class="agro-note">
+            <p><strong>Why multivariate?</strong> Single-nutrient correlations can be misleading. For example, P and K might both correlate with yield simply because high-fertility fields have both. MVR isolates each nutrient's unique contribution, controlling for the others.</p>
+          </div>
+
+          <div class="used-in">
+            <span>Multivariate Regression Tab</span>
+          </div>
+        </div>
+
+        <div class="calc-box">
+          <h3>Hinge-MVR (Segmented Regression)</h3>
+          <h4>What it measures</h4>
+          <p>A two-segment linear model that captures different yield responses below vs. above a breakpoint. Also called "piecewise regression" or "bent-stick model."</p>
+
+          <h4>Algorithm</h4>
+          <div class="formula">
+<span class="comment">// Create hinge features from the breakpoint (t):</span>
+lowPart  = max(0, t - x)  <span class="comment">// Distance below breakpoint</span>
+highPart = max(0, x - t)  <span class="comment">// Distance above breakpoint</span>
+
+<span class="comment">// Regression model:</span>
+Yield = β₀ + β₁×lowPart + β₂×highPart + β₃×cov₁ + ... + ε
+
+<span class="comment">// Interpretation:</span>
+β₁ = yield change per unit BELOW breakpoint (deficiency response)
+β₂ = yield change per unit ABOVE breakpoint (luxury response)
+          </div>
+
+          <h4>Visual Interpretation</h4>
+          <div class="formula">
+                    ╱ β₂ slope (above)
+                   ╱
+                  ∙ ← Breakpoint (t)
+                 ╱
+                ╱ β₁ slope (below)
+───────────────┴──────────────────
+              Low    Nutrient    High
+          </div>
+
+          <h4>What the coefficients mean</h4>
+          <table class="threshold-table">
+            <tr><th>Scenario</th><th>β₁ (below)</th><th>β₂ (above)</th><th>Interpretation</th></tr>
+            <tr><td>Classic deficiency</td><td>Large positive</td><td>Small/zero</td><td>Strong response below threshold, plateau above</td></tr>
+            <tr><td>Linear response</td><td>≈ equal</td><td>≈ equal</td><td>No breakpoint needed, use simple regression</td></tr>
+            <tr><td>Toxicity</td><td>Small</td><td>Negative</td><td>Yield decreases at high levels</td></tr>
+          </table>
+
+          <div class="agro-note">
+            <p><strong>When to use:</strong> Hinge-MVR is most useful when breakpoint analysis finds a stable threshold. It quantifies HOW MUCH yield responds on each side, while controlling for other nutrients.</p>
+          </div>
+
+          <div class="used-in">
+            <span>Breakpoint Analysis Tab (toggle)</span>
+          </div>
+        </div>
       </div>
     </div>
 
