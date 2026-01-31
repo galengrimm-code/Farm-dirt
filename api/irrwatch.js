@@ -36,8 +36,18 @@ export default async function handler(req, res) {
 
     // Forward Content-Type and body for POST requests
     if (req.method === 'POST') {
-      fetchOptions.headers['Content-Type'] = req.headers['content-type'] || 'application/x-www-form-urlencoded';
-      fetchOptions.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+      const contentType = req.headers['content-type'] || 'application/x-www-form-urlencoded';
+      fetchOptions.headers['Content-Type'] = contentType;
+
+      // Handle different content types
+      if (typeof req.body === 'string') {
+        fetchOptions.body = req.body;
+      } else if (contentType.includes('application/x-www-form-urlencoded')) {
+        // Convert parsed object back to URL-encoded format
+        fetchOptions.body = new URLSearchParams(req.body).toString();
+      } else {
+        fetchOptions.body = JSON.stringify(req.body);
+      }
     }
 
     const response = await fetch(targetUrl, fetchOptions);
