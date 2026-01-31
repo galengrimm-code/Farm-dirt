@@ -23,10 +23,11 @@ export default async function handler(req, res) {
     // Build the target URL
     const targetUrl = `${IRRWATCH_BASE}${path}`;
 
-    // Forward the request
+    // Forward the request with redirect following enabled
     const fetchOptions = {
       method: req.method,
-      headers: {}
+      headers: {},
+      redirect: 'follow' // Explicitly follow redirects (302)
     };
 
     // Forward Authorization header if present
@@ -51,10 +52,23 @@ export default async function handler(req, res) {
     }
 
     const response = await fetch(targetUrl, fetchOptions);
-    const data = await response.json();
 
-    // Return the response
-    res.status(response.status).json(data);
+    // Handle different response types
+    const contentType = response.headers.get('content-type') || '';
+
+    if (contentType.includes('application/json')) {
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } else {
+      // Non-JSON response (could be error page, redirect, etc.)
+      const text = await response.text();
+      res.status(response.status).json({
+        error: 'Non-JSON response',
+        status: response.status,
+        statusText: response.statusText,
+        body: text.substring(0, 500) // First 500 chars for debugging
+      });
+    }
 
   } catch (error) {
     console.error('IrrWatch proxy error:', error);
