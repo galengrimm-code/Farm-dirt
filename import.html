@@ -1871,28 +1871,41 @@
       const orderSelect = document.getElementById('irrwatchOrderSelect');
       const dateSelect = document.getElementById('irrwatchDateSelect');
 
-      orderSelect.innerHTML = '<option value="">Loading orders...</option>';
-      dateSelect.innerHTML = '<option value="">Select an order first</option>';
+      orderSelect.innerHTML = '<option value="">Loading fields...</option>';
+      dateSelect.innerHTML = '<option value="">Select a field first</option>';
       dateSelect.disabled = true;
 
       try {
-        const orders = await IrrWatchAPI.getOrders();
-        orderSelect.innerHTML = '<option value="">-- Select an order --</option>';
+        // Try fields endpoint first (works with standard user credentials)
+        let fields;
+        try {
+          fields = await IrrWatchAPI.getFields();
+          console.log('[IrrWatch] Fields response:', fields);
+        } catch (fieldErr) {
+          console.warn('[IrrWatch] Fields endpoint failed, trying orders:', fieldErr);
+          // Fall back to orders if fields doesn't work
+          fields = await IrrWatchAPI.getOrders();
+        }
 
-        orders.forEach(order => {
+        orderSelect.innerHTML = '<option value="">-- Select a field --</option>';
+
+        // Handle both array and object responses
+        const fieldList = Array.isArray(fields) ? fields : (fields.fields || fields.data || [fields]);
+
+        fieldList.forEach(field => {
           const option = document.createElement('option');
-          option.value = order.uuid;
-          option.textContent = order.fields?.properties?.name || `Order ${order.id}`;
-          option.dataset.orderData = JSON.stringify(order);
+          option.value = field.uuid || field.id;
+          option.textContent = field.name || field.properties?.name || `Field ${field.id || field.uuid}`;
+          option.dataset.orderData = JSON.stringify(field);
           orderSelect.appendChild(option);
         });
 
-        if (orders.length === 0) {
-          orderSelect.innerHTML = '<option value="">No orders found</option>';
+        if (fieldList.length === 0) {
+          orderSelect.innerHTML = '<option value="">No fields found</option>';
         }
       } catch (e) {
-        console.error('[IrrWatch] Failed to load orders:', e);
-        orderSelect.innerHTML = '<option value="">Error loading orders</option>';
+        console.error('[IrrWatch] Failed to load fields:', e);
+        orderSelect.innerHTML = '<option value="">Error loading fields</option>';
         document.getElementById('irrwatchStatus').innerHTML = `<span style="color: #ef4444;">Error: ${e.message}</span>`;
       }
     }

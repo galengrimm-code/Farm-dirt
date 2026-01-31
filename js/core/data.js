@@ -955,6 +955,13 @@ const IrrWatchAPI = {
     return this.apiRequest(`/company/${uuid}/order`);
   },
 
+  // Get fields for a company (direct access, doesn't require order permissions)
+  async getFields(companyUuid) {
+    const uuid = companyUuid || this.getCredentials().companyUuid;
+    if (!uuid) throw new Error('Company UUID not set');
+    return this.apiRequest(`/company/${uuid}/field`);
+  },
+
   // Get available result dates for an order
   async getResultDates(orderUuid, companyUuid) {
     const uuid = companyUuid || this.getCredentials().companyUuid;
