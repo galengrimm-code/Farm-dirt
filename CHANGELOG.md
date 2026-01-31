@@ -4,6 +4,25 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 
 ---
 
+## [v1.0.78] - January 31, 2026
+
+### Google Sheets Connection Overhaul
+
+- **Google Picker integration**: Browse and select sheets directly from Google Drive instead of pasting URLs
+- **One-click sheet creation**: "Create New Sheet" now creates the sheet with all 5 tabs (Samples, Fields, Settings, YieldData, SampleSites) and headers automatically set up
+- **Improved security**: Updated OAuth scope from `spreadsheets` to `drive.file` - app now only has access to sheets you explicitly select, not all your spreadsheets
+- **Migration flow**: Existing users see a one-time prompt to re-select their sheet with the new secure scope
+- **Simplified setup**: Removed manual URL pasting and tab renaming instructions
+
+### How Sharing Works Now
+
+With the new `drive.file` scope, team members access shared sheets by:
+1. Owner shares the sheet normally in Google Drive
+2. Team member opens the app and clicks "Select from Drive"
+3. They pick the shared sheet - app now has access for their account
+
+---
+
 ## [v1.0.77] - January 27, 2026
 
 ### Privacy Policy Visibility (Google OAuth Review)
