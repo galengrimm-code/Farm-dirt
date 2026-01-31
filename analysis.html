@@ -727,6 +727,9 @@
               <option value="soybeans">Soybeans</option>
             </select>
           </div>
+          <button onclick="exportYieldBuckets()" class="yc-export-btn" style="margin-left: auto;">
+            <span>📄</span> Export Report
+          </button>
         </div>
 
         <div id="yieldBucketsContent">
@@ -766,6 +769,10 @@
             <input type="checkbox" id="hingeToggle">
             <span>Run Hinge-MVR (advanced)</span>
           </label>
+
+          <button onclick="exportBreakpointAnalysis()" class="yc-export-btn" style="margin-left: auto;">
+            <span>📄</span> Export Report
+          </button>
         </div>
 
         <!-- Results Section -->
@@ -7484,6 +7491,121 @@
           <div class="summary-box"><div class="number">${field === 'all' ? 'All' : field}</div><div class="label">Field</div></div>
         </div>
         ${reportContent}
+        <div class="footer">Soil Sample Analysis App</div>
+      </body></html>`);
+      printWindow.document.close();
+      printWindow.print();
+    }
+
+    function exportYieldBuckets() {
+      const operationName = localStorage.getItem('operationName') || 'Soil Analysis';
+      const fieldFilter = document.getElementById('bucketFieldSelect')?.value || 'all';
+      const yearFilter = document.getElementById('bucketYieldYearSelect')?.value || 'all';
+      const cropFilter = document.getElementById('bucketCropSelect')?.value || 'all';
+      const bucketsContent = document.getElementById('yieldBucketsContent').innerHTML;
+
+      if (!bucketsContent || bucketsContent.includes('no-data')) {
+        showStatus('Run the analysis first', false);
+        return;
+      }
+
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`<!DOCTYPE html><html><head><title>${operationName} - Yield by Nutrient Level</title><style>${getReportStyles()}
+        .bucket-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+        .bucket-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; page-break-inside: avoid; }
+        @media print {
+          .bucket-grid { grid-template-columns: repeat(2, 1fr); }
+          .bucket-card { page-break-inside: avoid !important; }
+        }
+      </style></head><body>
+        <h1>${operationName} - Yield by Nutrient Level</h1>
+        <p>Generated: ${new Date().toLocaleString()}</p>
+        <div class="summary">
+          <div class="summary-box"><div class="number">${fieldFilter === 'all' ? 'All' : fieldFilter}</div><div class="label">Field</div></div>
+          <div class="summary-box"><div class="number">${yearFilter === 'all' ? 'All' : yearFilter}</div><div class="label">Yield Year</div></div>
+          <div class="summary-box"><div class="number">${cropFilter === 'all' ? 'All' : cropFilter}</div><div class="label">Crop</div></div>
+        </div>
+        <h2>Nutrient Level Analysis</h2>
+        <p>Average yield at Low, Medium, and High nutrient levels based on agronomic thresholds.</p>
+        ${bucketsContent}
+        <div class="footer">Soil Sample Analysis App</div>
+      </body></html>`);
+      printWindow.document.close();
+      printWindow.print();
+    }
+
+    function exportBreakpointAnalysis() {
+      const operationName = localStorage.getItem('operationName') || 'Soil Analysis';
+      const resultsEl = document.getElementById('breakpointResults');
+
+      if (resultsEl.style.display === 'none') {
+        showStatus('Run breakpoint analysis first', false);
+        return;
+      }
+
+      const nutrient = document.getElementById('bpNutrientName').textContent;
+      const breakpointValue = document.getElementById('bpValue').textContent;
+      const penalty = document.getElementById('bpPenalty').textContent;
+      const confidence = document.getElementById('bpConfidence').textContent;
+      const stability = document.getElementById('bpStability').textContent;
+      const nBelow = document.getElementById('bpNBelow').textContent;
+      const nAbove = document.getElementById('bpNAbove').textContent;
+      const meanBelow = document.getElementById('bpMeanBelow').textContent;
+      const meanAbove = document.getElementById('bpMeanAbove').textContent;
+      const interpretation = document.getElementById('bpInterpretation').innerHTML;
+
+      // Get impact summary if available
+      const impactTable = document.getElementById('impactSummaryBody')?.innerHTML || '';
+      const fieldBreakdown = document.getElementById('fieldBreakdownBody')?.innerHTML || '';
+
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`<!DOCTYPE html><html><head><title>${operationName} - Breakpoint Analysis</title><style>${getReportStyles()}
+        .bp-metric { text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .bp-metric .value { font-size: 24px; font-weight: 700; color: #1e293b; }
+        .bp-metric .label { font-size: 11px; color: #64748b; text-transform: uppercase; margin-top: 4px; }
+        .bp-metric.highlight { background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border-color: #3b82f6; }
+        .bp-metric.highlight .value { color: #1d4ed8; }
+        .interpretation { background: #f0fdf4; border-left: 4px solid #22c55e; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+        @media print {
+          .bp-grid { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 12px !important; }
+        }
+      </style></head><body>
+        <h1>${operationName} - Breakpoint Analysis: ${nutrient}</h1>
+        <p>Generated: ${new Date().toLocaleString()}</p>
+
+        <h2>Breakpoint Summary</h2>
+        <div class="bp-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0;">
+          <div class="bp-metric highlight">
+            <div class="value">${breakpointValue}</div>
+            <div class="label">Breakpoint</div>
+          </div>
+          <div class="bp-metric">
+            <div class="value" style="color: #dc2626;">${penalty}</div>
+            <div class="label">Yield Penalty</div>
+          </div>
+          <div class="bp-metric">
+            <div class="value">${confidence}</div>
+            <div class="label">Confidence</div>
+          </div>
+          <div class="bp-metric">
+            <div class="value">${stability}</div>
+            <div class="label">Stability</div>
+          </div>
+        </div>
+
+        <div class="interpretation">${interpretation}</div>
+
+        <h2>Group Statistics</h2>
+        <table>
+          <tr><th>Group</th><th>Count</th><th>Avg Yield (bu/ac)</th></tr>
+          <tr><td>Below Breakpoint</td><td>${nBelow}</td><td>${meanBelow}</td></tr>
+          <tr><td>Above Breakpoint</td><td>${nAbove}</td><td>${meanAbove}</td></tr>
+        </table>
+
+        ${impactTable ? `<h2>Impact by Zone</h2><table><thead><tr><th>Zone</th><th>Points</th><th>Avg ${nutrient}</th><th>Avg Yield</th><th>Est. Acres</th></tr></thead><tbody>${impactTable}</tbody></table>` : ''}
+
+        ${fieldBreakdown ? `<h2>Field Breakdown</h2><table><thead><tr><th>Field</th><th>Below BP</th><th>Near BP</th><th>Above BP</th><th>Yield Gap</th></tr></thead><tbody>${fieldBreakdown}</tbody></table>` : ''}
+
         <div class="footer">Soil Sample Analysis App</div>
       </body></html>`);
       printWindow.document.close();
