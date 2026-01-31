@@ -830,7 +830,8 @@ async function initializeSheetHeaders(sheetId) {
 
 // ========== IRRIWATCH API ==========
 const IrrWatchAPI = {
-  API_BASE: 'https://api.irriwatch.hydrosat.com',
+  // Use Vercel serverless proxy to avoid CORS issues
+  PROXY_URL: '/api/irrwatch',
   accessToken: null,
   tokenExpiry: null,
 
@@ -885,7 +886,7 @@ const IrrWatchAPI = {
     }
 
     console.log('[IrrWatch] Authenticating...');
-    const response = await fetch(`${this.API_BASE}/oauth/v2/token`, {
+    const response = await fetch(`${this.PROXY_URL}?path=${encodeURIComponent('/oauth/v2/token')}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
@@ -915,13 +916,13 @@ const IrrWatchAPI = {
     return this.accessToken;
   },
 
-  // Make authenticated API request
+  // Make authenticated API request (via proxy)
   async apiRequest(endpoint, options = {}) {
     if (!this.accessToken || Date.now() > this.tokenExpiry) {
       await this.authenticate();
     }
 
-    const response = await fetch(`${this.API_BASE}/api/v1${endpoint}`, {
+    const response = await fetch(`${this.PROXY_URL}?path=${encodeURIComponent('/api/v1' + endpoint)}`, {
       ...options,
       headers: {
         'Authorization': `Bearer ${this.accessToken}`,
