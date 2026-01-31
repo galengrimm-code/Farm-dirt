@@ -325,32 +325,18 @@
             To get started, connect a Google Sheet to store your soil sample data. Your data stays in your Google account.
           </p>
 
-          <button id="createSheetBtn" onclick="createSheetManual()" style="width: 100%; padding: 1rem; background: #22c55e; color: white; border: none; border-radius: 0.5rem; font-size: 1rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-            📄 Create New Google Sheet
+          <button id="createSheetBtn" onclick="handleCreateNewSheet()" style="width: 100%; padding: 1rem; background: #22c55e; color: white; border: none; border-radius: 0.5rem; font-size: 1rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+            ✨ Create New Sheet
           </button>
-          <div id="createSheetInstructions" style="display: none; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 0.375rem; padding: 0.75rem; margin-bottom: 1rem;">
-            <p style="color: #92400e; font-size: 0.75rem; margin: 0 0 0.5rem 0; font-weight: 600;">👆 Your new sheet opened in a new tab. Now:</p>
-            <ol style="color: #78350f; font-size: 0.7rem; margin: 0; padding-left: 1.25rem; line-height: 1.6;">
-              <li>Rename the first tab to <strong>Samples</strong> (right-click tab → Rename)</li>
-              <li>Add 2 more tabs: <strong>Fields</strong> and <strong>Settings</strong> (click + button)</li>
-              <li>Copy the full URL from your browser</li>
-              <li>Paste it below and click Connect</li>
-            </ol>
-          </div>
           <p id="createSheetStatus" style="color: #64748b; font-size: 0.75rem; margin: 0 0 1rem 0; text-align: center;">
-            Opens Google Sheets to create your data storage
+            Creates a new sheet with all tabs set up automatically
           </p>
 
           <div style="border-top: 1px solid #e2e8f0; padding-top: 1rem;">
             <p style="color: #64748b; font-size: 0.8125rem; margin: 0 0 0.75rem 0; font-weight: 500;">Already have a Google Sheet?</p>
-            <div style="display: flex; gap: 0.5rem;">
-              <input type="text" id="welcomeSheetId" placeholder="Paste Google Sheet URL or ID..."
-                style="flex: 1; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; font-size: 0.875rem; font-family: monospace;">
-              <button onclick="connectWelcomeSheet()" style="padding: 0.75rem 1rem; background: #3b82f6; color: white; border: none; border-radius: 0.375rem; font-weight: 600; cursor: pointer;">
-                Connect
-              </button>
-            </div>
-            <p id="welcomeSheetDetected" style="color: #22c55e; font-size: 0.75rem; margin: 0.5rem 0 0 0; display: none;"></p>
+            <button onclick="handleSelectExistingSheet()" style="width: 100%; padding: 0.875rem; background: #3b82f6; color: white; border: none; border-radius: 0.5rem; font-size: 0.9375rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+              📊 Select from Google Drive
+            </button>
           </div>
 
           <div style="border-top: 1px solid #e2e8f0; margin-top: 1.5rem; padding-top: 1rem;">
@@ -361,6 +347,27 @@
               Explore with sample data (read-only)
             </p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Migration Screen for existing users needing re-auth -->
+    <div id="migrationScreen" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 10000; align-items: center; justify-content: center; padding: 1rem;">
+      <div style="background: white; border-radius: 1rem; max-width: 500px; width: 100%; box-shadow: 0 25px 50px rgba(0,0,0,0.25); overflow: hidden;">
+        <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 2rem; text-align: center;">
+          <div style="font-size: 3rem; margin-bottom: 0.5rem;">🔄</div>
+          <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">Quick Update Required</h2>
+          <p style="margin: 0.5rem 0 0 0; opacity: 0.9; font-size: 0.875rem;">We've improved security - just re-select your sheet</p>
+        </div>
+        <div style="padding: 1.5rem;">
+          <p style="color: #475569; margin: 0 0 1.5rem 0; font-size: 0.9375rem; line-height: 1.6;">
+            We've updated how the app connects to Google Sheets for better security. Please re-select your sheet to continue. <strong>Your data is safe</strong> - this just re-authorizes access.
+          </p>
+
+          <button onclick="handleMigrationReauth()" style="width: 100%; padding: 1rem; background: #f59e0b; color: white; border: none; border-radius: 0.5rem; font-size: 1rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+            📊 Select My Sheet
+          </button>
+          <p id="migrationStatus" style="color: #64748b; font-size: 0.75rem; margin: 0.75rem 0 0 0; text-align: center;"></p>
         </div>
       </div>
     </div>
@@ -814,50 +821,71 @@
       welcomeScreen.style.display = 'none';
     }
 
-    function createSheetManual() {
-      // Open Google Sheets to create a new blank spreadsheet
-      window.open('https://sheets.new', '_blank');
+    async function handleCreateNewSheet() {
+      const statusEl = document.getElementById('createSheetStatus');
+      statusEl.textContent = 'Creating your sheet...';
+      statusEl.style.color = '#3b82f6';
 
-      // Show instructions
-      document.getElementById('createSheetInstructions').style.display = 'block';
-      document.getElementById('createSheetStatus').style.display = 'none';
+      try {
+        const result = await DataCore.createNewSheet('Farm-Dirt');
+        hideWelcomeScreen();
+        Utils.showStatus(`Created: ${result.sheetName}`, true);
+        setTimeout(() => window.location.reload(), 500);
+      } catch (error) {
+        console.error('Create sheet failed:', error);
+        statusEl.textContent = 'Failed to create sheet: ' + (error.message || 'Unknown error');
+        statusEl.style.color = '#ef4444';
+      }
+    }
 
-      // Focus the sheet ID input
-      setTimeout(() => {
-        document.getElementById('welcomeSheetId').focus();
-      }, 500);
+    function handleSelectExistingSheet() {
+      const statusEl = document.getElementById('createSheetStatus');
+      statusEl.textContent = 'Opening Google Drive...';
+      statusEl.style.color = '#3b82f6';
+
+      DataCore.openSheetPicker((result) => {
+        if (result.success) {
+          hideWelcomeScreen();
+          Utils.showStatus(`Connected to: ${result.sheetName}`, true);
+          setTimeout(() => window.location.reload(), 500);
+        } else if (result.cancelled) {
+          statusEl.textContent = 'Creates a new sheet with all tabs set up automatically';
+          statusEl.style.color = '#64748b';
+        } else if (result.error) {
+          statusEl.textContent = 'Error: ' + result.error;
+          statusEl.style.color = '#ef4444';
+        }
+      });
+    }
+
+    function handleMigrationReauth() {
+      const statusEl = document.getElementById('migrationStatus');
+      statusEl.textContent = 'Opening Google Drive...';
+      statusEl.style.color = '#3b82f6';
+
+      DataCore.openSheetPicker((result) => {
+        if (result.success) {
+          hideMigrationScreen();
+          Utils.showStatus(`Re-connected to: ${result.sheetName}`, true);
+          setTimeout(() => window.location.reload(), 500);
+        } else if (result.cancelled) {
+          statusEl.textContent = '';
+        } else if (result.error) {
+          statusEl.textContent = 'Error: ' + result.error;
+          statusEl.style.color = '#ef4444';
+        }
+      });
+    }
+
+    function showMigrationScreen() {
+      document.getElementById('migrationScreen').style.display = 'flex';
+    }
+
+    function hideMigrationScreen() {
+      document.getElementById('migrationScreen').style.display = 'none';
     }
 
     const extractSheetId = DataCore.extractSheetId;
-
-    function connectWelcomeSheet() {
-      const input = document.getElementById('welcomeSheetId').value.trim();
-      if (!input) {
-        Utils.showStatus('Please enter a Google Sheet URL or ID', false);
-        return;
-      }
-
-      // Extract Sheet ID from URL if needed
-      const sheetId = extractSheetId(input);
-
-      // Validate format (basic check)
-      if (sheetId.length < 20) {
-        Utils.showStatus('Could not find a valid Sheet ID - check the URL', false);
-        return;
-      }
-
-      // Show what was detected
-      const detectedEl = document.getElementById('welcomeSheetDetected');
-      detectedEl.textContent = `✓ Sheet ID detected: ${sheetId.substring(0, 20)}...`;
-      detectedEl.style.display = 'block';
-
-      // Save and reload
-      localStorage.setItem('googleSheetId', sheetId);
-      hideWelcomeScreen();
-      Utils.showStatus('Sheet connected! Loading data...', true);
-      // Reload to initialize with the new sheet
-      setTimeout(() => window.location.reload(), 500);
-    }
 
     // Demo data for new users to explore
     const DEMO_DATA = {
@@ -1782,6 +1810,14 @@
         handleSignInChange(SheetsAPI.isSignedIn);
       } catch (e) {
         console.warn('Google API init error:', e);
+      }
+
+      // Check if user needs to re-authorize (has old connection but needs new scope)
+      if (DataCore.needsMigration()) {
+        console.log('Migration needed - showing migration screen');
+        showMigrationScreen();
+        updateBackupFooter();
+        return; // Don't try to load data until they re-auth
       }
 
       // Check if this is a new user (no sheet ID and no local data)
