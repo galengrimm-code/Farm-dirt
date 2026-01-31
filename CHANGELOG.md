@@ -4,6 +4,31 @@ All notable changes to the Soil Sample Analysis app will be documented in this f
 
 ---
 
+## [v1.0.79] - January 31, 2026
+
+### IrrWatch NDVI Integration
+
+- **IrrWatch API connection**: Connect to IrrWatch in Settings to fetch satellite NDVI and vegetation data
+- **OAuth2 authentication**: Secure client credentials flow for IrrWatch API access
+- **Import NDVI data**: New section on Import page to fetch field-level NDVI data by order and date
+- **NDVI map overlay**: Toggle button on map page displays NDVI values as colored field overlays
+- **Color-coded vegetation**: Green (healthy) to brown (bare) color scale for easy visual assessment
+- **Data caching**: NDVI data stored in both IndexedDB (local) and Google Sheets (cloud)
+- **Field selector**: Choose which NDVI data fields to save to Google Sheets (ndvi, vegetation_cover, soil_moisture, evapotranspiration, etc.)
+- **Replace/Accumulate modes**: Keep only latest snapshot or accumulate historical data
+- **Discreet UI**: IrrWatch section hidden by default for users who don't have an account
+
+### How to Connect IrrWatch
+
+1. Go to Settings and find "IrrWatch NDVI Integration"
+2. Enter your IrrWatch API Key and Password (from IrrWatch portal)
+3. Select your company from the dropdown
+4. Go to Import page to fetch NDVI data by date
+5. Expand "Fields to Save" to customize which data columns are stored
+6. Toggle the NDVI button on the map to view vegetation health overlays
+
+---
+
 ## [v1.0.78] - January 31, 2026
 
 ### Google Sheets Connection Overhaul

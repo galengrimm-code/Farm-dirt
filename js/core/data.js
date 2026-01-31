@@ -19,7 +19,7 @@ const DataConfig = window.DataConfig = {
     }
     return stored;
   },
-  SHEETS: { FIELDS: 'Fields', SAMPLES: 'Samples', SETTINGS: 'Settings' }
+  SHEETS: { FIELDS: 'Fields', SAMPLES: 'Samples', SETTINGS: 'Settings', NDVI: 'NDVIData' }
 };
 
 // ========== INDEXEDDB ==========
@@ -346,6 +346,131 @@ const SheetsAPI = {
     } catch (e) {
       console.error('getSettings error:', e);
       return {};
+    }
+  },
+
+  // ========== NDVI DATA (IrrWatch) ==========
+  async getNdviData() {
+    try {
+      const sheetId = DataConfig.SHEET_ID;
+      if (!sheetId) return [];
+
+      const response = await gapi.client.sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: `${DataConfig.SHEETS.NDVI}!A1:Z10000`
+      });
+      const rows = response.result.values || [];
+      if (rows.length < 2) return [];
+
+      const headers = rows[0];
+      const data = [];
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const record = {};
+        headers.forEach((header, idx) => {
+          const value = row[idx];
+          if (value !== undefined && value !== '') {
+            const num = parseFloat(value);
+            record[header] = isNaN(num) ? value : num;
+          }
+        });
+        data.push(record);
+      }
+      console.log(`[Sheets] Loaded ${data.length} NDVI records`);
+      return data;
+    } catch (e) {
+      // Tab might not exist yet
+      if (e.result?.error?.code === 400) {
+        console.log('[Sheets] NDVIData tab does not exist yet');
+        return [];
+      }
+      console.error('getNdviData error:', e);
+      return [];
+    }
+  },
+
+  async saveNdviData(ndviData, replaceAll = true, customHeaders = null) {
+    try {
+      const sheetId = DataConfig.SHEET_ID;
+      if (!sheetId) throw new Error('No sheet connected');
+
+      // Ensure NDVIData tab exists
+      await this.ensureNdviTabExists();
+
+      // Use custom headers if provided, otherwise default
+      const headers = customHeaders || ['date', 'name', 'ndvi', 'vegetation_cover', 'soil_moisture_root_zone',
+                       'actual_evapotranspiration', 'crop_production_cumulative', 'fetchedAt'];
+
+      // Build rows
+      const dataRows = ndviData.map(record =>
+        headers.map(h => {
+          const val = record[h];
+          if (val === undefined || val === null) return '';
+          if (typeof val === 'number') return val;
+          return String(val);
+        })
+      );
+
+      // Always write headers + data
+      const allRows = [headers, ...dataRows];
+
+      if (replaceAll) {
+        // Clear existing data first
+        await gapi.client.sheets.spreadsheets.values.clear({
+          spreadsheetId: sheetId,
+          range: `${DataConfig.SHEETS.NDVI}!A:Z`
+        });
+      }
+
+      // Write data
+      await gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: `${DataConfig.SHEETS.NDVI}!A1`,
+        valueInputOption: 'RAW',
+        resource: { values: allRows }
+      });
+
+      console.log(`[Sheets] Saved ${ndviData.length} NDVI records`);
+      return true;
+    } catch (e) {
+      console.error('saveNdviData error:', e);
+      throw e;
+    }
+  },
+
+  async clearNdviData() {
+    try {
+      const sheetId = DataConfig.SHEET_ID;
+      if (!sheetId) return;
+
+      await gapi.client.sheets.spreadsheets.values.clear({
+        spreadsheetId: sheetId,
+        range: `${DataConfig.SHEETS.NDVI}!A2:Z10000`
+      });
+      console.log('[Sheets] Cleared NDVI data');
+    } catch (e) {
+      console.error('clearNdviData error:', e);
+    }
+  },
+
+  async ensureNdviTabExists() {
+    const sheetId = DataConfig.SHEET_ID;
+    try {
+      await gapi.client.sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: `${DataConfig.SHEETS.NDVI}!A1`
+      });
+    } catch (e) {
+      if (e.result?.error?.code === 400) {
+        // Tab doesn't exist - create it
+        await gapi.client.sheets.spreadsheets.batchUpdate({
+          spreadsheetId: sheetId,
+          resource: {
+            requests: [{ addSheet: { properties: { title: DataConfig.SHEETS.NDVI } } }]
+          }
+        });
+        console.log('[Sheets] Created NDVIData tab');
+      }
     }
   }
 };
@@ -703,6 +828,227 @@ async function initializeSheetHeaders(sheetId) {
   });
 }
 
+// ========== IRRIWATCH API ==========
+const IrrWatchAPI = {
+  API_BASE: 'https://api.irriwatch.hydrosat.com',
+  accessToken: null,
+  tokenExpiry: null,
+
+  // Load saved credentials
+  getCredentials() {
+    return {
+      apiKey: localStorage.getItem('irrwatch_apiKey') || '',
+      apiPassword: localStorage.getItem('irrwatch_apiPassword') || '',
+      companyUuid: localStorage.getItem('irrwatch_companyUuid') || ''
+    };
+  },
+
+  // Save credentials
+  saveCredentials(apiKey, apiPassword, companyUuid) {
+    if (apiKey) localStorage.setItem('irrwatch_apiKey', apiKey);
+    if (apiPassword) localStorage.setItem('irrwatch_apiPassword', apiPassword);
+    if (companyUuid) localStorage.setItem('irrwatch_companyUuid', companyUuid);
+  },
+
+  // Clear credentials
+  clearCredentials() {
+    localStorage.removeItem('irrwatch_apiKey');
+    localStorage.removeItem('irrwatch_apiPassword');
+    localStorage.removeItem('irrwatch_companyUuid');
+    localStorage.removeItem('irrwatch_accessToken');
+    localStorage.removeItem('irrwatch_tokenExpiry');
+    this.accessToken = null;
+    this.tokenExpiry = null;
+  },
+
+  // Check if configured
+  isConfigured() {
+    const creds = this.getCredentials();
+    return !!(creds.apiKey && creds.apiPassword);
+  },
+
+  // OAuth2 Client Credentials authentication
+  async authenticate() {
+    const creds = this.getCredentials();
+    if (!creds.apiKey || !creds.apiPassword) {
+      throw new Error('IrrWatch API credentials not configured');
+    }
+
+    // Check if we have a valid cached token
+    const savedToken = localStorage.getItem('irrwatch_accessToken');
+    const savedExpiry = localStorage.getItem('irrwatch_tokenExpiry');
+    if (savedToken && savedExpiry && Date.now() < parseInt(savedExpiry)) {
+      this.accessToken = savedToken;
+      this.tokenExpiry = parseInt(savedExpiry);
+      console.log('[IrrWatch] Using cached token');
+      return this.accessToken;
+    }
+
+    console.log('[IrrWatch] Authenticating...');
+    const response = await fetch(`${this.API_BASE}/oauth/v2/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: creds.apiKey,
+        client_secret: creds.apiPassword
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[IrrWatch] Auth failed:', error);
+      throw new Error('IrrWatch authentication failed. Check your API key and password.');
+    }
+
+    const data = await response.json();
+    this.accessToken = data.access_token;
+    this.tokenExpiry = Date.now() + (data.expires_in * 1000) - 60000; // Buffer of 1 minute
+
+    // Cache the token
+    localStorage.setItem('irrwatch_accessToken', this.accessToken);
+    localStorage.setItem('irrwatch_tokenExpiry', this.tokenExpiry.toString());
+
+    console.log('[IrrWatch] Authenticated successfully');
+    return this.accessToken;
+  },
+
+  // Make authenticated API request
+  async apiRequest(endpoint, options = {}) {
+    if (!this.accessToken || Date.now() > this.tokenExpiry) {
+      await this.authenticate();
+    }
+
+    const response = await fetch(`${this.API_BASE}/api/v1${endpoint}`, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${this.accessToken}`,
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        // Token expired, re-authenticate and retry
+        await this.authenticate();
+        return this.apiRequest(endpoint, options);
+      }
+      throw new Error(`IrrWatch API error: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  // Get list of companies
+  async getCompanies() {
+    return this.apiRequest('/company');
+  },
+
+  // Get orders for a company
+  async getOrders(companyUuid) {
+    const uuid = companyUuid || this.getCredentials().companyUuid;
+    if (!uuid) throw new Error('Company UUID not set');
+    return this.apiRequest(`/company/${uuid}/order`);
+  },
+
+  // Get available result dates for an order
+  async getResultDates(orderUuid, companyUuid) {
+    const uuid = companyUuid || this.getCredentials().companyUuid;
+    if (!uuid) throw new Error('Company UUID not set');
+    return this.apiRequest(`/company/${uuid}/order/${orderUuid}/result`);
+  },
+
+  // Get field-level data for a specific date
+  async getFieldLevelData(orderUuid, date, companyUuid) {
+    const uuid = companyUuid || this.getCredentials().companyUuid;
+    if (!uuid) throw new Error('Company UUID not set');
+    // Date format: YYYYMMDD
+    return this.apiRequest(`/company/${uuid}/order/${orderUuid}/result/${date}/field_level`);
+  },
+
+  // Test connection with current credentials
+  async testConnection() {
+    try {
+      await this.authenticate();
+      const companies = await this.getCompanies();
+      return { success: true, companies };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+};
+
+// ========== IRRIWATCH DATA STORAGE (IndexedDB) ==========
+async function loadIrrWatchDataFromIndexedDB() {
+  try {
+    const db = await openDB();
+    // Check if irrwatch store exists
+    if (!db.objectStoreNames.contains('irrwatch')) {
+      db.close();
+      return [];
+    }
+    const tx = db.transaction(['irrwatch'], 'readonly');
+    const data = await new Promise((resolve, reject) => {
+      const req = tx.objectStore('irrwatch').get('all');
+      req.onsuccess = () => resolve(req.result?.data || []);
+      req.onerror = reject;
+    });
+    db.close();
+    return data;
+  } catch (e) {
+    console.error('[IrrWatch] IndexedDB load error:', e);
+    return [];
+  }
+}
+
+async function saveIrrWatchDataToIndexedDB(irrwatchData) {
+  try {
+    const db = await openDB();
+    // Check if irrwatch store exists, if not we need to upgrade
+    if (!db.objectStoreNames.contains('irrwatch')) {
+      db.close();
+      // We need to trigger a version upgrade to add the store
+      const newVersion = DB_VERSION + 1;
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, newVersion);
+        request.onupgradeneeded = (e) => {
+          const upgradeDb = e.target.result;
+          if (!upgradeDb.objectStoreNames.contains('irrwatch')) {
+            upgradeDb.createObjectStore('irrwatch', { keyPath: 'id' });
+          }
+        };
+        request.onsuccess = async () => {
+          const newDb = request.result;
+          const tx = newDb.transaction(['irrwatch'], 'readwrite');
+          tx.objectStore('irrwatch').put({ id: 'all', data: irrwatchData });
+          await new Promise((res, rej) => {
+            tx.oncomplete = res;
+            tx.onerror = rej;
+          });
+          newDb.close();
+          resolve(true);
+        };
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    const tx = db.transaction(['irrwatch'], 'readwrite');
+    tx.objectStore('irrwatch').put({ id: 'all', data: irrwatchData });
+    await new Promise((resolve, reject) => {
+      tx.oncomplete = resolve;
+      tx.onerror = reject;
+    });
+    db.close();
+    return true;
+  } catch (e) {
+    console.error('[IrrWatch] IndexedDB save error:', e);
+    return false;
+  }
+}
+
 // ========== EXPORT AS GLOBAL ==========
 window.DataCore = {
   // Config
@@ -741,7 +1087,12 @@ window.DataCore = {
   // Google Picker
   openSheetPicker,
   createNewSheet,
-  needsMigration
+  needsMigration,
+
+  // IrrWatch API
+  IrrWatchAPI: IrrWatchAPI,
+  loadIrrWatchDataFromIndexedDB,
+  saveIrrWatchDataToIndexedDB
 };
 
 })();

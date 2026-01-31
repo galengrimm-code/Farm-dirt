@@ -50,6 +50,8 @@
     @keyframes gpsPulse { 0% { width: 16px; height: 16px; opacity: 1; } 100% { width: 50px; height: 50px; opacity: 0; } }
     #statusMessage { display: none; position: fixed; top: 5rem; left: 50%; transform: translateX(-50%); z-index: 9999; max-width: 90%; box-shadow: 0 4px 12px rgba(0,0,0,0.15); padding: 0.75rem 1rem; border-radius: 0.375rem; }
     .field-tooltip { background: white; border: 2px solid #1e293b; border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    .ndvi-tooltip { background: white; border: 2px solid #f97316; border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    #ndviToggleBtn.active { background: #f97316 !important; color: white !important; }
     .field-mode .sample-marker { min-width: 44px !important; min-height: 44px !important; font-size: 14px !important; }
     .field-mode .controls-left { display: none; }
     .field-mode .legend { display: none; }
@@ -240,6 +242,7 @@
         <div id="compareSummaryText" style="margin-top: 0.5rem; font-size: 0.75rem; color: #1e40af; font-weight: 500;">Select years to compare</div>
       </div>
       <div class="controls-right">
+        <button class="button" id="ndviToggleBtn" title="Toggle NDVI Layer" style="display: none;">🛰️ NDVI</button>
         <button class="button" id="addSampleSiteBtn">📍 Add Sample Site</button>
         <button class="button" id="fieldModeBtn">📱 Field Mode</button>
         <button class="button" id="refreshBtn">🔄 Refresh</button>
@@ -722,6 +725,11 @@
     let sampleSitesData = [];
     let sampleSiteMarkers = [];
 
+    // ========== NDVI/IRRWATCH STATE ==========
+    let ndviLayerVisible = false;
+    let ndviLayers = [];
+    let irrwatchData = []; // Cached field-level NDVI data
+
     // ========== CACHED STABILITY DATA ==========
     // Calculated once when data loads, not on every render
     let cachedStabilityData = null;
@@ -741,6 +749,141 @@
         refreshStabilityCache();
       }
       return cachedStabilityData;
+    }
+
+    // ========== NDVI/IRRWATCH FUNCTIONS ==========
+    const IrrWatchAPI = DataCore.IrrWatchAPI;
+
+    // Check if IrrWatch is configured and show/hide the NDVI button
+    function updateNdviButtonVisibility() {
+      const ndviBtn = document.getElementById('ndviToggleBtn');
+      if (ndviBtn) {
+        ndviBtn.style.display = IrrWatchAPI.isConfigured() ? 'inline-block' : 'none';
+      }
+    }
+
+    // Load NDVI data from IrrWatch or cache
+    async function loadIrrWatchData() {
+      if (!IrrWatchAPI.isConfigured()) return [];
+
+      // Try loading from IndexedDB cache first
+      const cached = await DataCore.loadIrrWatchDataFromIndexedDB();
+      if (cached && cached.length > 0) {
+        irrwatchData = cached;
+        console.log('[NDVI] Loaded', cached.length, 'records from cache');
+        return cached;
+      }
+
+      return [];
+    }
+
+    // Toggle NDVI layer visibility
+    function toggleNdviLayer() {
+      ndviLayerVisible = !ndviLayerVisible;
+      const btn = document.getElementById('ndviToggleBtn');
+
+      if (ndviLayerVisible) {
+        btn.classList.add('active');
+        btn.style.background = '#f97316';
+        btn.style.color = 'white';
+        renderNdviLayer();
+      } else {
+        btn.classList.remove('active');
+        btn.style.background = '';
+        btn.style.color = '';
+        clearNdviLayers();
+      }
+    }
+
+    // Clear NDVI layers from map
+    function clearNdviLayers() {
+      ndviLayers.forEach(layer => {
+        if (map.hasLayer(layer)) map.removeLayer(layer);
+      });
+      ndviLayers = [];
+    }
+
+    // Get color for NDVI value (0-1 scale, green = healthy vegetation)
+    function getNdviColor(ndvi) {
+      if (ndvi === null || ndvi === undefined || isNaN(ndvi)) return '#9ca3af'; // gray for no data
+      // NDVI typically ranges from -1 to 1, but vegetation is usually 0.2 to 0.9
+      // Color scale: brown (low/bare) -> yellow -> green (healthy)
+      if (ndvi < 0.1) return '#92400e'; // brown - bare soil/water
+      if (ndvi < 0.2) return '#d97706'; // orange-brown
+      if (ndvi < 0.3) return '#eab308'; // yellow
+      if (ndvi < 0.4) return '#a3e635'; // lime
+      if (ndvi < 0.5) return '#84cc16'; // light green
+      if (ndvi < 0.6) return '#22c55e'; // green
+      if (ndvi < 0.7) return '#16a34a'; // darker green
+      return '#15803d'; // dark green - very healthy vegetation
+    }
+
+    // Render NDVI data on the map
+    function renderNdviLayer() {
+      clearNdviLayers();
+
+      if (!irrwatchData || irrwatchData.length === 0) {
+        Utils.showStatus('No NDVI data loaded. Import data from Settings > IrrWatch.', false);
+        return;
+      }
+
+      // Get the most recent date's data
+      const sortedByDate = [...irrwatchData].sort((a, b) => {
+        const dateA = a.date || a.Date || '';
+        const dateB = b.date || b.Date || '';
+        return dateB.localeCompare(dateA);
+      });
+
+      // Group by field name for most recent reading
+      const latestByField = {};
+      sortedByDate.forEach(record => {
+        const fieldName = record.name || record.field_name || record.fieldName;
+        if (fieldName && !latestByField[fieldName]) {
+          latestByField[fieldName] = record;
+        }
+      });
+
+      console.log('[NDVI] Rendering', Object.keys(latestByField).length, 'fields');
+
+      // Render each field with NDVI color
+      Object.entries(latestByField).forEach(([fieldName, record]) => {
+        const polys = getFieldBoundaryCoords(fieldName);
+        if (!polys) return;
+
+        const ndvi = record.ndvi ?? record.vegetation_cover ?? null;
+        const color = getNdviColor(ndvi);
+
+        const arr = Array.isArray(polys[0]?.[0]) ? polys : [polys];
+        arr.forEach(coords => {
+          const poly = L.polygon(coords, {
+            color: color,
+            weight: 2,
+            fillOpacity: 0.6,
+            fillColor: color
+          }).addTo(map);
+
+          // Add tooltip with NDVI info
+          const ndviText = ndvi !== null ? (ndvi * 100).toFixed(0) + '%' : 'N/A';
+          const dateText = record.date || record.Date || 'Unknown date';
+          const vegCover = record.vegetation_cover ? (record.vegetation_cover * 100).toFixed(0) + '%' : null;
+
+          let tooltipHtml = `<strong>${fieldName}</strong><br>`;
+          tooltipHtml += `<span style="color: ${color};">NDVI: ${ndviText}</span>`;
+          if (vegCover && vegCover !== ndviText) {
+            tooltipHtml += `<br>Vegetation Cover: ${vegCover}`;
+          }
+          tooltipHtml += `<br><small style="color: #64748b;">${dateText}</small>`;
+
+          poly.bindTooltip(tooltipHtml, { permanent: false, direction: 'center', className: 'ndvi-tooltip' });
+          ndviLayers.push(poly);
+        });
+      });
+
+      // Update legend for NDVI mode
+      const legendText = document.getElementById('legendText');
+      const legendRange = document.getElementById('legendRange');
+      if (legendText) legendText.innerHTML = '<span style="color: #92400e;">Bare</span> → <span style="color: #15803d;">Healthy</span>';
+      if (legendRange) legendRange.textContent = '(NDVI 0-100%)';
     }
 
     // ========== CLIENT/FARM DATA ==========
@@ -1811,6 +1954,10 @@
         console.warn('Google API init error:', e);
       }
 
+      // Initialize NDVI/IrrWatch button visibility and load cached data
+      updateNdviButtonVisibility();
+      loadIrrWatchData();
+
       // Check if user needs to re-authorize (has old connection but needs new scope)
       if (DataCore.needsMigration()) {
         console.log('Migration needed - showing migration screen');
@@ -2050,6 +2197,9 @@
         loadLocalData();
         Utils.showStatus('Data refreshed', true);
       });
+
+      // NDVI toggle button
+      document.getElementById('ndviToggleBtn').addEventListener('click', toggleNdviLayer);
 
       // Sample site buttons
       document.getElementById('addSampleSiteBtn').addEventListener('click', togglePinDropMode);

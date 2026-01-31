@@ -372,6 +372,152 @@
     </div>
 
     <!-- Section Header: Data Management -->
+    <!-- IrrWatch NDVI Data Section (hidden until configured) -->
+    <div class="import-section irrwatch-section" id="irrwatchImportSection" style="display: none; background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); border-color: #f97316;">
+      <h3 style="color: #c2410c;">🛰️ Import NDVI Data (IrrWatch)</h3>
+      <p style="color: #9a3412; font-size: 0.875rem; margin-bottom: 1rem;">Fetch vegetation index and crop health data from IrrWatch satellite imagery.</p>
+
+      <div id="irrwatchNotConfigured" style="display: none;">
+        <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 0.5rem; padding: 1rem; text-align: center;">
+          <p style="margin: 0 0 0.75rem 0; color: #92400e;">IrrWatch API not configured. Set up your API credentials in Settings to import NDVI data.</p>
+          <a href="settings.html" class="button" style="background: #f97316; color: white; text-decoration: none;">⚙️ Go to Settings</a>
+        </div>
+      </div>
+
+      <div id="irrwatchConfigured" style="display: none;">
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+          <div class="form-group">
+            <label>Order/Field Group</label>
+            <select id="irrwatchOrderSelect" style="min-width: 200px;">
+              <option value="">Loading orders...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <select id="irrwatchDateSelect" style="min-width: 150px;" disabled>
+              <option value="">Select an order first</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="irrwatchDataPreview" style="display: none; margin-bottom: 1rem;">
+          <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 0.5rem; padding: 0.75rem;">
+            <strong style="color: #166534;">Preview:</strong>
+            <span id="irrwatchPreviewText" style="color: #15803d; margin-left: 0.5rem;"></span>
+          </div>
+        </div>
+
+        <!-- Field selector (collapsible) -->
+        <div style="margin-bottom: 1rem; border: 1px solid #fed7aa; border-radius: 0.5rem; overflow: hidden;">
+          <div id="fieldSelectorHeader" onclick="toggleFieldSelector()" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #fff7ed; cursor: pointer;">
+            <span style="font-size: 0.875rem; color: #9a3412;"><strong>📋 Fields to Save</strong> <span id="fieldSelectorCount" style="color: #64748b;">(8 selected)</span></span>
+            <span id="fieldSelectorArrow" style="color: #9a3412;">▼</span>
+          </div>
+          <div id="fieldSelectorBody" style="display: none; padding: 0.75rem; background: white; max-height: 300px; overflow-y: auto;">
+            <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.75rem;">Select which data fields to store in Google Sheets:</p>
+            <div id="fieldCheckboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem;">
+              <!-- Core fields (always included) -->
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                <input type="checkbox" data-field="date" checked disabled style="width: 16px; height: 16px;">
+                <span>date <em style="color: #94a3b8;">(required)</em></span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                <input type="checkbox" data-field="name" checked disabled style="width: 16px; height: 16px;">
+                <span>name <em style="color: #94a3b8;">(required)</em></span>
+              </label>
+              <!-- Key vegetation metrics -->
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                <input type="checkbox" class="ndvi-field-checkbox" data-field="ndvi" checked style="width: 16px; height: 16px;">
+                <span>ndvi</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                <input type="checkbox" class="ndvi-field-checkbox" data-field="vegetation_cover" checked style="width: 16px; height: 16px;">
+                <span>vegetation_cover</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                <input type="checkbox" class="ndvi-field-checkbox" data-field="soil_moisture_root_zone" checked style="width: 16px; height: 16px;">
+                <span>soil_moisture_root_zone</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                <input type="checkbox" class="ndvi-field-checkbox" data-field="actual_evapotranspiration" checked style="width: 16px; height: 16px;">
+                <span>actual_evapotranspiration</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                <input type="checkbox" class="ndvi-field-checkbox" data-field="crop_production_cumulative" checked style="width: 16px; height: 16px;">
+                <span>crop_production_cumulative</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                <input type="checkbox" class="ndvi-field-checkbox" data-field="crop_coefficient" style="width: 16px; height: 16px;">
+                <span>crop_coefficient</span>
+              </label>
+              <!-- Water/Irrigation -->
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                <input type="checkbox" class="ndvi-field-checkbox" data-field="potential_evapotranspiration" style="width: 16px; height: 16px;">
+                <span>potential_evapotranspiration</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                <input type="checkbox" class="ndvi-field-checkbox" data-field="water_deficit" style="width: 16px; height: 16px;">
+                <span>water_deficit</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                <input type="checkbox" class="ndvi-field-checkbox" data-field="irrigation_advice" style="width: 16px; height: 16px;">
+                <span>irrigation_advice</span>
+              </label>
+              <!-- Growth metrics -->
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                <input type="checkbox" class="ndvi-field-checkbox" data-field="leaf_area_index" style="width: 16px; height: 16px;">
+                <span>leaf_area_index</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                <input type="checkbox" class="ndvi-field-checkbox" data-field="biomass" style="width: 16px; height: 16px;">
+                <span>biomass</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                <input type="checkbox" class="ndvi-field-checkbox" data-field="canopy_temperature" style="width: 16px; height: 16px;">
+                <span>canopy_temperature</span>
+              </label>
+              <!-- Quality flags -->
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                <input type="checkbox" class="ndvi-field-checkbox" data-field="cloud_cover" style="width: 16px; height: 16px;">
+                <span>cloud_cover</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #475569;">
+                <input type="checkbox" class="ndvi-field-checkbox" data-field="data_quality" style="width: 16px; height: 16px;">
+                <span>data_quality</span>
+              </label>
+            </div>
+            <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0; display: flex; gap: 0.5rem;">
+              <button type="button" onclick="selectAllNdviFields()" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: #e2e8f0; border: none; border-radius: 0.25rem; cursor: pointer;">Select All</button>
+              <button type="button" onclick="selectDefaultNdviFields()" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: #e2e8f0; border: none; border-radius: 0.25rem; cursor: pointer;">Defaults</button>
+              <button type="button" onclick="clearNdviFields()" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: #e2e8f0; border: none; border-radius: 0.25rem; cursor: pointer;">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Import mode toggle -->
+        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fef3c7; border-radius: 0.5rem;">
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="checkbox" id="irrwatchReplaceMode" checked style="width: 18px; height: 18px;">
+            <span style="font-size: 0.875rem; color: #92400e;"><strong>Replace existing data</strong> (recommended - keeps only the selected date)</span>
+          </label>
+          <small style="display: block; margin-top: 0.25rem; color: #a16207;">Uncheck to accumulate multiple dates for historical comparison</small>
+        </div>
+
+        <div class="btn-row">
+          <button class="button" id="fetchIrrWatchBtn" style="background: #f97316; color: white;">📡 Fetch NDVI Data</button>
+          <button class="button" id="refreshIrrWatchBtn" style="background: #ea580c; color: white;">🔄 Refresh Orders</button>
+        </div>
+
+        <div id="irrwatchStatus" style="margin-top: 0.75rem;"></div>
+
+        <div id="irrwatchDataCount" style="margin-top: 0.75rem; padding: 0.75rem; background: #f8fafc; border-radius: 0.375rem; font-size: 0.8rem; color: #64748b;"></div>
+
+        <div style="margin-top: 0.75rem;">
+          <button class="button" id="clearIrrWatchBtn" style="background: #fecaca; color: #991b1b; border: 1px solid #fca5a5;">🗑️ Clear All NDVI Data</button>
+        </div>
+      </div>
+    </div>
+
     <div style="grid-column: 1 / -1; margin: 1rem 0 0.5rem 0;">
       <h2 style="margin: 0; padding: 0.75rem 1rem; background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%); color: white; border-radius: 0.5rem; font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
         📊 Data Management
@@ -1454,6 +1600,300 @@
       showStatus(`Farm "${name.trim()}" added to ${client?.name || 'client'}`, true);
     }
 
+    // ========== IRRWATCH INTEGRATION ==========
+    const IrrWatchAPI = DataCore.IrrWatchAPI;
+
+    // Default NDVI fields to save
+    const DEFAULT_NDVI_FIELDS = ['ndvi', 'vegetation_cover', 'soil_moisture_root_zone',
+                                  'actual_evapotranspiration', 'crop_production_cumulative'];
+
+    // Load saved field preferences
+    function getSelectedNdviFields() {
+      const saved = localStorage.getItem('irrwatch_selectedFields');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          return DEFAULT_NDVI_FIELDS;
+        }
+      }
+      return DEFAULT_NDVI_FIELDS;
+    }
+
+    // Save field preferences
+    function saveSelectedNdviFields() {
+      const checkboxes = document.querySelectorAll('.ndvi-field-checkbox:checked');
+      const fields = Array.from(checkboxes).map(cb => cb.dataset.field);
+      localStorage.setItem('irrwatch_selectedFields', JSON.stringify(fields));
+      updateFieldSelectorCount();
+    }
+
+    // Update count display
+    function updateFieldSelectorCount() {
+      const checkboxes = document.querySelectorAll('.ndvi-field-checkbox:checked');
+      const countEl = document.getElementById('fieldSelectorCount');
+      if (countEl) {
+        countEl.textContent = `(${checkboxes.length + 2} selected)`; // +2 for date and name
+      }
+    }
+
+    // Initialize field checkboxes from saved preferences
+    function initializeFieldSelector() {
+      const selectedFields = getSelectedNdviFields();
+      document.querySelectorAll('.ndvi-field-checkbox').forEach(cb => {
+        cb.checked = selectedFields.includes(cb.dataset.field);
+        cb.addEventListener('change', saveSelectedNdviFields);
+      });
+      updateFieldSelectorCount();
+    }
+
+    // Toggle field selector visibility
+    function toggleFieldSelector() {
+      const body = document.getElementById('fieldSelectorBody');
+      const arrow = document.getElementById('fieldSelectorArrow');
+      if (body.style.display === 'none') {
+        body.style.display = 'block';
+        arrow.textContent = '▲';
+      } else {
+        body.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    }
+    window.toggleFieldSelector = toggleFieldSelector;
+
+    // Select all fields
+    function selectAllNdviFields() {
+      document.querySelectorAll('.ndvi-field-checkbox').forEach(cb => cb.checked = true);
+      saveSelectedNdviFields();
+    }
+    window.selectAllNdviFields = selectAllNdviFields;
+
+    // Reset to defaults
+    function selectDefaultNdviFields() {
+      document.querySelectorAll('.ndvi-field-checkbox').forEach(cb => {
+        cb.checked = DEFAULT_NDVI_FIELDS.includes(cb.dataset.field);
+      });
+      saveSelectedNdviFields();
+    }
+    window.selectDefaultNdviFields = selectDefaultNdviFields;
+
+    // Clear all (except required)
+    function clearNdviFields() {
+      document.querySelectorAll('.ndvi-field-checkbox').forEach(cb => cb.checked = false);
+      saveSelectedNdviFields();
+    }
+    window.clearNdviFields = clearNdviFields;
+
+    function updateIrrWatchImportUI() {
+      const section = document.getElementById('irrwatchImportSection');
+      const notConfigured = document.getElementById('irrwatchNotConfigured');
+      const configured = document.getElementById('irrwatchConfigured');
+
+      if (IrrWatchAPI.isConfigured()) {
+        // Show the entire section only when configured
+        section.style.display = 'block';
+        notConfigured.style.display = 'none';
+        configured.style.display = 'block';
+        loadIrrWatchOrders();
+        updateIrrWatchDataCount();
+      } else {
+        // Hide the entire section for users without IrrWatch
+        section.style.display = 'none';
+      }
+    }
+
+    async function loadIrrWatchOrders() {
+      const orderSelect = document.getElementById('irrwatchOrderSelect');
+      const dateSelect = document.getElementById('irrwatchDateSelect');
+
+      orderSelect.innerHTML = '<option value="">Loading orders...</option>';
+      dateSelect.innerHTML = '<option value="">Select an order first</option>';
+      dateSelect.disabled = true;
+
+      try {
+        const orders = await IrrWatchAPI.getOrders();
+        orderSelect.innerHTML = '<option value="">-- Select an order --</option>';
+
+        orders.forEach(order => {
+          const option = document.createElement('option');
+          option.value = order.uuid;
+          option.textContent = order.fields?.properties?.name || `Order ${order.id}`;
+          option.dataset.orderData = JSON.stringify(order);
+          orderSelect.appendChild(option);
+        });
+
+        if (orders.length === 0) {
+          orderSelect.innerHTML = '<option value="">No orders found</option>';
+        }
+      } catch (e) {
+        console.error('[IrrWatch] Failed to load orders:', e);
+        orderSelect.innerHTML = '<option value="">Error loading orders</option>';
+        document.getElementById('irrwatchStatus').innerHTML = `<span style="color: #ef4444;">Error: ${e.message}</span>`;
+      }
+    }
+
+    async function loadIrrWatchDates(orderUuid) {
+      const dateSelect = document.getElementById('irrwatchDateSelect');
+      dateSelect.innerHTML = '<option value="">Loading dates...</option>';
+
+      try {
+        const results = await IrrWatchAPI.getResultDates(orderUuid);
+        dateSelect.innerHTML = '<option value="">-- Select a date --</option>';
+
+        results.forEach(result => {
+          const option = document.createElement('option');
+          option.value = result.date;
+          // Format date nicely
+          const year = result.date.substring(0, 4);
+          const month = result.date.substring(4, 6);
+          const day = result.date.substring(6, 8);
+          option.textContent = `${year}-${month}-${day}`;
+          option.dataset.resultUuid = result.uuid;
+          dateSelect.appendChild(option);
+        });
+
+        dateSelect.disabled = false;
+
+        if (results.length === 0) {
+          dateSelect.innerHTML = '<option value="">No data available</option>';
+        }
+      } catch (e) {
+        console.error('[IrrWatch] Failed to load dates:', e);
+        dateSelect.innerHTML = '<option value="">Error loading dates</option>';
+      }
+    }
+
+    async function fetchIrrWatchData() {
+      const orderSelect = document.getElementById('irrwatchOrderSelect');
+      const dateSelect = document.getElementById('irrwatchDateSelect');
+      const statusEl = document.getElementById('irrwatchStatus');
+      const dataCountEl = document.getElementById('irrwatchDataCount');
+      const previewSection = document.getElementById('irrwatchDataPreview');
+      const replaceMode = document.getElementById('irrwatchReplaceMode').checked;
+
+      const orderUuid = orderSelect.value;
+      const date = dateSelect.value;
+
+      if (!orderUuid) {
+        statusEl.innerHTML = '<span style="color: #ef4444;">Please select an order</span>';
+        return;
+      }
+
+      if (!date) {
+        statusEl.innerHTML = '<span style="color: #ef4444;">Please select a date</span>';
+        return;
+      }
+
+      statusEl.innerHTML = '<span style="color: #3b82f6;">📡 Fetching NDVI data...</span>';
+
+      try {
+        const fieldData = await IrrWatchAPI.getFieldLevelData(orderUuid, date);
+
+        if (!fieldData || fieldData.length === 0) {
+          statusEl.innerHTML = '<span style="color: #f59e0b;">No field data returned for this date</span>';
+          return;
+        }
+
+        // Format date for display (YYYYMMDD -> YYYY-MM-DD)
+        const formattedDate = `${date.substring(0,4)}-${date.substring(4,6)}-${date.substring(6,8)}`;
+
+        // Add date to each record
+        const enrichedData = fieldData.map(record => ({
+          ...record,
+          date: date,
+          formattedDate: formattedDate,
+          orderUuid: orderUuid,
+          fetchedAt: new Date().toISOString()
+        }));
+
+        let finalData;
+
+        if (replaceMode) {
+          // Replace mode: just use the new data
+          finalData = enrichedData;
+        } else {
+          // Accumulate mode: merge with existing, avoiding duplicates
+          let existingData = await DataCore.loadIrrWatchDataFromIndexedDB() || [];
+          // Remove old data for same date to avoid duplicates
+          existingData = existingData.filter(d => d.date !== date);
+          finalData = [...existingData, ...enrichedData];
+        }
+
+        // Save to IndexedDB
+        await DataCore.saveIrrWatchDataToIndexedDB(finalData);
+
+        // Save to Google Sheets with selected fields
+        if (SheetsAPI.isSignedIn && DataCore.config.SHEET_ID) {
+          try {
+            const selectedFields = getSelectedNdviFields();
+            // Always include date and name, plus selected fields and fetchedAt
+            const headers = ['date', 'name', ...selectedFields, 'fetchedAt'];
+            await SheetsAPI.saveNdviData(finalData, replaceMode, headers);
+            console.log(`[IrrWatch] Saved to Sheets with ${headers.length} columns`);
+          } catch (e) {
+            console.warn('[IrrWatch] Failed to save to Sheets:', e);
+            // Don't fail the whole operation if Sheets save fails
+          }
+        }
+
+        // Calculate some stats for display
+        const avgNdvi = enrichedData.reduce((sum, d) => sum + (d.ndvi || 0), 0) / enrichedData.length;
+        const avgVegCover = enrichedData.reduce((sum, d) => sum + (d.vegetation_cover || 0), 0) / enrichedData.length;
+
+        const modeText = replaceMode ? '(replaced previous)' : '(added to history)';
+        statusEl.innerHTML = `<span style="color: #22c55e;">✅ Imported ${enrichedData.length} field records ${modeText}</span>`;
+
+        // Show preview
+        previewSection.style.display = 'block';
+        document.getElementById('irrwatchPreviewText').innerHTML =
+          `${enrichedData.length} fields | Date: ${formattedDate} | Avg NDVI: ${(avgNdvi * 100).toFixed(0)}%`;
+
+        // Update data count
+        updateIrrWatchDataCount();
+
+        showStatus(`Imported ${enrichedData.length} NDVI records from IrrWatch`, true);
+      } catch (e) {
+        console.error('[IrrWatch] Fetch error:', e);
+        statusEl.innerHTML = `<span style="color: #ef4444;">Error: ${e.message}</span>`;
+      }
+    }
+
+    async function clearIrrWatchData() {
+      if (!confirm('Clear all cached NDVI data? You can re-fetch anytime from IrrWatch.')) return;
+
+      await DataCore.saveIrrWatchDataToIndexedDB([]);
+
+      // Also clear from Sheets if connected
+      if (SheetsAPI.isSignedIn && DataCore.config.SHEET_ID) {
+        try {
+          await SheetsAPI.clearNdviData();
+        } catch (e) {
+          console.warn('[IrrWatch] Failed to clear from Sheets:', e);
+        }
+      }
+
+      document.getElementById('irrwatchStatus').innerHTML = '<span style="color: #64748b;">NDVI data cleared</span>';
+      document.getElementById('irrwatchDataPreview').style.display = 'none';
+      updateIrrWatchDataCount();
+      showStatus('NDVI data cleared', true);
+    }
+
+    async function updateIrrWatchDataCount() {
+      const dataCountEl = document.getElementById('irrwatchDataCount');
+      const data = await DataCore.loadIrrWatchDataFromIndexedDB() || [];
+
+      if (data.length > 0) {
+        const dates = [...new Set(data.map(d => d.formattedDate || d.date))].sort().reverse();
+        const fields = [...new Set(data.map(d => d.name))];
+
+        let html = `<strong>${fields.length}</strong> fields with NDVI data<br>`;
+        html += `<span style="font-size: 0.75rem;">Dates: ${dates.slice(0, 3).join(', ')}${dates.length > 3 ? ` (+${dates.length - 3} more)` : ''}</span>`;
+        dataCountEl.innerHTML = html;
+      } else {
+        dataCountEl.textContent = 'No NDVI data cached';
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', async () => {
       // Run migration first
       DataCore.migrateDataIfNeeded();
@@ -1462,6 +1902,8 @@
       loadActiveSelection();
       await loadLocalData(); updateSummary(); updateBackupStatus(); updateBackupFooter(); refreshFieldTable();
       populateBoundaryClientFarmSelectors(); // Initialize client/farm dropdowns
+      updateIrrWatchImportUI(); // Initialize IrrWatch UI
+      initializeFieldSelector(); // Initialize NDVI field selector
       try { await SheetsAPI.init(); SheetsAPI.onSignInChange = handleSignInChange; handleSignInChange(SheetsAPI.isSignedIn); } catch (e) { console.warn(e); }
       document.getElementById('uploadBoundaryBtn').addEventListener('click', uploadBoundaries);
       document.getElementById('uploadSampleBtn').addEventListener('click', uploadSamples);
@@ -1477,6 +1919,17 @@
       document.getElementById('exportCSVBtn').addEventListener('click', exportToCSV);
       document.getElementById('exportPDFBtn').addEventListener('click', exportToPDF);
       document.getElementById('exportJSONBtn').addEventListener('click', exportToJSON);
+
+      // IrrWatch event listeners (only if elements exist - section may be hidden)
+      const irrwatchOrderSelect = document.getElementById('irrwatchOrderSelect');
+      if (irrwatchOrderSelect) {
+        irrwatchOrderSelect.addEventListener('change', (e) => {
+          if (e.target.value) loadIrrWatchDates(e.target.value);
+        });
+        document.getElementById('fetchIrrWatchBtn').addEventListener('click', fetchIrrWatchData);
+        document.getElementById('refreshIrrWatchBtn').addEventListener('click', loadIrrWatchOrders);
+        document.getElementById('clearIrrWatchBtn').addEventListener('click', clearIrrWatchData);
+      }
     });
 
     async function handleAuth() { if (SheetsAPI.isSignedIn) await SheetsAPI.signOut(); else await SheetsAPI.signIn(); }

@@ -231,6 +231,69 @@
       <div id="connectionStatus" style="margin-top: 0.75rem;"></div>
     </div>
 
+    <!-- IrrWatch Integration Card (collapsed by default for users without it) -->
+    <div class="settings-card" id="irrwatchCard" style="border: 1px solid #e2e8f0; padding: 1rem;">
+      <!-- Collapsed state (default for non-users) -->
+      <div id="irrwatchCollapsed" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;" onclick="expandIrrWatchCard()">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="font-size: 1.25rem;">🛰️</span>
+          <span style="font-weight: 600; color: #64748b;">IrrWatch NDVI Integration</span>
+          <span style="font-size: 0.75rem; color: #94a3b8;">(optional)</span>
+        </div>
+        <span style="color: #94a3b8; font-size: 0.875rem;">+ Connect</span>
+      </div>
+
+      <!-- Expanded state -->
+      <div id="irrwatchExpanded" style="display: none;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 2px solid #fed7aa;">
+          <h3 style="margin: 0; color: #c2410c;">🛰️ IrrWatch NDVI Integration</h3>
+          <button onclick="collapseIrrWatchCard()" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.25rem;">×</button>
+        </div>
+        <p style="color: #64748b; margin-bottom: 1rem; font-size: 0.875rem;">Connect to IrrWatch to import NDVI imagery and vegetation data for your fields.</p>
+
+        <!-- Connected state -->
+        <div id="irrwatchConnectedState" style="display: none;">
+          <div style="padding: 1rem; background: #f0fdf4; border: 1px solid #86efac; border-radius: 0.5rem; margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <span style="color: #22c55e; font-size: 1.25rem;">✅</span>
+              <strong style="color: #166534;">Connected to IrrWatch</strong>
+            </div>
+            <p id="irrwatchCompanyName" style="margin: 0; color: #166534; font-size: 0.875rem;"></p>
+          </div>
+          <div class="btn-row">
+            <button class="button secondary" onclick="testIrrWatchConnection()">🔗 Test Connection</button>
+            <button class="button" style="background: #ef4444; color: white;" onclick="disconnectIrrWatch()">Disconnect</button>
+          </div>
+        </div>
+
+        <!-- Setup state -->
+        <div id="irrwatchSetupState">
+          <div class="threshold-grid">
+            <div class="threshold-row" style="flex-direction: column; align-items: stretch; gap: 0.5rem;">
+              <label style="font-weight: 600; color: #374151;">API Key</label>
+              <input type="text" id="irrwatchApiKey" placeholder="Your IrrWatch API Key" style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem;">
+              <small style="color: #64748b;">Found in IrrWatch portal under API Credentials</small>
+            </div>
+            <div class="threshold-row" style="flex-direction: column; align-items: stretch; gap: 0.5rem;">
+              <label style="font-weight: 600; color: #374151;">API Password</label>
+              <input type="password" id="irrwatchApiPassword" placeholder="Your IrrWatch API Password" style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem;">
+            </div>
+            <div class="threshold-row" style="flex-direction: column; align-items: stretch; gap: 0.5rem;">
+              <label style="font-weight: 600; color: #374151;">Company</label>
+              <select id="irrwatchCompanySelect" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem;" disabled>
+                <option value="">Connect to load companies...</option>
+              </select>
+            </div>
+          </div>
+          <div class="btn-row" style="margin-top: 1rem;">
+            <button class="button primary" onclick="connectIrrWatch()">🔌 Connect to IrrWatch</button>
+          </div>
+        </div>
+
+        <div id="irrwatchStatus" style="margin-top: 0.75rem;"></div>
+      </div>
+    </div>
+
     <!-- Active Operation Card -->
     <div class="settings-card" style="border: 2px solid #8b5cf6; background: linear-gradient(to right, #f5f3ff, white);">
       <h3>🏢 Active Operation</h3>
@@ -1247,6 +1310,7 @@
       updateBackupFooter();
       initWhatsNew();
       loadClientManagement();
+      updateIrrWatchUI(); // Initialize IrrWatch UI state
       try { await SheetsAPI.init(); SheetsAPI.onSignInChange = handleSignInChange; handleSignInChange(SheetsAPI.isSignedIn); } catch (e) {}
       document.getElementById('saveBtn').addEventListener('click', saveSettings);
       document.getElementById('resetBtn').addEventListener('click', resetSettings);
@@ -1760,7 +1824,143 @@
         }
       }
     }
-    
+
+    // ========== IRRWATCH INTEGRATION ==========
+    const IrrWatchAPI = DataCore.IrrWatchAPI;
+
+    function expandIrrWatchCard() {
+      document.getElementById('irrwatchCollapsed').style.display = 'none';
+      document.getElementById('irrwatchExpanded').style.display = 'block';
+      document.getElementById('irrwatchCard').style.border = '2px solid #f97316';
+      document.getElementById('irrwatchCard').style.background = 'linear-gradient(to right, #fff7ed, white)';
+      document.getElementById('irrwatchCard').style.padding = '1.5rem';
+    }
+
+    function collapseIrrWatchCard() {
+      document.getElementById('irrwatchCollapsed').style.display = 'flex';
+      document.getElementById('irrwatchExpanded').style.display = 'none';
+      document.getElementById('irrwatchCard').style.border = '1px solid #e2e8f0';
+      document.getElementById('irrwatchCard').style.background = 'white';
+      document.getElementById('irrwatchCard').style.padding = '1rem';
+    }
+
+    function updateIrrWatchUI() {
+      const connectedState = document.getElementById('irrwatchConnectedState');
+      const setupState = document.getElementById('irrwatchSetupState');
+      const companyNameEl = document.getElementById('irrwatchCompanyName');
+      const collapsedEl = document.getElementById('irrwatchCollapsed');
+
+      if (IrrWatchAPI.isConfigured()) {
+        const creds = IrrWatchAPI.getCredentials();
+        if (creds.companyUuid) {
+          // Show connected state - auto-expand since they're using it
+          expandIrrWatchCard();
+          connectedState.style.display = 'block';
+          setupState.style.display = 'none';
+          const savedCompanyName = localStorage.getItem('irrwatch_companyName') || creds.companyUuid;
+          companyNameEl.textContent = `Company: ${savedCompanyName}`;
+          // Update collapsed text to show connected
+          collapsedEl.querySelector('span:last-child').textContent = '✓ Connected';
+          collapsedEl.querySelector('span:last-child').style.color = '#22c55e';
+        } else {
+          // Credentials entered but company not selected - show expanded
+          expandIrrWatchCard();
+          connectedState.style.display = 'none';
+          setupState.style.display = 'block';
+          document.getElementById('irrwatchApiKey').value = creds.apiKey;
+          document.getElementById('irrwatchApiPassword').value = '********';
+        }
+      } else {
+        // Not configured - keep collapsed (default state)
+        connectedState.style.display = 'none';
+        setupState.style.display = 'block';
+      }
+    }
+
+    async function connectIrrWatch() {
+      const apiKey = document.getElementById('irrwatchApiKey').value.trim();
+      const apiPassword = document.getElementById('irrwatchApiPassword').value.trim();
+      const statusEl = document.getElementById('irrwatchStatus');
+      const companySelect = document.getElementById('irrwatchCompanySelect');
+
+      if (!apiKey || !apiPassword) {
+        statusEl.innerHTML = '<span style="color: #ef4444;">Please enter API Key and Password</span>';
+        return;
+      }
+
+      statusEl.innerHTML = '<span style="color: #3b82f6;">🔄 Connecting to IrrWatch...</span>';
+
+      // Save credentials (password only if not masked)
+      IrrWatchAPI.saveCredentials(apiKey, apiPassword !== '********' ? apiPassword : null, null);
+
+      const result = await IrrWatchAPI.testConnection();
+
+      if (result.success) {
+        statusEl.innerHTML = '<span style="color: #22c55e;">✅ Connected! Select your company below.</span>';
+
+        // Populate company dropdown
+        companySelect.innerHTML = '<option value="">-- Select a company --</option>';
+        result.companies.forEach(company => {
+          const option = document.createElement('option');
+          option.value = company.uuid;
+          option.textContent = company.name;
+          companySelect.appendChild(option);
+        });
+        companySelect.disabled = false;
+
+        // Add change handler
+        companySelect.onchange = function() {
+          const selectedUuid = this.value;
+          const selectedName = this.options[this.selectedIndex].text;
+          if (selectedUuid) {
+            IrrWatchAPI.saveCredentials(null, null, selectedUuid);
+            localStorage.setItem('irrwatch_companyName', selectedName);
+            updateIrrWatchUI();
+            showStatus('IrrWatch connected successfully!', true);
+          }
+        };
+      } else {
+        statusEl.innerHTML = `<span style="color: #ef4444;">❌ ${result.error}</span>`;
+      }
+    }
+
+    async function testIrrWatchConnection() {
+      const statusEl = document.getElementById('irrwatchStatus');
+      statusEl.innerHTML = '<span style="color: #3b82f6;">🔄 Testing connection...</span>';
+
+      const result = await IrrWatchAPI.testConnection();
+      if (result.success) {
+        // Also test getting orders
+        try {
+          const orders = await IrrWatchAPI.getOrders();
+          statusEl.innerHTML = `<span style="color: #22c55e;">✅ Connection verified - Found ${orders.length} orders</span>`;
+        } catch (e) {
+          statusEl.innerHTML = `<span style="color: #22c55e;">✅ Connected (${result.companies.length} companies)</span>`;
+        }
+      } else {
+        statusEl.innerHTML = `<span style="color: #ef4444;">❌ ${result.error}</span>`;
+      }
+    }
+
+    function disconnectIrrWatch() {
+      if (!confirm('Disconnect from IrrWatch? You can reconnect anytime.')) {
+        return;
+      }
+
+      IrrWatchAPI.clearCredentials();
+      localStorage.removeItem('irrwatch_companyName');
+
+      // Reset UI
+      document.getElementById('irrwatchApiKey').value = '';
+      document.getElementById('irrwatchApiPassword').value = '';
+      document.getElementById('irrwatchCompanySelect').innerHTML = '<option value="">Connect to load companies...</option>';
+      document.getElementById('irrwatchCompanySelect').disabled = true;
+      document.getElementById('irrwatchStatus').innerHTML = '';
+
+      updateIrrWatchUI();
+      showStatus('Disconnected from IrrWatch', true);
+    }
+
     function saveSettings() {
       const settings = {};
       Object.keys(defaults).forEach(k => {
