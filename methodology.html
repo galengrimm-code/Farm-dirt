@@ -289,7 +289,7 @@
         <a href="#ratios">Ratios</a>
         <a href="#thresholds">Thresholds</a>
         <a href="#averages">Averages</a>
-        <a href="#yield">Yield Correlation</a>
+        <a href="#yield">Yield Analysis</a>
         <a href="#spatial">Map & Spatial</a>
         <a href="#color">Color Scales</a>
       </div>
@@ -784,7 +784,7 @@ cellKey = `${gridLat},${gridLon}`
     <!-- YIELD CORRELATION -->
     <div class="section" id="yield">
       <div class="section-header" onclick="toggleSection(this)">
-        <h2><span>🌾</span> Yield Correlation</h2>
+        <h2><span>🌾</span> Yield Analysis</h2>
         <span class="toggle">▼</span>
       </div>
       <div class="section-content">
@@ -872,6 +872,98 @@ lower = predicted - tValue × SE_y
 
           <div class="used-in">
             <span>Scatter Plot</span>
+          </div>
+        </div>
+
+        <div class="calc-box">
+          <h3>Yield by Nutrient Level (Bucket Analysis)</h3>
+          <h4>What it measures</h4>
+          <p>Average yield at different nutrient levels (Low, Medium, High) based on agronomic thresholds.</p>
+
+          <h4>Method</h4>
+          <div class="formula">
+<span class="comment">// Classify each sample into buckets based on thresholds:</span>
+Low    = value &lt; critical threshold
+Medium = critical ≤ value &lt; optimal max
+High   = value ≥ optimal max
+
+<span class="comment">// Calculate average yield in each bucket:</span>
+avgYield_low    = mean(yield of all Low samples)
+avgYield_medium = mean(yield of all Medium samples)
+avgYield_high   = mean(yield of all High samples)
+
+<span class="comment">// Calculate yield difference:</span>
+yieldDiff = avgYield_high - avgYield_low
+          </div>
+
+          <h4>Interpretation</h4>
+          <table class="threshold-table">
+            <tr><th>Pattern</th><th>What it suggests</th></tr>
+            <tr><td>Low &lt; Medium &lt; High</td><td>Classic response - nutrient is limiting in low areas</td></tr>
+            <tr><td>Low ≈ Medium ≈ High</td><td>No yield response to this nutrient (not limiting)</td></tr>
+            <tr><td>High &lt; Low</td><td>Possible toxicity, imbalance, or confounding factor</td></tr>
+          </table>
+
+          <div class="agro-note">
+            <p><strong>Sample size matters:</strong> Buckets with fewer than 10 samples may not be reliable. Look for consistent patterns across multiple years before making management changes.</p>
+          </div>
+
+          <div class="used-in">
+            <span>Yield by Nutrient Level Tab</span>
+          </div>
+        </div>
+
+        <div class="calc-box">
+          <h3>Breakpoint Analysis</h3>
+          <h4>What it measures</h4>
+          <p>The critical nutrient threshold where yield response changes - below = yield penalty, above = diminishing returns.</p>
+
+          <h4>Algorithm (Binning with Bootstrap)</h4>
+          <div class="formula">
+<span class="comment">// Step 1: Test each unique nutrient value as potential breakpoint</span>
+for each candidate threshold t:
+  below = samples where nutrient &lt; t
+  above = samples where nutrient ≥ t
+
+  <span class="comment">// Require minimum samples per side (15% of total, min 5)</span>
+  if below.count &lt; minPerSide OR above.count &lt; minPerSide: skip
+
+  penalty = mean(yield_above) - mean(yield_below)
+  if penalty &gt; bestPenalty AND penalty ≥ MIN_PENALTY:
+    bestBreakpoint = t
+
+<span class="comment">// Step 2: Bootstrap stability test (50 iterations)</span>
+for i = 1 to 50:
+  subset = random 80% of samples
+  bootBreakpoint = run algorithm on subset
+  if |bootBreakpoint - bestBreakpoint| ≤ tolerance:
+    nearCount++
+
+stabilityPct = nearCount / 50 × 100
+          </div>
+
+          <h4>Minimum Penalty Thresholds</h4>
+          <table class="threshold-table">
+            <tr><th>Crop</th><th>Min Penalty</th><th>Why</th></tr>
+            <tr><td>Corn</td><td>5 bu/ac</td><td>Smaller differences not economically significant</td></tr>
+            <tr><td>Soybeans</td><td>2 bu/ac</td><td>Lower yield baseline, smaller absolute differences</td></tr>
+          </table>
+
+          <h4>Confidence Levels</h4>
+          <table class="threshold-table">
+            <tr><th>Stability %</th><th>Confidence</th><th>Meaning</th></tr>
+            <tr><td>≥ 70%</td><td>High</td><td>Breakpoint found consistently across resamples</td></tr>
+            <tr><td>50-69%</td><td>Medium</td><td>Breakpoint is likely but variable</td></tr>
+            <tr><td>30-49%</td><td>Medium-Low</td><td>Weak signal, needs more data</td></tr>
+            <tr><td>&lt; 30%</td><td>Low</td><td>No reliable breakpoint detected</td></tr>
+          </table>
+
+          <div class="agro-note">
+            <p><strong>Data-driven thresholds:</strong> Unlike fixed textbook thresholds, breakpoint analysis finds YOUR threshold based on YOUR data. This accounts for soil type, climate, hybrid/variety, and management that make your operation unique.</p>
+          </div>
+
+          <div class="used-in">
+            <span>Breakpoint Analysis Tab</span>
           </div>
         </div>
       </div>
