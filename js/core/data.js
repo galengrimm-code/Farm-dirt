@@ -840,15 +840,17 @@ const IrrWatchAPI = {
     return {
       apiKey: localStorage.getItem('irrwatch_apiKey') || '',
       apiPassword: localStorage.getItem('irrwatch_apiPassword') || '',
-      companyUuid: localStorage.getItem('irrwatch_companyUuid') || ''
+      companyUuid: localStorage.getItem('irrwatch_companyUuid') || '',
+      companyName: localStorage.getItem('irrwatch_companyName') || ''
     };
   },
 
   // Save credentials
-  saveCredentials(apiKey, apiPassword, companyUuid) {
+  saveCredentials(apiKey, apiPassword, companyUuid, companyName) {
     if (apiKey) localStorage.setItem('irrwatch_apiKey', apiKey);
     if (apiPassword) localStorage.setItem('irrwatch_apiPassword', apiPassword);
     if (companyUuid) localStorage.setItem('irrwatch_companyUuid', companyUuid);
+    if (companyName) localStorage.setItem('irrwatch_companyName', companyName);
   },
 
   // Clear credentials
@@ -856,6 +858,7 @@ const IrrWatchAPI = {
     localStorage.removeItem('irrwatch_apiKey');
     localStorage.removeItem('irrwatch_apiPassword');
     localStorage.removeItem('irrwatch_companyUuid');
+    localStorage.removeItem('irrwatch_companyName');
     localStorage.removeItem('irrwatch_accessToken');
     localStorage.removeItem('irrwatch_tokenExpiry');
     this.accessToken = null;
@@ -962,7 +965,7 @@ const IrrWatchAPI = {
     return this.apiRequest(`/company/${uuid}/field`);
   },
 
-  // Get available result dates for an order
+  // Get available result dates for an order/field
   async getResultDates(orderUuid, companyUuid) {
     const uuid = companyUuid || this.getCredentials().companyUuid;
     if (!uuid) throw new Error('Company UUID not set');
@@ -975,6 +978,21 @@ const IrrWatchAPI = {
     if (!uuid) throw new Error('Company UUID not set');
     // Date format: YYYYMMDD
     return this.apiRequest(`/company/${uuid}/order/${orderUuid}/result/${date}/field_level`);
+  },
+
+  // Get available dates for a field by name (API supports names, not just UUIDs)
+  async getFieldDates(fieldName, companyName) {
+    const company = companyName || this.getCredentials().companyName || this.getCredentials().companyUuid;
+    if (!company) throw new Error('Company not set');
+    return this.apiRequest(`/company/${encodeURIComponent(company)}/order/${encodeURIComponent(fieldName)}/result`);
+  },
+
+  // Get field-level data by name for a specific date
+  async getFieldData(fieldName, date, companyName) {
+    const company = companyName || this.getCredentials().companyName || this.getCredentials().companyUuid;
+    if (!company) throw new Error('Company not set');
+    // Date format: YYYYMMDD
+    return this.apiRequest(`/company/${encodeURIComponent(company)}/order/${encodeURIComponent(fieldName)}/result/${date}/field_level`);
   },
 
   // Test connection with current credentials
