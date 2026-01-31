@@ -984,15 +984,16 @@ const IrrWatchAPI = {
   async getFieldDates(fieldName, companyName) {
     const company = companyName || this.getCredentials().companyName || this.getCredentials().companyUuid;
     if (!company) throw new Error('Company not set');
-    return this.apiRequest(`/company/${encodeURIComponent(company)}/order/${encodeURIComponent(fieldName)}/result`);
+    // Don't encode here - apiRequest encodes the whole path
+    return this.apiRequest(`/company/${company}/order/${fieldName}/result`);
   },
 
   // Get field-level data by name for a specific date
   async getFieldData(fieldName, date, companyName) {
     const company = companyName || this.getCredentials().companyName || this.getCredentials().companyUuid;
     if (!company) throw new Error('Company not set');
-    // Date format: YYYYMMDD
-    return this.apiRequest(`/company/${encodeURIComponent(company)}/order/${encodeURIComponent(fieldName)}/result/${date}/field_level`);
+    // Date format: YYYYMMDD - Don't encode here, apiRequest handles it
+    return this.apiRequest(`/company/${company}/order/${fieldName}/result/${date}/field_level`);
   },
 
   // Test connection with current credentials
