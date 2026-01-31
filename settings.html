@@ -157,39 +157,58 @@
     <div class="settings-card" style="border: 2px solid #3b82f6; background: linear-gradient(to right, #eff6ff, white);">
       <h3>☁️ Google Sheets Connection</h3>
       <p style="color: #64748b; margin-bottom: 1rem; font-size: 0.875rem;">Connect to a Google Sheet to sync your data across devices and share with your team.</p>
-      
-      <div class="threshold-grid">
-        <div class="threshold-row" style="flex-direction: column; align-items: stretch; gap: 0.5rem;">
-          <label style="font-weight: 600; color: #374151;">Google Sheet URL</label>
-          <input type="text" id="sheetId" placeholder="Paste the full Google Sheet URL or just the ID" style="width: 100%; font-family: monospace;">
-          <small style="color: #64748b;">Paste the full URL, e.g., https://docs.google.com/spreadsheets/d/1ABC.../edit</small>
-          <p id="sheetIdDetected" style="color: #22c55e; font-size: 0.8125rem; margin: 0.25rem 0 0 0; display: none;"></p>
+
+      <!-- Connected state (shown when sheet is connected) -->
+      <div id="connectedState" style="display: none;">
+        <div style="padding: 1rem; background: #f0fdf4; border: 1px solid #86efac; border-radius: 0.5rem; margin-bottom: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span style="color: #22c55e; font-size: 1.25rem;">✅</span>
+            <strong style="color: #166534;">Connected</strong>
+          </div>
+          <p id="connectedSheetName" style="margin: 0; color: #166534; font-size: 0.875rem;"></p>
         </div>
-        <div class="threshold-row" style="flex-direction: column; align-items: stretch; gap: 0.5rem;">
-          <label style="font-weight: 600; color: #374151;">Operation Name</label>
-          <input type="text" id="operationName" placeholder="e.g., Smith Family Farms" style="width: 100%;">
+        <div class="btn-row">
+          <button class="button secondary" onclick="testSheetConnection()">🔗 Test Connection</button>
+          <button class="button" style="background: #ef4444; color: white;" onclick="disconnectSheet()">Disconnect</button>
         </div>
       </div>
-      
-      <div style="margin-top: 1rem; padding: 1rem; background: #f8fafc; border-radius: 0.5rem;">
-        <h4 style="margin: 0 0 0.75rem 0; font-size: 0.875rem; color: #374151;">📋 Setup Instructions for New Users:</h4>
-        <ol style="margin: 0; padding-left: 1.25rem; color: #64748b; font-size: 0.8125rem; line-height: 1.6;">
-          <li>Click "Create New Google Sheet" below</li>
-          <li>Rename first tab to <strong>Samples</strong>, add tabs <strong>Fields</strong> and <strong>Settings</strong></li>
-          <li>Copy the full URL from your browser's address bar</li>
-          <li>Paste above and click "Save Sheet Configuration"</li>
-        </ol>
+
+      <!-- Setup state (shown when no sheet is connected) -->
+      <div id="setupState">
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+          <!-- Option 1: Select Existing -->
+          <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: #f8fafc; border-radius: 0.5rem; border: 1px solid #e2e8f0;">
+            <span style="font-size: 1.5rem;">📊</span>
+            <div style="flex: 1;">
+              <strong style="color: #374151;">I have an existing sheet</strong>
+              <p style="margin: 0.25rem 0 0 0; color: #64748b; font-size: 0.8125rem;">Browse your Google Drive and select it</p>
+            </div>
+            <button id="selectExistingBtn" class="button secondary" onclick="handleSelectExisting()">
+              Select from Drive
+            </button>
+          </div>
+
+          <!-- Option 2: Create New -->
+          <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: #f8fafc; border-radius: 0.5rem; border: 1px solid #e2e8f0;">
+            <span style="font-size: 1.5rem;">✨</span>
+            <div style="flex: 1;">
+              <strong style="color: #374151;">I'm starting fresh</strong>
+              <p style="margin: 0.25rem 0 0 0; color: #64748b; font-size: 0.8125rem;">Create a new sheet with all tabs set up</p>
+            </div>
+            <button id="createNewBtn" class="button primary" onclick="handleCreateNew()">
+              Create New Sheet
+            </button>
+          </div>
+        </div>
+
+        <!-- Operation Name (for new sheets) -->
         <div style="margin-top: 1rem;">
-          <button class="button" style="background: #22c55e; color: white; width: 100%;" onclick="window.open('https://sheets.new', '_blank')">
-            📄 Create New Google Sheet
-          </button>
+          <label style="font-weight: 600; color: #374151; display: block; margin-bottom: 0.5rem;">Operation Name (optional)</label>
+          <input type="text" id="operationName" placeholder="e.g., Smith Family Farms" style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem;">
+          <small style="color: #64748b;">Used to name your new sheet</small>
         </div>
       </div>
-      
-      <div class="btn-row" style="margin-top: 1rem;">
-        <button class="button primary" onclick="saveSheetConfig()">💾 Save Sheet Configuration</button>
-        <button class="button secondary" onclick="testSheetConnection()">🔗 Test Connection</button>
-      </div>
+
       <div id="connectionStatus" style="margin-top: 0.75rem;"></div>
     </div>
 
@@ -1544,12 +1563,10 @@
     }
 
     function loadSheetConfig() {
-      const sheetId = localStorage.getItem('googleSheetId') || '';
       const operationName = localStorage.getItem('operationName') || '';
-      document.getElementById('sheetId').value = sheetId;
       document.getElementById('operationName').value = operationName;
 
-      console.log('[Sheets] Loaded sheet config:', { sheetId: sheetId ? sheetId.substring(0, 10) + '...' : '(none)', operationName });
+      console.log('[Sheets] Loaded sheet config:', { operationName });
 
       // Update app title if operation name is set
       if (operationName) {
@@ -1560,68 +1577,91 @@
       // Show initial connection status
       updateConnectionStatusIndicator();
     }
-    
-    function saveSheetConfig() {
-      const input = document.getElementById('sheetId').value.trim();
-      const operationName = document.getElementById('operationName').value.trim();
-
-      // Extract Sheet ID from URL if needed
-      const sheetId = input ? extractSheetId(input) : '';
-
-      console.log('[Sheets] Saving sheet config:', { sheetId: sheetId ? sheetId.substring(0, 10) + '...' : '(none)', operationName });
-
-      const detectedEl = document.getElementById('sheetIdDetected');
-
-      if (sheetId) {
-        if (sheetId.length < 20) {
-          showStatus('Could not find a valid Sheet ID - check the URL', false);
-          detectedEl.style.display = 'none';
-          return;
-        }
-        localStorage.setItem('googleSheetId', sheetId);
-        // Show what was detected
-        detectedEl.textContent = `✓ Sheet ID detected: ${sheetId.substring(0, 25)}...`;
-        detectedEl.style.display = 'block';
-        // Update the input to show just the ID for clarity
-        document.getElementById('sheetId').value = sheetId;
-      } else {
-        localStorage.removeItem('googleSheetId');
-        detectedEl.style.display = 'none';
-      }
-
-      if (operationName) {
-        localStorage.setItem('operationName', operationName);
-      } else {
-        localStorage.removeItem('operationName');
-      }
-
-      console.log('[Sheets] Sheet config saved successfully');
-      showStatus('✓ Sheet configuration saved! Refresh other pages to apply.', true);
-      updateConnectionStatusIndicator();
-    }
 
     function updateConnectionStatusIndicator() {
       const sheetId = localStorage.getItem('googleSheetId');
+      const sheetName = localStorage.getItem('googleSheetName');
+      const connectedState = document.getElementById('connectedState');
+      const setupState = document.getElementById('setupState');
       const statusEl = document.getElementById('connectionStatus');
 
-      if (!sheetId) {
-        statusEl.innerHTML = '<span style="color: #64748b;">📋 No sheet configured - enter a Google Sheet URL above</span>';
-      } else if (!SheetsAPI.isSignedIn) {
-        statusEl.innerHTML = '<span style="color: #f59e0b;">🔑 Sheet connected - sign in to test connection</span>';
+      if (sheetId) {
+        // Show connected state
+        connectedState.style.display = 'block';
+        setupState.style.display = 'none';
+        document.getElementById('connectedSheetName').textContent = sheetName || `Sheet ID: ${sheetId.substring(0, 20)}...`;
+        statusEl.innerHTML = '';
       } else {
-        statusEl.innerHTML = '<span style="color: #64748b;">📋 Sheet connected - click "Test Connection" to verify</span>';
+        // Show setup state
+        connectedState.style.display = 'none';
+        setupState.style.display = 'block';
+        statusEl.innerHTML = '';
       }
     }
 
+    function handleSelectExisting() {
+      const statusEl = document.getElementById('connectionStatus');
+      statusEl.innerHTML = '<span style="color: #3b82f6;">🔄 Opening Google Drive picker...</span>';
+
+      DataCore.openSheetPicker((result) => {
+        if (result.success) {
+          showStatus(`Connected to: ${result.sheetName}`, true);
+          updateConnectionStatusIndicator();
+        } else if (result.cancelled) {
+          statusEl.innerHTML = '';
+        } else if (result.error) {
+          statusEl.innerHTML = `<span style="color: #ef4444;">❌ ${result.error}</span>`;
+        }
+      });
+    }
+
+    async function handleCreateNew() {
+      const operationName = document.getElementById('operationName').value.trim();
+      const statusEl = document.getElementById('connectionStatus');
+
+      statusEl.innerHTML = '<span style="color: #3b82f6;">🔄 Creating your sheet...</span>';
+
+      try {
+        const result = await DataCore.createNewSheet(operationName);
+
+        // Save operation name if provided
+        if (operationName) {
+          localStorage.setItem('operationName', operationName);
+        }
+
+        showStatus(`Created and connected to: ${result.sheetName}`, true);
+        updateConnectionStatusIndicator();
+      } catch (error) {
+        console.error('[Sheets] Create sheet failed:', error);
+        statusEl.innerHTML = `<span style="color: #ef4444;">❌ Failed to create sheet: ${error.message || 'Unknown error'}</span>`;
+      }
+    }
+
+    function disconnectSheet() {
+      if (!confirm('Disconnect from this Google Sheet? Your data will remain in the sheet.')) {
+        return;
+      }
+
+      localStorage.removeItem('googleSheetId');
+      localStorage.removeItem('googleSheetName');
+
+      // Remove sheet param from URL
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('sheet');
+      window.history.replaceState({}, '', newUrl);
+
+      showStatus('Disconnected from Google Sheet', true);
+      updateConnectionStatusIndicator();
+    }
+
     async function testSheetConnection() {
-      const input = document.getElementById('sheetId').value.trim();
-      const sheetId = input ? extractSheetId(input) : '';
+      const sheetId = localStorage.getItem('googleSheetId');
       const statusEl = document.getElementById('connectionStatus');
 
       console.log('[Sheets] Testing connection to sheet:', sheetId);
 
       if (!sheetId) {
-        statusEl.innerHTML = '<span style="color: #ef4444;">⚠️ Please enter a Sheet ID first</span>';
+        statusEl.innerHTML = '<span style="color: #ef4444;">⚠️ No sheet connected</span>';
         return;
       }
 
@@ -1666,12 +1706,12 @@
           }
 
           const sampleText = sampleCount > 0 ? `Found ${sampleCount} samples` : 'No samples yet';
-          statusEl.innerHTML = `<span style="color: #22c55e;">✅ Connected successfully - ${sampleText}<br><small>Sheet: ${sheetTitle}</small></span>`;
+          statusEl.innerHTML = `<span style="color: #22c55e;">✅ Connection verified - ${sampleText}<br><small>Sheet: ${sheetTitle}</small></span>`;
         }
       } catch (e) {
         console.error('[Sheets] Connection test failed:', e);
         if (e.status === 404) {
-          statusEl.innerHTML = '<span style="color: #ef4444;">❌ Sheet not found. Check the Sheet ID.</span>';
+          statusEl.innerHTML = '<span style="color: #ef4444;">❌ Sheet not found. It may have been deleted.</span>';
         } else if (e.status === 403) {
           statusEl.innerHTML = '<span style="color: #ef4444;">❌ Access denied. Make sure you have access to this sheet.</span>';
         } else {

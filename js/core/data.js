@@ -122,7 +122,7 @@ const SheetsAPI = {
 
   async init() {
     return new Promise((resolve, reject) => {
-      gapi.load('client', async () => {
+      gapi.load('client:picker', async () => {
         try {
           await gapi.client.init({
             apiKey: DataConfig.API_KEY,
@@ -132,7 +132,7 @@ const SheetsAPI = {
 
           tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: DataConfig.CLIENT_ID,
-            scope: 'https://www.googleapis.com/auth/spreadsheets',
+            scope: 'https://www.googleapis.com/auth/drive.file',
             callback: (response) => {
               if (response.error) {
                 console.error('Token error:', response);
@@ -519,6 +519,146 @@ function isNewUser() {
   return !sheetId && !hasLocalData;
 }
 
+// ========== GOOGLE PICKER ==========
+let pickerCallback = null;
+
+function openSheetPicker(callback) {
+  pickerCallback = callback;
+  if (!SheetsAPI.isSignedIn) {
+    SheetsAPI.signIn().then(() => {
+      // Wait a moment for token to be set
+      setTimeout(showPicker, 500);
+    });
+    return;
+  }
+  showPicker();
+}
+
+function showPicker() {
+  const accessToken = gapi.client.getToken()?.access_token;
+  if (!accessToken) {
+    console.error('[Picker] No access token available');
+    if (pickerCallback) pickerCallback({ error: 'No access token' });
+    return;
+  }
+
+  const picker = new google.picker.PickerBuilder()
+    .setTitle('Select your Google Sheet')
+    .addView(google.picker.ViewId.SPREADSHEETS)
+    .setOAuthToken(accessToken)
+    .setDeveloperKey(DataConfig.API_KEY)
+    .setCallback(handlePickerSelection)
+    .setOrigin(window.location.origin)
+    .build();
+
+  picker.setVisible(true);
+}
+
+function handlePickerSelection(data) {
+  if (data.action === google.picker.Action.PICKED) {
+    const sheetId = data.docs[0].id;
+    const sheetName = data.docs[0].name;
+
+    // Save connection
+    localStorage.setItem('googleSheetId', sheetId);
+    localStorage.setItem('googleSheetName', sheetName);
+
+    // Update URL for bookmarking
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.set('sheet', sheetId);
+    window.history.replaceState({}, '', newUrl);
+
+    if (pickerCallback) {
+      pickerCallback({ success: true, sheetId, sheetName });
+    }
+  } else if (data.action === google.picker.Action.CANCEL) {
+    if (pickerCallback) {
+      pickerCallback({ cancelled: true });
+    }
+  }
+}
+
+async function createNewSheet(operationName) {
+  if (!SheetsAPI.isSignedIn) {
+    await new Promise((resolve) => {
+      const originalCallback = SheetsAPI.onSignInChange;
+      SheetsAPI.onSignInChange = (isSignedIn) => {
+        originalCallback(isSignedIn);
+        if (isSignedIn) resolve();
+      };
+      SheetsAPI.signIn();
+    });
+  }
+
+  const sheetTitle = operationName ? `${operationName} - Soil Analysis` : 'Farm-Dirt - Soil Analysis';
+
+  const response = await gapi.client.sheets.spreadsheets.create({
+    properties: {
+      title: sheetTitle
+    },
+    sheets: [
+      { properties: { title: 'Samples', index: 0 } },
+      { properties: { title: 'Fields', index: 1 } },
+      { properties: { title: 'Settings', index: 2 } },
+      { properties: { title: 'YieldData', index: 3 } },
+      { properties: { title: 'SampleSites', index: 4 } }
+    ]
+  });
+
+  const sheetId = response.result.spreadsheetId;
+  const sheetName = response.result.properties.title;
+
+  // Add headers
+  await initializeSheetHeaders(sheetId);
+
+  // Save connection
+  localStorage.setItem('googleSheetId', sheetId);
+  localStorage.setItem('googleSheetName', sheetName);
+
+  // Update URL
+  const newUrl = new URL(window.location.href);
+  newUrl.searchParams.set('sheet', sheetId);
+  window.history.replaceState({}, '', newUrl);
+
+  return { sheetId, sheetName };
+}
+
+async function initializeSheetHeaders(sheetId) {
+  // Samples headers
+  await gapi.client.sheets.spreadsheets.values.update({
+    spreadsheetId: sheetId,
+    range: 'Samples!A1:Z1',
+    valueInputOption: 'RAW',
+    resource: {
+      values: [[
+        'SampleID', 'Client', 'Farm', 'Field', 'Lat', 'Lng', 'SampleDate',
+        'pH', 'P_ppm', 'K_ppm', 'Zn_ppm', 'OM_pct', 'CEC', 'Ca_ppm', 'Mg_ppm',
+        'S_ppm', 'Mn_ppm', 'Fe_ppm', 'Cu_ppm', 'B_ppm', 'pct_K', 'pct_Mg', 'pct_Ca'
+      ]]
+    }
+  });
+
+  // Fields headers
+  await gapi.client.sheets.spreadsheets.values.update({
+    spreadsheetId: sheetId,
+    range: 'Fields!A1:J1',
+    valueInputOption: 'RAW',
+    resource: {
+      values: [['FieldID', 'Client', 'Farm', 'FieldName', 'Acres', 'Geometry', 'Notes', 'CreatedDate']]
+    }
+  });
+
+  // Settings headers
+  await gapi.client.sheets.spreadsheets.values.update({
+    spreadsheetId: sheetId,
+    range: 'Settings!A1:B1',
+    valueInputOption: 'RAW',
+    resource: {
+      values: [['Key', 'Value']]
+    }
+  });
+}
+
 // ========== EXPORT AS GLOBAL ==========
 window.DataCore = {
   // Config
@@ -552,7 +692,11 @@ window.DataCore = {
   getActiveFields,
   getFieldBoundaryCoords,
   extractSheetId,
-  isNewUser
+  isNewUser,
+
+  // Google Picker
+  openSheetPicker,
+  createNewSheet
 };
 
 })();
