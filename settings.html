@@ -498,6 +498,25 @@
       <a href="methodology.html" style="display: inline-block; padding: 0.5rem 1rem; background: #3b82f6; color: white; border-radius: 0.375rem; text-decoration: none; font-weight: 500; font-size: 0.875rem;">View Methodology</a>
     </div>
 
+    <div class="settings-card" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+      <h3>ℹ️ About</h3>
+      <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #64748b; font-size: 0.875rem;">Version</span>
+          <span id="settingsVersion" style="font-weight: 600; color: #1e293b; font-size: 0.875rem;"></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #64748b; font-size: 0.875rem;">Data Backup</span>
+          <span id="settingsBackupStatus" style="font-size: 0.875rem;"></span>
+        </div>
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; justify-content: center;">
+          <a href="privacy-policy.html" style="color: #3b82f6; text-decoration: none; font-size: 0.875rem;">🔒 Privacy</a>
+          <a href="terms-of-service.html" style="color: #3b82f6; text-decoration: none; font-size: 0.875rem;">📄 Terms</a>
+          <a href="support.html" style="color: #3b82f6; text-decoration: none; font-size: 0.875rem;">💬 Support</a>
+        </div>
+      </div>
+    </div>
+
     <div class="btn-row full-width">
       <button class="button primary" id="saveBtn">💾 Save Settings</button>
       <button class="button secondary" id="resetBtn">🔄 Reset to Defaults</button>
@@ -1327,6 +1346,28 @@
       const buildDate = new Date(BUILD_DATE);
       const buildStr = buildDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       document.getElementById('currentVersion').textContent = `${APP_VERSION} • ${buildStr}`;
+
+      // Also populate About section
+      const settingsVersion = document.getElementById('settingsVersion');
+      if (settingsVersion) {
+        settingsVersion.textContent = `${APP_VERSION} • ${buildStr}`;
+      }
+
+      // Backup status
+      const backupStatus = document.getElementById('settingsBackupStatus');
+      if (backupStatus) {
+        const backupTime = localStorage.getItem('soilDataBackupTime');
+        const sampleData = JSON.parse(localStorage.getItem('soilSamples') || '[]');
+        if (backupTime) {
+          const date = new Date(parseInt(backupTime));
+          const backupStr = date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+          backupStatus.innerHTML = `<span style="color: #22c55e;">✓ ${backupStr}</span>`;
+        } else if (sampleData.length === 0) {
+          backupStatus.innerHTML = `<span style="color: #64748b;">No data yet</span>`;
+        } else {
+          backupStatus.innerHTML = `<span style="color: #f59e0b;">⚠ Not backed up</span>`;
+        }
+      }
 
       // Show recent changes
       const whatsNew = document.getElementById('whatsNewContent');

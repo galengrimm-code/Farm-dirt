@@ -73,40 +73,59 @@
       select, input { font-size: 14px !important; padding: 0.5rem; min-width: 0; width: 100%; }
       .legend { display: none; } /* Hide legend on mobile */
       .mobile-toolbar { display: flex !important; }
-      /* Compact stats box on mobile - minimal footprint */
+      /* Mobile stats pill - minimal floating indicator */
       .stats-box {
         bottom: 60px !important;
         top: auto !important;
-        right: 0.5rem !important;
-        padding: 0 !important;
-        min-width: 85px !important;
-        max-width: 100px !important;
+        right: 12px !important;
+        padding: 8px 12px !important;
+        min-width: auto !important;
+        max-width: none !important;
         height: auto !important;
-        font-size: 11px !important;
+        font-size: 13px !important;
+        border-radius: 20px !important;
+        background: rgba(255, 255, 255, 0.95) !important;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 8px !important;
       }
       .stats-box .stats-header {
-        padding: 4px 6px !important;
+        display: flex !important;
+        align-items: center !important;
+        padding: 0 !important;
         margin: 0 !important;
-        font-size: 10px !important;
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        color: #3b82f6 !important;
       }
-      .stats-box .stats-header span:first-child { font-size: 10px !important; }
-      .stats-box .stats-toggle { font-size: 8px !important; }
+      .stats-box .stats-header span:first-child { font-size: 13px !important; }
+      .stats-box .stats-toggle { display: none !important; }
       .stats-box .stats-content {
-        padding: 0 6px 4px 6px !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 6px !important;
+        padding: 0 !important;
       }
       .stats-box .stats-content > div {
+        display: inline-flex !important;
         margin-bottom: 0 !important;
-        font-size: 11px !important;
-        line-height: 1.3 !important;
+        font-size: 13px !important;
+        line-height: 1 !important;
+        gap: 2px !important;
       }
-      .stats-box #statsNote {
-        margin-top: 2px !important;
-        padding-top: 2px !important;
-        font-size: 8px !important;
-        line-height: 1.2 !important;
-      }
-      .stats-box #statsNote:empty { display: none !important; }
-      .stats-box.collapsed .stats-content { display: none !important; }
+      .stats-box .stats-content > div span:first-child { display: none !important; }
+      .stats-box .stats-content > div:nth-child(1) span:last-child { font-weight: 600 !important; color: #1e293b !important; }
+      .stats-box .stats-content > div:nth-child(2),
+      .stats-box .stats-content > div:nth-child(3) { font-size: 11px !important; color: #64748b !important; }
+      .stats-box .stats-content > div:nth-child(2) span:last-child,
+      .stats-box .stats-content > div:nth-child(3) span:last-child { font-weight: 500 !important; color: #64748b !important; }
+      .stats-box #statsNote { display: none !important; }
+      .stats-box.collapsed .stats-content { display: flex !important; }
       /* Hide stats box in Field View mode */
       .stats-box.field-view-hidden { display: none !important; }
       /* Hide nav tabs in Field View mode */
@@ -141,9 +160,13 @@
         max-width: 150px !important;
       }
     }
-    .mobile-toolbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #e2e8f0; padding: 0.5rem; z-index: 1000; justify-content: space-around; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
-    .mobile-toolbar button { flex: 1; margin: 0 0.25rem; padding: 0.6rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; background: white; font-size: 0.7rem; cursor: pointer; font-weight: 500; }
-    .mobile-toolbar button.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+    .mobile-toolbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #e5e7eb; padding: 8px 16px; padding-bottom: max(8px, env(safe-area-inset-bottom)); z-index: 1000; justify-content: space-around; }
+    .mobile-toolbar button { display: flex; flex-direction: column; align-items: center; gap: 2px; background: none; border: none; padding: 8px 16px; cursor: pointer; border-radius: 8px; transition: background 0.15s; }
+    .mobile-toolbar button .btn-icon { font-size: 20px; line-height: 1; }
+    .mobile-toolbar button .btn-label { font-size: 11px; color: #64748b; font-weight: 500; }
+    .mobile-toolbar button:active { background: #f3f4f6; }
+    .mobile-toolbar button.active { background: #eff6ff; }
+    .mobile-toolbar button.active .btn-label { color: #3b82f6; font-weight: 600; }
 
     /* Pin Drop Mode */
     .pin-drop-mode #map { cursor: crosshair !important; }
@@ -160,10 +183,11 @@
     @keyframes zoneRingPulse { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; } }
 
     .backup-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 0.25rem 1rem; font-size: 0.7rem; color: #64748b; text-align: center; z-index: 900; }
-    @media (max-width: 639px) { .backup-footer { bottom: 50px; } }
+    @media (max-width: 639px) { .backup-footer { display: none; } }
 
     /* Prominent Site Footer */
     .site-footer { text-align: center; padding: 32px 24px; margin-top: 60px; border-top: 2px solid #e5e7eb; background: #f3f4f6; }
+    @media (max-width: 639px) { .site-footer { display: none; } }
     .footer-links { margin-bottom: 16px; }
     .footer-link { display: inline-block; padding: 10px 20px; margin: 0 8px; font-size: 16px; font-weight: 600; color: #374151; text-decoration: none; background: white; border: 1px solid #d1d5db; border-radius: 8px; transition: all 0.2s; }
     .footer-link:hover { background: #f9fafb; border-color: #3b82f6; color: #3b82f6; }
@@ -283,10 +307,22 @@
     
     <!-- Mobile bottom toolbar -->
     <div class="mobile-toolbar">
-      <button id="mobileSampleSiteBtn">📍 Site</button>
-      <button id="mobileFieldModeBtn">📱 Field</button>
-      <button id="mobileCompareBtn">📊 Compare</button>
-      <button id="mobileRefreshBtn">🔄 Refresh</button>
+      <button id="mobileSampleSiteBtn">
+        <span class="btn-icon">📍</span>
+        <span class="btn-label">Site</span>
+      </button>
+      <button id="mobileFieldModeBtn">
+        <span class="btn-icon">🗺️</span>
+        <span class="btn-label">Field</span>
+      </button>
+      <button id="mobileCompareBtn">
+        <span class="btn-icon">📊</span>
+        <span class="btn-label">Compare</span>
+      </button>
+      <button id="mobileRefreshBtn">
+        <span class="btn-icon">🔄</span>
+        <span class="btn-label">Refresh</span>
+      </button>
     </div>
     
     <div class="main-content" style="position: relative;">
@@ -2264,7 +2300,8 @@
       compareYear = '';
       const mobileBtn = document.getElementById('mobileCompareBtn');
       if (mobileBtn) {
-        mobileBtn.textContent = '📊 Compare';
+        const label = mobileBtn.querySelector('.btn-label');
+        if (label) label.textContent = 'Compare';
         mobileBtn.classList.remove('active');
       }
       updateLegend();
@@ -3863,18 +3900,19 @@
       fieldModeActive = !fieldModeActive;
       const btn = document.getElementById('fieldModeBtn');
       const mobileBtn = document.getElementById('mobileFieldModeBtn');
+      const mobileLabel = mobileBtn?.querySelector('.btn-label');
       if (fieldModeActive) {
         btn.classList.add('active');
         btn.textContent = '📱 Field Mode ON';
         mobileBtn.classList.add('active');
-        mobileBtn.textContent = '📱 ON';
+        if (mobileLabel) mobileLabel.textContent = 'ON';
         document.body.classList.add('field-mode');
         startGPS();
       } else {
         btn.classList.remove('active');
         btn.textContent = '📱 Field Mode';
         mobileBtn.classList.remove('active');
-        mobileBtn.textContent = '📱 Field Mode';
+        if (mobileLabel) mobileLabel.textContent = 'Field';
         document.body.classList.remove('field-mode');
         stopGPS();
       }
