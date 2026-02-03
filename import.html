@@ -1385,7 +1385,8 @@
         pH: 2, Buffer_pH: 2, OM: 2, P: 0, P2: 0, K: 0, CEC: 1,
         Ca_sat: 1, Mg_sat: 1, K_Sat: 1, H_Sat: 1, Na_Sat: 1,
         Zn: 2, Cu: 2, Mn: 1, Fe: 1, Boron: 2, S: 1,
-        Ca: 0, Mg: 0, Na: 0, NO3: 1, NH4: 1, Soluble_Salts: 2, EC: 2
+        Ca: 0, Mg: 0, Na: 0, NO3: 1, NH4: 1, Soluble_Salts: 2, EC: 2,
+        EC_shallow: 2, EC_deep: 2
       }
     };
 
@@ -2765,7 +2766,7 @@
     }
 
     // Standard fields we care about
-    const STANDARD_FIELDS = ['pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH', 'Na', 'Ca', 'Mg', 'NO3', 'NH4', 'Soluble_Salts', 'EC'];
+    const STANDARD_FIELDS = ['pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH', 'Na', 'Ca', 'Mg', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'EC_shallow', 'EC_deep'];
     
     // Default aliases (built-in)
     const DEFAULT_ALIASES = {
@@ -2793,7 +2794,9 @@
       'NO3': ['NO3', 'NO3-N', 'Nitrate', 'Nitrate-N', 'N03'],
       'NH4': ['NH4', 'NH4-N', 'Ammonium', 'Ammonium-N'],
       'Soluble_Salts': ['Soluble_Salts', 'Soluble_Sal', 'Sol_Salts', 'Salts', 'SS'],
-      'EC': ['EC', 'EC (1:1)', 'Electrical Conductivity']
+      'EC': ['EC', 'EC (1:1)', 'Electrical Conductivity'],
+      'EC_shallow': ['EC_shallow', 'EC shallow', 'ECshallow', 'EC (Shallow)', 'EC Shallow'],
+      'EC_deep': ['EC_deep', 'EC deep', 'ECdeep', 'EC (Deep)', 'EC Deep']
     };
     
     // Get combined aliases (default + user-saved)
@@ -5281,7 +5284,7 @@
               headers.forEach((h, i) => {
                 if (row[i] !== undefined && row[i] !== '') {
                   // Try to parse as number for numeric fields
-                  if (['lat', 'lon', 'year', 'pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH', 'Na', 'Ca', 'Mg', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'P_Zn_Ratio'].includes(h)) {
+                  if (['lat', 'lon', 'year', 'pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH', 'Na', 'Ca', 'Mg', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'EC_shallow', 'EC_deep', 'P_Zn_Ratio'].includes(h)) {
                     const num = parseFloat(row[i]);
                     sample[h] = isNaN(num) ? row[i] : num;
                   } else if (h === 'yieldCorrelations' && row[i]) {
@@ -5466,7 +5469,7 @@
     function getVisibleNutrients() {
       const saved = JSON.parse(localStorage.getItem('nutrientVisibility') || '{}');
       const defaultVisible = ['sampleId', 'pH', 'P_Zn_Ratio', 'P', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH'];
-      const allNutrients = ['sampleId', 'pH', 'P_Zn_Ratio', 'P', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH', 'P2', 'Na_Sat', 'Na', 'Ca', 'Mg', 'NO3', 'NH4', 'Soluble_Salts', 'EC'];
+      const allNutrients = ['sampleId', 'pH', 'P_Zn_Ratio', 'P', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH', 'P2', 'Na_Sat', 'Na', 'Ca', 'Mg', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'EC_shallow', 'EC_deep'];
       return allNutrients.filter(n => saved[n] !== undefined ? saved[n] : defaultVisible.includes(n));
     }
 
@@ -6363,7 +6366,7 @@
       const nutrientContainer = document.getElementById('csvNutrientMappings');
       nutrientContainer.innerHTML = '';
 
-      const nutrients = ['pH', 'Buffer_pH', 'P', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'P2'];
+      const nutrients = ['pH', 'Buffer_pH', 'P', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'EC_shallow', 'EC_deep', 'P2'];
 
       nutrients.forEach(nutrient => {
         const div = document.createElement('div');
@@ -6415,7 +6418,7 @@
 
     // Update all previews after auto-mapping
     function updateAllCsvPreviews() {
-      const fields = ['Lat', 'Lon', 'SampleId', 'Field', 'Year', 'Depth', 'pH', 'Buffer_pH', 'P', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'P2'];
+      const fields = ['Lat', 'Lon', 'SampleId', 'Field', 'Year', 'Depth', 'pH', 'Buffer_pH', 'P', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'EC_shallow', 'EC_deep', 'P2'];
       fields.forEach(f => updateCsvPreview(f));
     }
 
@@ -6484,11 +6487,13 @@
         'NO3': ['no3-n (ppm)', 'no3-n', 'no3', 'nitrate', 'nitrate-n', 'no3n'],
         'NH4': ['nh4-n', 'nh4', 'ammonium', 'ammonium-n', 'nh4n'],
         'Soluble_Salts': ['soluble salts', 'salts', 'ss', 'soluble_salts', 'sol salts'],
-        'EC': ['ec', 'electrical conductivity', 'e.c.', 'conductivity']
+        'EC': ['ec', 'electrical conductivity', 'e.c.', 'conductivity'],
+        'EC_shallow': ['ec shallow', 'ec_shallow', 'ecshallow', 'ec (shallow)', 'shallow ec'],
+        'EC_deep': ['ec deep', 'ec_deep', 'ecdeep', 'ec (deep)', 'deep ec']
       };
 
       // Map nutrient fields using stored aliases + lab aliases
-      const nutrients = ['pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH', 'Na', 'Ca', 'Mg', 'NO3', 'NH4', 'Soluble_Salts', 'H_Sat', 'Na_Sat', 'EC'];
+      const nutrients = ['pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca_sat', 'Mg_sat', 'K_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'Buffer_pH', 'Na', 'Ca', 'Mg', 'NO3', 'NH4', 'Soluble_Salts', 'H_Sat', 'Na_Sat', 'EC', 'EC_shallow', 'EC_deep'];
 
       nutrients.forEach(nutrient => {
         const select = document.getElementById(`csvMap${nutrient}`);
