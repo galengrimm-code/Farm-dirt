@@ -3128,8 +3128,9 @@
         if (selectedYear !== 'all') {
           fieldSamples = fieldSamples.filter(s => String(s.year) === String(selectedYear));
         } else {
-          // "All" selected - use only the most recent year for this field
-          const years = [...new Set(fieldSamples.map(s => s.year).filter(y => y))].sort((a, b) => b - a);
+          // "All" selected - use only the most recent year that has data for the selected attribute
+          const samplesWithAttrData = fieldSamples.filter(s => Utils.getNumericValue(s[selectedAttribute], selectedAttribute) !== null);
+          const years = [...new Set(samplesWithAttrData.map(s => s.year).filter(y => y))].sort((a, b) => b - a);
           if (years.length > 0) {
             const mostRecentYear = years[0];
             fieldSamples = fieldSamples.filter(s => String(s.year) === String(mostRecentYear));
@@ -3328,12 +3329,13 @@
       // Filter by active client/farm
       const activeFields = getActiveFields();
 
-      // Build map of most recent year per field (for "All Fields" + "All Years" view)
+      // Build map of most recent year per field that has data for the selected attribute
       const mostRecentYearByField = {};
       if (selectedField === 'all' && selectedYear === 'all') {
         activeFields.forEach(fieldName => {
+          // Only consider samples that have valid data for the selected attribute
           const fieldYears = sampleData
-            .filter(s => s.field === fieldName)
+            .filter(s => s.field === fieldName && Utils.getNumericValue(s[selectedAttribute], selectedAttribute) !== null)
             .map(s => s.year)
             .filter(y => y);
           if (fieldYears.length > 0) {
