@@ -132,7 +132,7 @@ const SheetsAPI = {
 
           tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: DataConfig.CLIENT_ID,
-            scope: 'https://www.googleapis.com/auth/drive.file',
+            scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
             callback: (response) => {
               if (response.error) {
                 console.error('Token error:', response);
