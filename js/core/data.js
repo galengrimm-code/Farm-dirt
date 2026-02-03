@@ -717,6 +717,15 @@ function handlePickerSelection(data) {
     // Mark as authorized with new scope
     localStorage.setItem('pickerAuthorized', 'true');
 
+    // Clear cached token and request fresh one to ensure access to selected file
+    // With drive.file scope, the token needs to be obtained after file selection
+    localStorage.removeItem('googleAccessToken');
+    localStorage.removeItem('googleTokenExpiry');
+    if (tokenClient) {
+      console.log('[Picker] Requesting fresh token for selected file...');
+      tokenClient.requestAccessToken({ prompt: '' });
+    }
+
     // Update URL for bookmarking
     const newUrl = new URL(window.location.href);
     newUrl.searchParams.set('sheet', sheetId);
