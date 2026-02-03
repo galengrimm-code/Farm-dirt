@@ -61,9 +61,7 @@
       .top-bar > div:first-child { display: none; }
       .nav-links { width: 100%; justify-content: center; order: -1; }
       .nav-link { padding: 0.4rem 0.6rem; font-size: 0.75rem; }
-      .auth-section { position: absolute; right: 0.75rem; top: 0.5rem; }
-      .auth-section .user-info { display: none; }
-      .auth-section .sign-in-btn { font-size: 0.7rem; padding: 0.3rem 0.5rem; }
+      .auth-section { display: none; } /* Hide header auth on mobile - use toolbar instead */
       
       /* Simplified mobile controls */
       .controls-bar { padding: 0.5rem; gap: 0.5rem; flex-direction: column; }
@@ -139,7 +137,6 @@
       /* Compare mode is desktop-only - hide all compare elements on mobile */
       #compareYearStack { display: none !important; }
       #compareInfoBar { display: none !important; }
-      #mobileCompareBtn { display: none !important; }
       .compare-legend { display: none !important; }
 
       /* Hide zoom indicator on mobile */
@@ -306,9 +303,9 @@
         <span class="btn-icon">🗺️</span>
         <span class="btn-label">Field</span>
       </button>
-      <button id="mobileCompareBtn">
-        <span class="btn-icon">📊</span>
-        <span class="btn-label">Compare</span>
+      <button id="mobileAuthBtn" onclick="handleAuth()">
+        <span class="btn-icon">🔐</span>
+        <span class="btn-label">Sign In</span>
       </button>
       <button id="mobileRefreshBtn">
         <span class="btn-icon">🔄</span>
@@ -2269,7 +2266,6 @@
         loadLocalData();
         Utils.showStatus('Data refreshed', true);
       });
-      document.getElementById('mobileCompareBtn').addEventListener('click', toggleMobileCompare);
 
       // Force View mode when window resizes to mobile
       window.addEventListener('resize', () => {
@@ -2289,52 +2285,10 @@
       document.getElementById('viewYearGroup').style.display = isStabilityAttribute(selectedAttribute) ? 'none' : 'block';
       document.getElementById('compareInfoBar').style.display = 'none';
       compareYear = '';
-      const mobileBtn = document.getElementById('mobileCompareBtn');
-      if (mobileBtn) {
-        const label = mobileBtn.querySelector('.btn-label');
-        if (label) label.textContent = 'Compare';
-        mobileBtn.classList.remove('active');
-      }
       updateLegend();
       updateMap();
     }
     
-    function toggleMobileCompare() {
-      // Compare mode is desktop-only - this function shouldn't be called on mobile
-      // but CSS hides the button anyway. This is a safety net.
-      if (isMobileDevice()) {
-        Utils.showStatus('Compare mode is available on desktop', false);
-        return;
-      }
-
-      const btn = document.getElementById('mobileCompareBtn');
-      compareMode = !compareMode;
-
-      if (compareMode) {
-        btn.textContent = '📊 Compare ON';
-        btn.classList.add('active');
-        document.getElementById('compareYearsBtn').classList.add('active');
-        document.getElementById('singleYearBtn').classList.remove('active');
-        document.getElementById('compareYearStack').style.display = 'block';
-        document.getElementById('viewYearGroup').style.display = 'none';
-        document.getElementById('compareInfoBar').style.display = 'block';
-        updateCompareYearOptions();
-        updateCompareSummary();
-      } else {
-        btn.textContent = '📊 Compare';
-        btn.classList.remove('active');
-        document.getElementById('singleYearBtn').classList.add('active');
-        document.getElementById('compareYearsBtn').classList.remove('active');
-        document.getElementById('compareYearStack').style.display = 'none';
-        // Show year dropdown only if not in stability mode
-        document.getElementById('viewYearGroup').style.display = isStabilityAttribute(selectedAttribute) ? 'none' : 'block';
-        document.getElementById('compareInfoBar').style.display = 'none';
-        compareYear = '';
-      }
-      updateLegend();
-      updateMap();
-    }
-
     function updateCompareSummary() {
       const baselineYear = document.getElementById('compareYearSelect').value;
       const compareToYear = document.getElementById('compareToYearSelect').value;
@@ -2480,8 +2434,18 @@
     }
 
     function updateMobileAuthBtn() {
-      // Mobile toolbar doesn't have a dedicated auth button
-      // The refresh button can be used to sync when signed in
+      const mobileAuthBtn = document.getElementById('mobileAuthBtn');
+      if (!mobileAuthBtn) return;
+
+      if (SheetsAPI.isSignedIn) {
+        mobileAuthBtn.querySelector('.btn-icon').textContent = '✓';
+        mobileAuthBtn.querySelector('.btn-label').textContent = 'Signed In';
+        mobileAuthBtn.classList.add('active');
+      } else {
+        mobileAuthBtn.querySelector('.btn-icon').textContent = '🔐';
+        mobileAuthBtn.querySelector('.btn-label').textContent = 'Sign In';
+        mobileAuthBtn.classList.remove('active');
+      }
     }
 
     // Load data using API key only (public access) - no OAuth required
