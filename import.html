@@ -1464,7 +1464,7 @@
         // Samples tab
         const samplesCheck = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: CONFIG.SHEET_ID, range: 'Samples!A1:Z1' });
         if (!samplesCheck.result.values || samplesCheck.result.values.length === 0) {
-          await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: CONFIG.SHEET_ID, range: 'Samples!A1:W1', valueInputOption: 'RAW', resource: { values: [['sampleId', 'field', 'lat', 'lon', 'year', 'depth', 'pH', 'P', 'K', 'OM', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'CEC', 'Buffer_pH', 'yieldCorrelations']] } });
+          await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: CONFIG.SHEET_ID, range: 'Samples!A1:Z1', valueInputOption: 'RAW', resource: { values: [['sampleId', 'field', 'lat', 'lon', 'year', 'depth', 'pH', 'P', 'K', 'OM', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'S', 'CEC', 'Buffer_pH', 'EC', 'EC_shallow', 'EC_deep', 'yieldCorrelations']] } });
         }
       },
       
@@ -5159,10 +5159,13 @@
 
           // Ensure required columns exist in headers
           let headersUpdated = false;
-          if (!headers.includes('yieldCorrelations')) {
-            headers.push('yieldCorrelations');
-            headersUpdated = true;
-            console.log('Added yieldCorrelations column to Sheet headers');
+          const requiredColumns = ['EC', 'EC_shallow', 'EC_deep', 'yieldCorrelations'];
+          for (const col of requiredColumns) {
+            if (!headers.includes(col)) {
+              headers.push(col);
+              headersUpdated = true;
+              console.log(`Added ${col} column to Sheet headers`);
+            }
           }
           if (headersUpdated) {
             // Update header row to include new columns
