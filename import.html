@@ -7010,7 +7010,7 @@
       const nutrientContainer = document.getElementById('shpNutrientMappings');
       nutrientContainer.innerHTML = '';
 
-      const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts'];
+      const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'EC_shallow', 'EC_deep'];
 
       nutrients.forEach(nutrient => {
         const div = document.createElement('div');
@@ -7085,11 +7085,14 @@
         'Na_Sat': ['na_sat', 'bs-na', 'bs_na', 'na_base_sat', 'na sat', 'na sat %', 'na%', '%na'],
         'NO3': ['no3', 'no3-n', 'no3-n (ppm)', 'nitrate', 'nitrate-n'],
         'NH4': ['nh4', 'nh4-n', 'ammonium', 'ammonium-n'],
-        'Soluble_Salts': ['soluble_salts', 'soluble_sal', 'sol_salts', 'salts', 'ss']
+        'Soluble_Salts': ['soluble_salts', 'soluble_sal', 'sol_salts', 'salts', 'ss'],
+        'EC': ['ec', 'electrical conductivity', 'e.c.', 'conductivity'],
+        'EC_shallow': ['ec_shallow', 'ec shallow', 'ecshallow', 'ec (shallow)', 'shallow ec'],
+        'EC_deep': ['ec_deep', 'ec deep', 'ecdeep', 'ec (deep)', 'deep ec']
       };
 
       // Map nutrient fields
-      const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts'];
+      const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'EC_shallow', 'EC_deep'];
       const mappedAttrs = new Set();
 
       nutrients.forEach(nutrient => {
@@ -7339,7 +7342,7 @@
     async function shpImportConfirm() {
       // Save new mappings as aliases if requested
       if (document.getElementById('shpSaveMapping').checked) {
-        const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts'];
+        const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'EC_shallow', 'EC_deep'];
         nutrients.forEach(n => {
           if (shpMappings[n] && shpMappings[n].toLowerCase() !== n.toLowerCase()) {
             saveAlias(n, shpMappings[n]);
@@ -7397,7 +7400,7 @@
         };
 
         // Apply nutrient mappings
-        const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts'];
+        const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'EC_shallow', 'EC_deep'];
         nutrients.forEach(n => {
           if (shpMappings[n]) {
             const val = props[shpMappings[n]];
