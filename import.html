@@ -7264,7 +7264,7 @@
         field: document.getElementById('shpMapField').value
       };
 
-      const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts'];
+      const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'EC_shallow', 'EC_deep'];
       nutrients.forEach(n => {
         const select = document.getElementById(`shpMap${n}`);
         if (select && select.value) {

@@ -811,7 +811,8 @@ async function initializeSheetHeaders(sheetId) {
       values: [[
         'SampleID', 'Client', 'Farm', 'Field', 'Lat', 'Lng', 'SampleDate',
         'pH', 'P_ppm', 'K_ppm', 'Zn_ppm', 'OM_pct', 'CEC', 'Ca_ppm', 'Mg_ppm',
-        'S_ppm', 'Mn_ppm', 'Fe_ppm', 'Cu_ppm', 'B_ppm', 'pct_K', 'pct_Mg', 'pct_Ca'
+        'S_ppm', 'Mn_ppm', 'Fe_ppm', 'Cu_ppm', 'B_ppm', 'pct_K', 'pct_Mg', 'pct_Ca',
+        'EC', 'EC_shallow', 'EC_deep'
       ]]
     }
   });
