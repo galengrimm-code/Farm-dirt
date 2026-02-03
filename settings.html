@@ -561,7 +561,9 @@
       NO3: { name: 'Nitrate', defaultVisible: false },
       NH4: { name: 'Ammonium', defaultVisible: false },
       Soluble_Salts: { name: 'Soluble Salts', defaultVisible: false },
-      EC: { name: 'EC', defaultVisible: false }
+      EC: { name: 'EC', defaultVisible: false },
+      EC_shallow: { name: 'EC Shallow', defaultVisible: false },
+      EC_deep: { name: 'EC Deep', defaultVisible: false }
     };
 
     // Default decimal places for each attribute
@@ -591,6 +593,8 @@
       NH4: 1,
       Soluble_Salts: 2,
       EC: 2,
+      EC_shallow: 2,
+      EC_deep: 2,
       P_Zn_Ratio: 1
     };
 
@@ -620,7 +624,9 @@
       'NO3': ['NO3', 'NO3-N', 'Nitrate', 'Nitrate-N', 'N03'],
       'NH4': ['NH4', 'NH4-N', 'Ammonium', 'Ammonium-N'],
       'Soluble_Salts': ['Soluble_Salts', 'Soluble_Sal', 'Sol_Salts', 'Salts', 'SS'],
-      'EC': ['EC', 'EC (1:1)', 'Electrical Conductivity']
+      'EC': ['EC', 'EC (1:1)', 'Electrical Conductivity'],
+      'EC_shallow': ['EC_shallow', 'EC shallow', 'ECshallow', 'EC (Shallow)', 'EC Shallow'],
+      'EC_deep': ['EC_deep', 'EC deep', 'ECdeep', 'EC (Deep)', 'EC Deep']
     };
 
     // ========== CLIENT/FARM DATA STRUCTURES ==========

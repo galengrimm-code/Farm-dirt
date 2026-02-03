@@ -989,21 +989,23 @@
       get API_KEY() { return DataCore.config.API_KEY; },
       get SHEET_ID() { return DataCore.config.SHEET_ID; },
 
-      NUTRIENTS: ['pH', 'CEC', 'OM', 'P', 'K', 'P_Zn_Ratio', 'Zn', 'K_Sat', 'Ca_sat', 'Mg_sat', 'H_Sat', 'S', 'Mn', 'Cu', 'Boron', 'Fe', 'Buffer_pH', 'P2', 'Na_Sat', 'Na', 'Ca', 'Mg', 'NO3', 'NH4', 'Soluble_Salts', 'EC'],
+      NUTRIENTS: ['pH', 'CEC', 'OM', 'P', 'K', 'P_Zn_Ratio', 'Zn', 'K_Sat', 'Ca_sat', 'Mg_sat', 'H_Sat', 'S', 'Mn', 'Cu', 'Boron', 'Fe', 'Buffer_pH', 'P2', 'Na_Sat', 'Na', 'Ca', 'Mg', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'EC_shallow', 'EC_deep'],
 
       NUTRIENT_NAMES: {
         pH: 'pH', P_Zn_Ratio: 'P:Zn Ratio', P: 'Phosphorus (P)', P2: 'Phosphorus P2', K: 'Potassium (K)', OM: 'Organic Matter',
         CEC: 'CEC', Ca_sat: 'Calcium Sat %', Mg_sat: 'Magnesium Sat %',
         K_Sat: 'K Base Sat %', H_Sat: 'H Base Sat %', Na_Sat: 'Na Base Sat %', Zn: 'Zinc', Cu: 'Copper',
         Mn: 'Manganese', Fe: 'Iron', Boron: 'Boron', S: 'Sulfur', Buffer_pH: 'Buffer pH',
-        Na: 'Sodium', Ca: 'Calcium', Mg: 'Magnesium', NO3: 'Nitrate', NH4: 'Ammonium', Soluble_Salts: 'Soluble Salts', EC: 'EC'
+        Na: 'Sodium', Ca: 'Calcium', Mg: 'Magnesium', NO3: 'Nitrate', NH4: 'Ammonium', Soluble_Salts: 'Soluble Salts', EC: 'EC',
+        EC_shallow: 'EC Shallow', EC_deep: 'EC Deep'
       },
 
       NUTRIENT_UNITS: {
         pH: '', P_Zn_Ratio: '', P: 'ppm', P2: 'ppm', K: 'ppm', OM: '%', CEC: 'meq/100g',
         Ca_sat: '%', Mg_sat: '%', K_Sat: '%', H_Sat: '%', Na_Sat: '%',
         Zn: 'ppm', Cu: 'ppm', Mn: 'ppm', Fe: 'ppm', Boron: 'ppm', S: 'ppm', Buffer_pH: '',
-        Na: 'ppm', Ca: 'ppm', Mg: 'ppm', NO3: 'ppm', NH4: 'ppm', Soluble_Salts: 'mmhos/cm', EC: 'dS/m'
+        Na: 'ppm', Ca: 'ppm', Mg: 'ppm', NO3: 'ppm', NH4: 'ppm', Soluble_Salts: 'mmhos/cm', EC: 'dS/m',
+        EC_shallow: 'dS/m', EC_deep: 'dS/m'
       },
 
       LOWER_IS_BETTER: ['Mg_sat', 'H_Sat', 'Na_Sat', 'Soluble_Salts'],
@@ -1017,7 +1019,7 @@
         Ca_sat: 1, Mg_sat: 1, K_Sat: 1, H_Sat: 1, Na_Sat: 1,
         Zn: 2, Cu: 2, Mn: 1, Fe: 1, Boron: 2, S: 1,
         Ca: 0, Mg: 0, Na: 0, NO3: 1, NH4: 1, Soluble_Salts: 2, EC: 2,
-        P_Zn_Ratio: 1
+        EC_shallow: 2, EC_deep: 2, P_Zn_Ratio: 1
       }
     };
 
