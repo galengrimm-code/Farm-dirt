@@ -296,8 +296,9 @@
           </div>
           <div class="form-group">
             <label>Crop Type</label>
-            <select id="yieldCrop" style="width: 140px;" required>
+            <select id="yieldCrop" style="width: 160px;" required>
               <option value="">-- Select Crop --</option>
+              <option value="auto">🔍 Auto-detect</option>
               <option value="corn">🌽 Corn</option>
               <option value="soybeans">🫘 Soybeans</option>
               <option value="wheat">🌾 Wheat</option>
@@ -326,6 +327,16 @@
               <span id="quickYieldPreview" style="color: #64748b; font-size: 0.85rem;"></span>
             </div>
             <small id="quickYieldColumnStatus" style="color: #16a34a; display: block; margin-top: 0.25rem;"></small>
+          </div>
+        </div>
+        <div id="quickCropColumnSection" style="display: none; margin-top: 0.5rem;">
+          <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 0.5rem; padding: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+              <label style="margin: 0; font-weight: 500; white-space: nowrap; color: #92400e;">Crop Column:</label>
+              <select id="quickCropColumn" style="flex: 1; min-width: 150px; max-width: 300px;" onchange="updateQuickCropPreview()"></select>
+              <span id="quickCropPreview" style="color: #64748b; font-size: 0.85rem;"></span>
+            </div>
+            <small id="quickCropColumnStatus" style="color: #92400e; display: block; margin-top: 0.25rem;"></small>
           </div>
         </div>
         <button class="button" id="uploadYieldBtn" style="background: #f59e0b; color: white;">Upload Yield Data</button>
@@ -2105,6 +2116,7 @@
       document.getElementById('uploadSampleBtn').addEventListener('click', uploadSamples);
       document.getElementById('uploadYieldBtn').addEventListener('click', uploadYield);
       document.getElementById('yieldFiles').addEventListener('change', onQuickYieldFilesChange);
+      document.getElementById('yieldCrop').addEventListener('change', onYieldCropChange);
       document.getElementById('loadFromSheetsBtn').addEventListener('click', loadFromSheets);
       document.getElementById('syncToSheetsBtn').addEventListener('click', syncToSheets);
       document.getElementById('clearSamplesBtn').addEventListener('click', clearSamples);
@@ -3207,7 +3219,8 @@
     let quickYieldColumns = {
       fields: [],
       sampleValues: {},
-      selectedField: null
+      selectedField: null,
+      selectedCropField: null
     };
 
     // Handle file selection for quick yield import - detect columns
@@ -3215,13 +3228,17 @@
       const fileInput = document.getElementById('yieldFiles');
       const files = fileInput.files;
       const section = document.getElementById('quickYieldColumnSection');
+      const cropSection = document.getElementById('quickCropColumnSection');
       const select = document.getElementById('quickYieldColumn');
+      const cropSelect = document.getElementById('quickCropColumn');
       const preview = document.getElementById('quickYieldPreview');
       const status = document.getElementById('quickYieldColumnStatus');
+      const cropStatus = document.getElementById('quickCropColumnStatus');
 
       if (!files.length) {
         section.style.display = 'none';
-        quickYieldColumns = { fields: [], sampleValues: {}, selectedField: null };
+        cropSection.style.display = 'none';
+        quickYieldColumns = { fields: [], sampleValues: {}, selectedField: null, selectedCropField: null };
         return;
       }
 
@@ -3253,16 +3270,17 @@
 
         if (columns.length === 0) {
           section.style.display = 'none';
+          cropSection.style.display = 'none';
           return;
         }
 
         quickYieldColumns.fields = columns;
         quickYieldColumns.sampleValues = sampleValues;
 
-        // Populate dropdown
+        // Populate yield dropdown
         select.innerHTML = columns.map(f => `<option value="${f}">${f}</option>`).join('');
 
-        // Auto-detect best match
+        // Auto-detect best match for yield
         let matched = null;
         const aliases = YIELD_FIELD_ALIASES.yield;
         for (const alias of aliases) {
@@ -3288,9 +3306,42 @@
         updateQuickYieldPreview();
         section.style.display = 'block';
 
+        // Populate crop dropdown and auto-detect
+        cropSelect.innerHTML = '<option value="">(none)</option>' + columns.map(f => `<option value="${f}">${f}</option>`).join('');
+
+        // Auto-detect crop column
+        let cropMatched = null;
+        const cropAliases = YIELD_FIELD_ALIASES.crop;
+        for (const alias of cropAliases) {
+          const found = columns.find(f => f.toLowerCase() === alias.toLowerCase());
+          if (found) { cropMatched = found; break; }
+        }
+        if (!cropMatched) {
+          for (const alias of cropAliases) {
+            const found = columns.find(f => f.toLowerCase().includes(alias.toLowerCase()));
+            if (found) { cropMatched = found; break; }
+          }
+        }
+
+        if (cropMatched) {
+          cropSelect.value = cropMatched;
+          quickYieldColumns.selectedCropField = cropMatched;
+          cropStatus.innerHTML = `<span style="color: #16a34a;">✓ Auto-detected: ${cropMatched}</span>`;
+        } else {
+          quickYieldColumns.selectedCropField = null;
+          cropStatus.innerHTML = `<span style="color: #78716c;">Select column containing crop type (required for auto-detect)</span>`;
+        }
+
+        updateQuickCropPreview();
+
+        // Show crop section only when auto-detect is selected
+        const isAutoDetectCrop = document.getElementById('yieldCrop').value === 'auto';
+        cropSection.style.display = isAutoDetectCrop ? 'block' : 'none';
+
       } catch (err) {
         console.warn('Error peeking at columns:', err);
         section.style.display = 'none';
+        cropSection.style.display = 'none';
       }
     }
 
@@ -3388,6 +3439,40 @@
         preview.textContent = 'Sample: ' + quickYieldColumns.sampleValues[selectedField];
       } else {
         preview.textContent = '';
+      }
+    }
+
+    function updateQuickCropPreview() {
+      const select = document.getElementById('quickCropColumn');
+      const preview = document.getElementById('quickCropPreview');
+      const status = document.getElementById('quickCropColumnStatus');
+      const selectedField = select.value;
+
+      quickYieldColumns.selectedCropField = selectedField || null;
+
+      if (selectedField && quickYieldColumns.sampleValues[selectedField]) {
+        preview.textContent = 'Sample: ' + quickYieldColumns.sampleValues[selectedField];
+        // Show unique crop values found
+        const sampleVal = quickYieldColumns.sampleValues[selectedField];
+        if (sampleVal) {
+          const normalized = normalizeCropValue(sampleVal.split(',')[0].trim());
+          status.innerHTML = `<span style="color: #16a34a;">✓ Crops detected: ${normalized}</span>`;
+        }
+      } else {
+        preview.textContent = '';
+        status.innerHTML = `<span style="color: #78716c;">Select column containing crop type (required for auto-detect)</span>`;
+      }
+    }
+
+    // Toggle crop column section when crop type dropdown changes
+    function onYieldCropChange() {
+      const isAutoDetectCrop = document.getElementById('yieldCrop').value === 'auto';
+      const cropSection = document.getElementById('quickCropColumnSection');
+      const hasFiles = document.getElementById('yieldFiles').files.length > 0;
+
+      // Only show crop section if files are loaded and auto-detect is selected
+      if (cropSection) {
+        cropSection.style.display = (isAutoDetectCrop && hasFiles && quickYieldColumns.fields.length > 0) ? 'block' : 'none';
       }
     }
 
@@ -4183,6 +4268,7 @@
       const yieldYearInput = document.getElementById('yieldYear');
       let yieldYear = yieldYearInput.value.trim();
       const yieldCrop = document.getElementById('yieldCrop').value;
+      const isAutoDetectCrop = yieldCrop === 'auto';
       const radiusFeet = parseInt(document.getElementById('yieldRadius').value);
       const statusEl = document.getElementById('yieldStatus');
 
@@ -4191,6 +4277,15 @@
 
       // Get user-selected yield column (if available)
       const selectedYieldColumn = quickYieldColumns.selectedField || null;
+
+      // Get selected crop column for auto-detect mode
+      const selectedCropColumn = isAutoDetectCrop ? (quickYieldColumns.selectedCropField || null) : null;
+
+      // Require crop column when auto-detect is selected
+      if (isAutoDetectCrop && !selectedCropColumn) {
+        showStatus('Please select a crop column for auto-detect mode', false);
+        return;
+      }
 
       statusEl.innerHTML = '<span style="color: #3b82f6;">⏳ Processing yield data...</span>';
 
@@ -4232,7 +4327,7 @@
             try {
               statusEl.innerHTML = `<span style="color: #3b82f6;">⏳ Processing file ${i + 1} of ${totalFiles}: ${zipFile.name}<br><small>${totalPointsLoaded.toLocaleString()} points loaded so far</small></span>`;
               await breathe(); // Let UI update
-              const result = await parseYieldFromZip(zipFile, selectedYieldColumn);
+              const result = await parseYieldFromZip(zipFile, selectedYieldColumn, selectedCropColumn);
               addPoints(result.points);
               if (result.detectedYear && !detectedYear) {
                 detectedYear = result.detectedYear;
@@ -4250,7 +4345,7 @@
 
         } else if (zipFiles.length === 1) {
           // Single ZIP file
-          const result = await parseYieldFromZip(zipFiles[0], selectedYieldColumn);
+          const result = await parseYieldFromZip(zipFiles[0], selectedYieldColumn, selectedCropColumn);
           addPoints(result.points);
           detectedYear = result.detectedYear;
           filesProcessed = 1;
@@ -4282,7 +4377,7 @@
               await breathe(); // Let UI update
               const shpBuffer = await shpFile.arrayBuffer();
               const dbfBuffer = await dbfFile.arrayBuffer();
-              const result = parseYieldShapefile(shpBuffer, dbfBuffer, selectedYieldColumn);
+              const result = parseYieldShapefile(shpBuffer, dbfBuffer, selectedYieldColumn, selectedCropColumn);
               addPoints(result.points);
               if (result.detectedYear && !detectedYear) {
                 detectedYear = result.detectedYear;
@@ -4300,7 +4395,7 @@
 
         } else {
           // Single shapefile (loose files)
-          const result = await parseYieldFromShapefiles(files, selectedYieldColumn);
+          const result = await parseYieldFromShapefiles(files, selectedYieldColumn, selectedCropColumn);
           addPoints(result.points);
           detectedYear = result.detectedYear;
           filesProcessed = 1;
@@ -4332,7 +4427,13 @@
         await breathe();
         for (const p of yieldPoints) {
           p.year = parseInt(yieldYear);
-          p.crop = yieldCrop;
+          // For auto-detect mode, normalize the per-point crop value
+          // For fixed crop mode, use the selected crop
+          if (isAutoDetectCrop) {
+            p.crop = p.crop ? normalizeCropValue(p.crop) : 'unknown';
+          } else {
+            p.crop = yieldCrop;
+          }
         }
 
         // Store yield data - avoid spread operator for large arrays
@@ -4446,9 +4547,10 @@
 
         fileInput.value = '';
 
-        // Reset column selector
+        // Reset column selectors
         document.getElementById('quickYieldColumnSection').style.display = 'none';
-        quickYieldColumns = { fields: [], sampleValues: {}, selectedField: null };
+        document.getElementById('quickCropColumnSection').style.display = 'none';
+        quickYieldColumns = { fields: [], sampleValues: {}, selectedField: null, selectedCropField: null };
 
       } catch (e) {
         console.error('Yield upload error:', e);
@@ -4456,7 +4558,7 @@
       }
     }
     
-    async function parseYieldFromZip(zipFile, overrideYieldField = null) {
+    async function parseYieldFromZip(zipFile, overrideYieldField = null, overrideCropField = null) {
       const JSZip = window.JSZip || (await loadJSZip());
       const zip = await JSZip.loadAsync(zipFile);
 
@@ -4472,10 +4574,10 @@
       const shpBuffer = await shpFile.async('arraybuffer');
       const dbfBuffer = await dbfFile.async('arraybuffer');
 
-      return parseYieldShapefile(shpBuffer, dbfBuffer, overrideYieldField);
+      return parseYieldShapefile(shpBuffer, dbfBuffer, overrideYieldField, overrideCropField);
     }
 
-    async function parseYieldFromShapefiles(files, overrideYieldField = null) {
+    async function parseYieldFromShapefiles(files, overrideYieldField = null, overrideCropField = null) {
       const fileMap = {};
       for (const f of files) {
         const ext = f.name.split('.').pop().toLowerCase();
@@ -4484,10 +4586,10 @@
 
       if (!fileMap.shp || !fileMap.dbf) throw new Error('Need both .shp and .dbf files');
 
-      return parseYieldShapefile(fileMap.shp, fileMap.dbf, overrideYieldField);
+      return parseYieldShapefile(fileMap.shp, fileMap.dbf, overrideYieldField, overrideCropField);
     }
 
-    function parseYieldShapefile(shpBuffer, dbfBuffer, overrideYieldField = null) {
+    function parseYieldShapefile(shpBuffer, dbfBuffer, overrideYieldField = null, overrideCropField = null) {
       const points = [];
       
       // Parse DBF for attributes
@@ -4554,7 +4656,24 @@
       // Also look for explicit year field
       const yearFieldNames = ['Year', 'YEAR', 'CropYear', 'CROPYEAR', 'Crop_Year'];
       let yearField = fields.find(f => yearFieldNames.includes(f.name));
-      
+
+      // Find crop field - use override if provided, otherwise auto-detect
+      let cropField = null;
+      if (overrideCropField) {
+        cropField = fields.find(f => f.name === overrideCropField);
+        if (!cropField) {
+          console.warn('Override crop field not found:', overrideCropField, 'Available:', fields.map(f => f.name));
+        }
+      }
+      if (!cropField) {
+        // Auto-detect crop field
+        const cropFieldNames = YIELD_FIELD_ALIASES.crop || ['Crop', 'CROP', 'CropType', 'Crop_Type', 'Product', 'PRODUCT', 'Commodity'];
+        cropField = fields.find(f => cropFieldNames.includes(f.name));
+        if (!cropField) {
+          cropField = fields.find(f => f.name.toLowerCase().includes('crop') || f.name.toLowerCase().includes('product'));
+        }
+      }
+
       // Parse SHP for coordinates
       const shpView = new DataView(shpBuffer);
       let shpOffset = 100; // Skip header
@@ -4583,12 +4702,18 @@
 
         let fieldOffset = 0;
         let yieldValue = null;
+        let cropValue = null;
 
         for (const field of fields) {
           const rawValue = bytesToString(dbfBuffer, dbfOffset + fieldOffset, field.length);
 
           if (field.name === yieldField.name) {
             yieldValue = parseFloat(rawValue);
+          }
+
+          // Extract crop value if crop field is mapped
+          if (cropField && field.name === cropField.name && rawValue) {
+            cropValue = rawValue;
           }
 
           // Try to detect year from first record with valid data
@@ -4627,11 +4752,16 @@
         dbfOffset += recordSize - 1;
 
         if (records[i] && yieldValue && !isNaN(yieldValue) && yieldValue > 0) {
-          points.push({
+          const point = {
             lat: records[i].lat,
             lon: records[i].lon,
             yield: yieldValue
-          });
+          };
+          // Include crop value if available (will be normalized later)
+          if (cropValue) {
+            point.crop = cropValue;
+          }
+          points.push(point);
         }
       }
 
