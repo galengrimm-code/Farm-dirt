@@ -297,8 +297,7 @@
           <div class="form-group">
             <label>Crop Type</label>
             <select id="yieldCrop" style="width: 160px;" required>
-              <option value="">-- Select Crop --</option>
-              <option value="auto">🔍 Auto-detect</option>
+              <option value="auto" selected>🔍 Auto-detect</option>
               <option value="corn">🌽 Corn</option>
               <option value="soybeans">🫘 Soybeans</option>
               <option value="wheat">🌾 Wheat</option>
@@ -4287,7 +4286,7 @@
         return;
       }
 
-      statusEl.innerHTML = '<span style="color: #3b82f6;">⏳ Processing yield data...</span>';
+      statusEl.innerHTML = '<span style="color: #3b82f6;">⏳ Processing yield data...</span><br><span style="font-size: 0.8rem; color: #b45309; background: #fef3c7; padding: 0.25rem 0.5rem; border-radius: 0.25rem; display: inline-block; margin-top: 0.5rem;">Please stay on this screen while the import processes.</span>';
 
       try {
         let yieldPoints = [];
