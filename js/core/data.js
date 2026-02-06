@@ -250,25 +250,29 @@ const SheetsAPI = {
       console.log('Loading fields from sheet:', sheetId);
       const response = await gapi.client.sheets.spreadsheets.values.get({
         spreadsheetId: sheetId,
-        range: `${DataConfig.SHEETS.FIELDS}!A2:F1000`
+        range: `${DataConfig.SHEETS.FIELDS}!A2:H1000`
       });
       const rows = response.result.values || [];
       console.log('[Sheets] Fields tab returned', rows.length, 'rows');
 
       const fields = rows.map((row, idx) => {
+        // Format: FieldID, Client, Farm, FieldName, farmId, Acres, Geometry, CreatedDate
         let boundary = null;
-        if (row[2]) {
+        const geometryCol = row[6]; // Column G = Geometry
+        if (geometryCol) {
           try {
-            boundary = JSON.parse(row[2]);
+            boundary = JSON.parse(geometryCol);
           } catch (parseErr) {
-            console.warn(`[Sheets] Failed to parse boundary for field "${row[1]}" (row ${idx + 2}):`, parseErr.message);
+            console.warn(`[Sheets] Failed to parse boundary for field "${row[3]}" (row ${idx + 2}):`, parseErr.message);
           }
         }
         return {
           id: row[0],
-          name: row[1],
+          clientName: row[1] || '',
+          farmName: row[2] || '',
+          name: row[3],
           boundary: boundary,
-          acres: parseFloat(row[3]) || 0,
+          acres: parseFloat(row[5]) || 0,
           farmId: row[4] || ''
         };
       });
@@ -820,10 +824,10 @@ async function initializeSheetHeaders(sheetId) {
   // Fields headers
   await gapi.client.sheets.spreadsheets.values.update({
     spreadsheetId: sheetId,
-    range: 'Fields!A1:J1',
+    range: 'Fields!A1:H1',
     valueInputOption: 'RAW',
     resource: {
-      values: [['FieldID', 'Client', 'Farm', 'FieldName', 'Acres', 'Geometry', 'Notes', 'CreatedDate']]
+      values: [['FieldID', 'Client', 'Farm', 'FieldName', 'farmId', 'Acres', 'Geometry', 'CreatedDate']]
     }
   });
 
