@@ -1399,8 +1399,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.194";
-    const BUILD_DATE = "2026-02-06T15:59:01";
+    const APP_VERSION = "v1.0.195";
+    const BUILD_DATE = "2026-02-06T16:07:52";
 
     // Reference shared data config with import-specific additions
     const CONFIG = {
@@ -5616,19 +5616,22 @@
       if (!confirm('Clear all samples? Boundaries will be kept.')) return;
 
       sampleData = [];
+      localStorage.removeItem('soilDataCacheTime');
       await saveLocalData();
       saveBackup();
       updateSummary();
       updateBackupStatus();
 
-      if (SheetsAPI.isSignedIn) {
+      if (SheetsAPI.isSignedIn && CONFIG.SHEET_ID) {
         showStatus('Clearing from Google Sheets...', true);
         try {
           await clearSheetsData('Samples');
-          showStatus('✓ Samples cleared', true);
+          showStatus('✓ Samples cleared (local + Google Sheets)', true);
         } catch (e) {
-          showStatus('Local cleared, but Sheets error: ' + e.message, false);
+          showStatus('⚠ Local cleared, but Sheets error: ' + e.message + '. Sign in and clear again to remove from Sheets.', false);
         }
+      } else if (CONFIG.SHEET_ID) {
+        showStatus('✓ Samples cleared locally. Sign in to also clear from Google Sheets.', true);
       } else {
         showStatus('✓ Samples cleared', true);
       }
@@ -5638,19 +5641,22 @@
       if (!confirm('Clear all field boundaries? Samples will be kept.')) return;
 
       fieldBoundaries = {};
+      localStorage.removeItem('soilDataCacheTime');
       await saveLocalData();
       saveBackup();
       updateSummary();
       updateBackupStatus();
 
-      if (SheetsAPI.isSignedIn) {
+      if (SheetsAPI.isSignedIn && CONFIG.SHEET_ID) {
         showStatus('Clearing from Google Sheets...', true);
         try {
           await clearSheetsData('Fields');
-          showStatus('✓ Boundaries cleared', true);
+          showStatus('✓ Boundaries cleared (local + Google Sheets)', true);
         } catch (e) {
-          showStatus('Local cleared, but Sheets error: ' + e.message, false);
+          showStatus('⚠ Local cleared, but Sheets error: ' + e.message + '. Sign in and clear again to remove from Sheets.', false);
         }
+      } else if (CONFIG.SHEET_ID) {
+        showStatus('✓ Boundaries cleared locally. Sign in to also clear from Google Sheets.', true);
       } else {
         showStatus('✓ Boundaries cleared', true);
       }
@@ -5663,6 +5669,7 @@
       sampleData.forEach(s => {
         if (s.yieldCorrelations) delete s.yieldCorrelations;
       });
+      yieldData = [];
 
       await saveLocalData();
       saveBackup();
@@ -5676,33 +5683,43 @@
 
       sampleData = [];
       fieldBoundaries = {};
+      yieldData = [];
+      localStorage.removeItem('soilDataCacheTime');
       await saveLocalData();
       saveBackup();
       updateSummary();
       updateBackupStatus();
 
-      if (SheetsAPI.isSignedIn) {
+      if (SheetsAPI.isSignedIn && CONFIG.SHEET_ID) {
         showStatus('Clearing from Google Sheets...', true);
         try {
           await clearSheetsData('Samples');
           await clearSheetsData('Fields');
-          showStatus('✓ All data cleared', true);
+          showStatus('✓ All data cleared (local + Google Sheets)', true);
         } catch (e) {
-          showStatus('Local cleared, but Sheets error: ' + e.message, false);
+          showStatus('⚠ Local cleared, but Sheets error: ' + e.message + '. Sign in and clear again to remove from Sheets.', false);
         }
+      } else if (CONFIG.SHEET_ID) {
+        showStatus('✓ All data cleared locally. Sign in to also clear from Google Sheets.', true);
       } else {
         showStatus('✓ All data cleared', true);
       }
     }
-    
+
     async function clearSheetsData(sheetName) {
+      if (!CONFIG.SHEET_ID) return;
+      // Validate token before attempting clear
+      const tokenValid = await SheetsAPI.validateToken();
+      if (!tokenValid) {
+        throw new Error('Auth token expired. Please sign in again.');
+      }
       // Get the last row with data
       const response = await gapi.client.sheets.spreadsheets.values.get({
         spreadsheetId: CONFIG.SHEET_ID,
         range: `${sheetName}!A:A`
       });
       const numRows = response.result.values ? response.result.values.length : 1;
-      
+
       if (numRows > 1) {
         // Clear all data rows (keep header row 1)
         await gapi.client.sheets.spreadsheets.values.clear({
