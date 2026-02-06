@@ -1399,8 +1399,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.193";
-    const BUILD_DATE = "2026-02-06T15:25:50";
+    const APP_VERSION = "v1.0.194";
+    const BUILD_DATE = "2026-02-06T15:59:01";
 
     // Reference shared data config with import-specific additions
     const CONFIG = {
@@ -6726,11 +6726,11 @@
         'Fe': ['fe', 'dtpa-fe', 'iron', 'fe ppm'],
         'Cu': ['cu', 'dtpa-cu', 'copper', 'cu ppm'],
         'Boron': ['b', 'dtpa-b', 'boron', 'hot water b', 'b ppm'],
-        'Ca_sat': ['ca sat %', 'ca sat', 'ca%', 'ca base sat', '%ca', 'ca_sat', 'ca%bs', '%ca sat', 'ca bs', 'casat'],
-        'Mg_sat': ['mg sat %', 'mg sat', 'mg%', 'mg base sat', '%mg', 'mg_sat', 'mg%bs', '%mg sat', 'mg bs', 'mgsat'],
-        'K_Sat': ['k sat %', 'k sat', 'k%', 'k base sat', '%k', 'k_sat', 'k%bs', '%k sat', 'k bs', 'ksat'],
-        'H_Sat': ['h sat %', 'h sat', 'h%', '%h', 'h_sat', 'h%bs', 'h bs', 'hsat', 'hydrogen'],
-        'Na_Sat': ['na sat %', 'na sat', 'na%', '%na', 'na_sat', 'na%bs', 'na bs', 'nasat'],
+        'Ca_sat': ['ca sat %', 'ca sat', 'ca%', 'ca base sat', '%ca', 'ca_sat', 'ca%bs', '%ca sat', 'ca bs', 'casat', 'base saturation - ca', 'calcium percentage'],
+        'Mg_sat': ['mg sat %', 'mg sat', 'mg%', 'mg base sat', '%mg', 'mg_sat', 'mg%bs', '%mg sat', 'mg bs', 'mgsat', 'base saturation - mg', 'magnesium percentage'],
+        'K_Sat': ['k sat %', 'k sat', 'k%', 'k base sat', '%k', 'k_sat', 'k%bs', '%k sat', 'k bs', 'ksat', 'base saturation - k', 'potassium percentage'],
+        'H_Sat': ['h sat %', 'h sat', 'h%', '%h', 'h_sat', 'h%bs', 'h bs', 'hsat', 'base saturation - h', 'hydrogen percentage', 'hydrogen sat'],
+        'Na_Sat': ['na sat %', 'na sat', 'na%', '%na', 'na_sat', 'na%bs', 'na bs', 'nasat', 'base saturation - na', 'sodium percentage'],
         'NO3': ['no3-n (ppm)', 'no3-n', 'no3', 'nitrate', 'nitrate-n', 'no3n'],
         'NH4': ['nh4-n', 'nh4', 'ammonium', 'ammonium-n', 'nh4n'],
         'Soluble_Salts': ['soluble salts', 'salts', 'ss', 'soluble_salts', 'sol salts'],
@@ -6765,18 +6765,35 @@
         }
 
         // Partial match if no exact match
+        // Prefer actual lab data (ppm, Mehlich, Bray) over Calculated/meq columns
         if (!matched) {
+          let fallback = '';
           for (const header of csvHeaders) {
             const h = header.toLowerCase().trim();
+            const isCalculated = h.includes('<calculated>') || h.includes('(meq/');
             for (const alias of nutrientAliases) {
-              // Check if header contains alias or alias contains header (for short field names)
-              if (h.includes(alias) && alias.length >= 2) {
-                matched = header;
-                break;
+              if (alias.length < 2) continue;
+              // For short aliases (<=3 chars), require word boundary to avoid false positives
+              // e.g., 'ca' should not match 'calculated', 'ec' should not match 'spectrophotometric'
+              let aliasMatches = false;
+              if (alias.length <= 3) {
+                const regex = new RegExp('(?:^|[\\s\\[\\(,;_\\-])' + alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:$|[\\s\\]\\),;_\\-])', 'i');
+                aliasMatches = regex.test(h);
+              } else {
+                aliasMatches = h.includes(alias);
+              }
+              if (aliasMatches) {
+                if (!isCalculated) {
+                  matched = header;
+                  break;
+                } else if (!fallback) {
+                  fallback = header;
+                }
               }
             }
             if (matched) break;
           }
+          if (!matched && fallback) matched = fallback;
         }
 
         if (matched) select.value = matched;
@@ -6785,12 +6802,20 @@
       // Update all previews after auto-mapping
       updateAllCsvPreviews();
 
-      console.log('Auto-mapping complete. Mapped columns:', {
+      // Log all mapped columns including nutrients
+      const mappedNutrients = {};
+      ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'EC', 'Soluble_Salts'].forEach(n => {
+        const sel = document.getElementById(`csvMap${n}`);
+        if (sel && sel.value) mappedNutrients[n] = sel.value;
+      });
+      console.log('Auto-mapping complete. Location:', {
         lat: document.getElementById('csvMapLat').value,
         lon: document.getElementById('csvMapLon').value,
         field: document.getElementById('csvMapField').value,
         year: document.getElementById('csvMapYear').value
       });
+      console.log('Auto-mapped nutrients:', mappedNutrients);
+      console.log('Nutrients mapped count:', Object.keys(mappedNutrients).length);
     }
 
     // Close CSV mapping modal
@@ -6849,7 +6874,7 @@
         depth: document.getElementById('csvMapDepth').value
       };
 
-      const nutrients = ['pH', 'Buffer_pH', 'P', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts'];
+      const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'EC_shallow', 'EC_deep'];
       nutrients.forEach(n => {
         const select = document.getElementById(`csvMap${n}`);
         if (select && select.value) {
@@ -7029,7 +7054,7 @@
         }
 
         // Add nutrient values
-        const nutrients = ['pH', 'Buffer_pH', 'P', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts'];
+        const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'EC_shallow', 'EC_deep'];
         nutrients.forEach(n => {
           if (csvMappings[n] && row[csvMappings[n]]) {
             const val = parseFloat(row[csvMappings[n]]);
@@ -7148,12 +7173,15 @@
       if (mapping.sampleId) document.getElementById('csvMapSampleId').value = findHeader(mapping.sampleId);
       if (mapping.field) document.getElementById('csvMapField').value = findHeader(mapping.field);
 
-      // Nutrient fields
-      const nutrients = ['pH', 'Buffer_pH', 'P', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts'];
+      // Nutrient fields - only override if saved column exists in current CSV
+      const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'EC_shallow', 'EC_deep'];
       nutrients.forEach(n => {
         if (mapping[n]) {
-          const select = document.getElementById(`csvMap${n}`);
-          if (select) select.value = findHeader(mapping[n]);
+          const found = findHeader(mapping[n]);
+          if (found) {
+            const select = document.getElementById(`csvMap${n}`);
+            if (select) select.value = found;
+          }
         }
       });
     }
