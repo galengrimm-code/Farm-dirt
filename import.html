@@ -1399,8 +1399,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.197";
-    const BUILD_DATE = "2026-02-06T16:50:02";
+    const APP_VERSION = "v1.0.198";
+    const BUILD_DATE = "2026-02-06T17:47:28";
 
     // Reference shared data config with import-specific additions
     const CONFIG = {
@@ -6829,18 +6829,25 @@
 
       // Log all mapped columns including nutrients
       const mappedNutrients = {};
-      ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'EC', 'Soluble_Salts'].forEach(n => {
+      const unmappedNutrients = [];
+      nutrients.forEach(n => {
         const sel = document.getElementById(`csvMap${n}`);
-        if (sel && sel.value) mappedNutrients[n] = sel.value;
+        if (sel && sel.value) {
+          mappedNutrients[n] = sel.value;
+        } else {
+          unmappedNutrients.push(n);
+        }
       });
-      console.log('Auto-mapping complete. Location:', {
+      console.log('=== AUTO-MAPPING RESULTS ===');
+      console.log('CSV headers:', csvHeaders);
+      console.log('Location:', {
         lat: document.getElementById('csvMapLat').value,
         lon: document.getElementById('csvMapLon').value,
         field: document.getElementById('csvMapField').value,
         year: document.getElementById('csvMapYear').value
       });
-      console.log('Auto-mapped nutrients:', mappedNutrients);
-      console.log('Nutrients mapped count:', Object.keys(mappedNutrients).length);
+      console.log('Mapped nutrients (' + Object.keys(mappedNutrients).length + '):', mappedNutrients);
+      console.log('Unmapped nutrients (' + unmappedNutrients.length + '):', unmappedNutrients);
     }
 
     // Close CSV mapping modal
@@ -6906,6 +6913,9 @@
           csvMappings[n] = select.value;
         }
       });
+
+      console.log('=== PREVIEW STEP: Final csvMappings ===', JSON.parse(JSON.stringify(csvMappings)));
+      console.log('Total mapped columns:', Object.values(csvMappings).filter(v => v).length);
 
       // Find mapped columns (non-empty values)
       const mappedFields = Object.entries(csvMappings)
@@ -7082,12 +7092,31 @@
         const nutrients = ['pH', 'Buffer_pH', 'P', 'P2', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S', 'Zn', 'Cu', 'Mn', 'Fe', 'Boron', 'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat', 'NO3', 'NH4', 'Soluble_Salts', 'EC', 'EC_shallow', 'EC_deep'];
         nutrients.forEach(n => {
           if (csvMappings[n] && row[csvMappings[n]]) {
-            const val = parseFloat(row[csvMappings[n]]);
-            if (!isNaN(val) && val !== 0) {
+            // Strip commas from numbers (e.g. "1,845" → "1845")
+            const raw = row[csvMappings[n]].replace(/,/g, '');
+            const val = parseFloat(raw);
+            if (!isNaN(val)) {
               sample[n] = val;
             }
           }
         });
+
+        // Log first sample's nutrient extraction for debugging
+        if (idx === 0) {
+          const mappedNutrients = {};
+          nutrients.forEach(n => {
+            if (csvMappings[n]) {
+              mappedNutrients[n] = {
+                csvCol: csvMappings[n],
+                rawValue: row[csvMappings[n]],
+                parsed: sample[n] !== undefined ? sample[n] : '(not set)'
+              };
+            }
+          });
+          console.log('=== CSV IMPORT DEBUG (first row) ===');
+          console.log('Mapped nutrients:', mappedNutrients);
+          console.log('Sample properties:', Object.keys(sample).filter(k => !['lat','lon','year','depth','sampleId','field'].includes(k)));
+        }
 
         samples.push(sample);
       });
@@ -7096,6 +7125,17 @@
         showStatus('No valid samples to import. Check that rows have valid coordinates and year values.', false);
         return;
       }
+
+      // Log import summary
+      const nutrientCounts = {};
+      nutrients.forEach(n => {
+        nutrientCounts[n] = samples.filter(s => s[n] !== undefined).length;
+      });
+      const populatedNutrients = Object.entries(nutrientCounts).filter(([k,v]) => v > 0);
+      console.log('=== IMPORT SUMMARY ===');
+      console.log(`${samples.length} samples imported, ${skipped} skipped`);
+      console.log(`Nutrients with data (${populatedNutrients.length}):`, Object.fromEntries(populatedNutrients));
+      console.log('Nutrients with NO data:', Object.entries(nutrientCounts).filter(([k,v]) => v === 0 && csvMappings[k]).map(([k]) => k + ' (mapped to: ' + csvMappings[k] + ')'));
 
       // Normalize data using aliases
       samples.forEach(s => normalizeNutrientData(s));
