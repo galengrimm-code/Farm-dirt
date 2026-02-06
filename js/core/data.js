@@ -180,9 +180,22 @@ const SheetsAPI = {
   },
 
   checkTokenRefresh() {
-    if (this.isSignedIn && tokenExpiry && Date.now() > tokenExpiry - 600000) {
-      console.log('Token expiring soon, refreshing...');
-      tokenClient.requestAccessToken({ prompt: '' });
+    if (!this.isSignedIn || !tokenExpiry) return;
+
+    const now = Date.now();
+    if (now > tokenExpiry) {
+      // Token has fully expired - clear it and sign out gracefully
+      console.log('[Sheets] Token expired, signing out. Please sign in again.');
+      accessToken = null;
+      tokenExpiry = null;
+      localStorage.removeItem('googleAccessToken');
+      localStorage.removeItem('googleTokenExpiry');
+      this.isSignedIn = false;
+      this.onSignInChange(false);
+    } else if (now > tokenExpiry - 600000) {
+      // Token expiring within 10 minutes - just log it
+      // refreshTokenAndRetry() will handle refresh on next API call
+      console.log('[Sheets] Token expiring soon, will refresh on next API call.');
     }
   },
 
