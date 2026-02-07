@@ -980,8 +980,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.202";
-    const BUILD_DATE = "2026-02-06T18:14:59";
+    const APP_VERSION = "v1.0.203";
+    const BUILD_DATE = "2026-02-07T15:11:54";
 
     // Reference shared data config with analysis-specific additions
     const CONFIG = {
@@ -2344,7 +2344,7 @@
       } else if (OM_optimal || OM_high) {
         badge = '✓ On Track'; background = 'green';
         insight = '✅ Organic matter is in a healthy range. Maintain solid agronomic practices to preserve high OM.';
-        tips = ['Continue cover crop and residue management practices to protect current OM levels.'];
+        tips = ['Continue solid management practices to maintain O-M levels.'];
         if (tdir === 'Down' && value < thresh.optimalMin + 0.3) {
           warnings.push('OM is trending down toward the bottom of optimal. Monitor and consider increasing carbon inputs.');
         }
@@ -7066,16 +7066,16 @@
 
           /* ===== TREND CARDS - FIELD TRENDS REPORT ===== */
 
-          /* Card container - keep card + all insights together */
+          /* Card container - compact to fit 2 per page */
           .trend-card {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
-            max-height: 680px !important;
+            max-height: 430px !important;
             overflow: hidden !important;
-            margin-bottom: 15px !important;
-            padding: 15px !important;
+            margin-bottom: 10px !important;
+            padding: 10px !important;
             border: 2px solid #e2e8f0 !important;
-            border-radius: 8px !important;
+            border-radius: 6px !important;
             position: relative !important;
           }
           .trend-card.positive {
@@ -7097,34 +7097,34 @@
             display: none !important;
           }
 
-          /* Compact the graph for print */
+          /* Compact the graph for print - smaller to fit 2 per page */
           .trend-graph {
-            padding: 5px !important;
+            padding: 3px !important;
           }
           .trend-graph svg {
-            min-height: 120px !important;
-            max-height: 150px !important;
+            min-height: 80px !important;
+            max-height: 100px !important;
             width: 100% !important;
           }
           .trend-graph.large svg,
           .trend-graph.xlarge svg {
-            min-height: 140px !important;
-            max-height: 170px !important;
+            min-height: 90px !important;
+            max-height: 110px !important;
           }
 
           /* Compact header */
           .trend-header {
-            margin-bottom: 10px !important;
-            padding-bottom: 8px !important;
+            margin-bottom: 6px !important;
+            padding-bottom: 5px !important;
           }
           .trend-title {
-            font-size: 14px !important;
+            font-size: 13px !important;
           }
           .trend-pct {
-            font-size: 16px !important;
+            font-size: 14px !important;
           }
           .trend-sub {
-            font-size: 9px !important;
+            font-size: 8px !important;
           }
 
           /* ===== DATA TABLE (trend-values) FIXES ===== */
@@ -7132,20 +7132,20 @@
           /* Container for data table */
           .trend-values {
             width: 100% !important;
-            padding: 8px !important;
+            padding: 4px !important;
             background: rgba(255,255,255,0.9) !important;
             border: 1px solid #e2e8f0 !important;
-            border-radius: 6px !important;
+            border-radius: 4px !important;
           }
 
           /* Header row - the div with Avg/Median labels */
           .trend-values > div:first-child {
             display: flex !important;
             justify-content: flex-end !important;
-            padding: 4px 8px !important;
-            margin-bottom: 4px !important;
+            padding: 2px 6px !important;
+            margin-bottom: 2px !important;
             border-bottom: 1px solid #e2e8f0 !important;
-            font-size: 9px !important;
+            font-size: 8px !important;
           }
 
           /* Data rows */
@@ -7153,8 +7153,8 @@
             display: flex !important;
             justify-content: space-between !important;
             align-items: center !important;
-            padding: 4px 8px !important;
-            font-size: 10px !important;
+            padding: 2px 6px !important;
+            font-size: 9px !important;
             width: 100% !important;
             box-sizing: border-box !important;
           }
@@ -7175,15 +7175,20 @@
             text-align: center !important;
           }
 
+          /* Compact content layout for 2-per-page */
+          .trend-content {
+            gap: 6px !important;
+          }
+
           /* Fix the Change row with border-top */
           .trend-row[style*="border-top"] {
-            margin-top: 6px !important;
-            padding-top: 6px !important;
+            margin-top: 4px !important;
+            padding-top: 4px !important;
             border-top-width: 2px !important;
             border-top-style: solid !important;
           }
 
-          /* Insight boxes inside cards - keep together, compact */
+          /* Insight boxes inside cards - keep together, compact for 2-per-page */
           .trend-card > div[style*="background: #f8fafc"],
           .trend-card > div[style*="background: #fef3c7"],
           .trend-card > div[style*="background: #dcfce7"],
@@ -7192,20 +7197,20 @@
           .trend-card > div[style*="background: linear-gradient"] {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
-            margin: 8px 0 !important;
-            padding: 8px !important;
-            font-size: 10px !important;
-            line-height: 1.3 !important;
+            margin: 4px 0 !important;
+            padding: 5px !important;
+            font-size: 9px !important;
+            line-height: 1.2 !important;
           }
 
           /* Recommendation lists compact */
           .trend-card ul {
-            margin: 5px 0 !important;
-            padding-left: 15px !important;
+            margin: 3px 0 !important;
+            padding-left: 14px !important;
           }
           .trend-card li {
-            font-size: 9px !important;
-            margin-bottom: 3px !important;
+            font-size: 8px !important;
+            margin-bottom: 2px !important;
             line-height: 1.2 !important;
           }
 
@@ -7339,11 +7344,11 @@
 
       const printWindow = window.open('', '_blank');
       printWindow.document.write(`<!DOCTYPE html><html><head><title>${operationName} - Field Trends</title><style>${getReportStyles()}
-        /* Print-optimized layout for Field Trends */
+        /* Print-optimized layout for Field Trends - 2 cards per page */
         .trends-container {
           display: flex;
           flex-direction: column;
-          gap: 15px;
+          gap: 8px;
         }
         @media print {
           .trends-container {
@@ -7351,7 +7356,7 @@
           }
           .trends-container > .trend-card {
             width: 100% !important;
-            margin-bottom: 15px !important;
+            margin-bottom: 8px !important;
           }
         }
       </style></head><body>
