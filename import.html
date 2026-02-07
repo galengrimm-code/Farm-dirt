@@ -1399,8 +1399,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.201";
-    const BUILD_DATE = "2026-02-06T18:09:46";
+    const APP_VERSION = "v1.0.202";
+    const BUILD_DATE = "2026-02-06T18:14:59";
 
     // Reference shared data config with import-specific additions
     const CONFIG = {
@@ -5636,9 +5636,11 @@
       sampleData = [];
       localStorage.removeItem('soilDataCacheTime');
       await saveLocalData();
+      await saveToIndexedDB(); // Also clear IndexedDB
       saveBackup();
       updateSummary();
       updateBackupStatus();
+      console.log('[Clear] Samples cleared. localStorage + IndexedDB updated.');
 
       if (SheetsAPI.isSignedIn && CONFIG.SHEET_ID) {
         showStatus('Clearing from Google Sheets...', true);
@@ -5661,9 +5663,11 @@
       fieldBoundaries = {};
       localStorage.removeItem('soilDataCacheTime');
       await saveLocalData();
+      await saveToIndexedDB(); // Also clear IndexedDB
       saveBackup();
       updateSummary();
       updateBackupStatus();
+      console.log('[Clear] Boundaries cleared. localStorage + IndexedDB updated.');
 
       if (SheetsAPI.isSignedIn && CONFIG.SHEET_ID) {
         showStatus('Clearing from Google Sheets...', true);
@@ -5690,9 +5694,11 @@
       yieldData = [];
 
       await saveLocalData();
+      await saveToIndexedDB(); // Also clear IndexedDB
       saveBackup();
       updateSummary();
       updateBackupStatus();
+      console.log('[Clear] Yield data cleared. localStorage + IndexedDB updated.');
       showStatus('✓ Yield correlations cleared', true);
     }
 
@@ -5704,9 +5710,11 @@
       yieldData = [];
       localStorage.removeItem('soilDataCacheTime');
       await saveLocalData();
+      await saveToIndexedDB(); // Also clear IndexedDB
       saveBackup();
       updateSummary();
       updateBackupStatus();
+      console.log('[Clear] All data cleared. localStorage + IndexedDB updated.');
 
       if (SheetsAPI.isSignedIn && CONFIG.SHEET_ID) {
         showStatus('Clearing from Google Sheets...', true);
