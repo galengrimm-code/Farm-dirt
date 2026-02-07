@@ -819,19 +819,25 @@ async function createNewSheet(operationName) {
 }
 
 async function initializeSheetHeaders(sheetId) {
-  // Samples headers
+  // Samples headers - use internal property names so getSamples/syncToSheets work consistently
+  const sampleHeaders = [
+    'sampleId', 'field', 'lat', 'lon', 'year', 'depth',
+    'pH', 'Buffer_pH', 'P', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S',
+    'Zn', 'Cu', 'Mn', 'Fe', 'Boron',
+    'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat',
+    'NO3', 'NH4', 'Soluble_Salts',
+    'EC', 'EC_shallow', 'EC_deep',
+    'P_Zn_Ratio', 'yieldCorrelations'
+  ];
+  const lastCol = String.fromCharCode(64 + Math.min(sampleHeaders.length, 26));
+  const colLetter = sampleHeaders.length > 26
+    ? 'A' + String.fromCharCode(64 + sampleHeaders.length - 26)
+    : lastCol;
   await gapi.client.sheets.spreadsheets.values.update({
     spreadsheetId: sheetId,
-    range: 'Samples!A1:Z1',
+    range: `Samples!A1:${colLetter}1`,
     valueInputOption: 'RAW',
-    resource: {
-      values: [[
-        'SampleID', 'Client', 'Farm', 'Field', 'Lat', 'Lng', 'SampleDate',
-        'pH', 'P_ppm', 'K_ppm', 'Zn_ppm', 'OM_pct', 'CEC', 'Ca_ppm', 'Mg_ppm',
-        'S_ppm', 'Mn_ppm', 'Fe_ppm', 'Cu_ppm', 'B_ppm', 'pct_K', 'pct_Mg', 'pct_Ca',
-        'EC', 'EC_shallow', 'EC_deep'
-      ]]
-    }
+    resource: { values: [sampleHeaders] }
   });
 
   // Fields headers

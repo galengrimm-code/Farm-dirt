@@ -1399,8 +1399,8 @@
   <script src="js/core/utils.js"></script>
   <script>
     // ========== APP VERSION ==========
-    const APP_VERSION = "v1.0.200";
-    const BUILD_DATE = "2026-02-06T18:00:50";
+    const APP_VERSION = "v1.0.201";
+    const BUILD_DATE = "2026-02-06T18:09:46";
 
     // Reference shared data config with import-specific additions
     const CONFIG = {
@@ -5390,14 +5390,9 @@
           });
         }
 
-        // Write samples (clear first to prevent duplicates)
+        // Write samples (clear entire sheet including headers, then rewrite)
         if (sampleData.length > 0) {
-          await clearSheetData('Samples', 2); // Clear data rows, keep header
-          const headerRes = await gapi.client.sheets.spreadsheets.values.get({
-            spreadsheetId: CONFIG.SHEET_ID,
-            range: 'Samples!A1:ZZ1'
-          });
-          let headers = headerRes.result.values?.[0] || [];
+          await clearSheetData('Samples', 1); // Clear everything including header row
 
           // Convert column index to letter (supports AA, AB, etc. for columns > 26)
           function colToLetter(col) {
@@ -5409,39 +5404,48 @@
             return letter;
           }
 
-          // Ensure all sample properties have headers in the Sheet
-          // Scan all samples to find every property key that needs a column
-          let headersUpdated = false;
-          const allKeys = new Set();
-          sampleData.forEach(s => Object.keys(s).forEach(k => allKeys.add(k)));
-          // Also ensure these are always present
-          ['EC', 'EC_shallow', 'EC_deep', 'yieldCorrelations'].forEach(k => allKeys.add(k));
-          for (const col of allKeys) {
-            if (!headers.includes(col)) {
-              headers.push(col);
-              headersUpdated = true;
-            }
-          }
-          if (headersUpdated) {
-            console.log('Updated Sheet headers to', headers.length, 'columns:', headers);
-          }
-          if (headersUpdated) {
-            // Update header row to include new columns
-            const lastColHeader = colToLetter(headers.length - 1);
-            await gapi.client.sheets.spreadsheets.values.update({
-              spreadsheetId: CONFIG.SHEET_ID,
-              range: `Samples!A1:${lastColHeader}1`,
-              valueInputOption: 'RAW',
-              resource: { values: [headers] }
-            });
-          }
+          // Map old-format Sheet headers to internal property names
+          // This handles sheets created before the header standardization
+          const oldHeaderMap = {
+            'SampleID': 'sampleId', 'Field': 'field', 'Lat': 'lat', 'Lng': 'lon',
+            'SampleDate': 'year', 'P_ppm': 'P', 'K_ppm': 'K', 'Zn_ppm': 'Zn',
+            'OM_pct': 'OM', 'Ca_ppm': 'Ca', 'Mg_ppm': 'Mg', 'S_ppm': 'S',
+            'Mn_ppm': 'Mn', 'Fe_ppm': 'Fe', 'Cu_ppm': 'Cu', 'B_ppm': 'Boron',
+            'pct_K': 'K_Sat', 'pct_Mg': 'Mg_sat', 'pct_Ca': 'Ca_sat'
+          };
 
-          // Debug: check how many samples have yield data
-          const samplesWithYield = sampleData.filter(s => s.yieldCorrelations && Object.keys(s.yieldCorrelations).length > 0);
-          console.log(`Syncing ${sampleData.length} samples, ${samplesWithYield.length} with yield data`);
-          if (samplesWithYield.length > 0) {
-            console.log('Sample yield data example:', JSON.stringify(samplesWithYield[0].yieldCorrelations));
-          }
+          // Define the canonical headers using internal property names
+          const canonicalHeaders = [
+            'sampleId', 'field', 'lat', 'lon', 'year', 'depth',
+            'pH', 'Buffer_pH', 'P', 'K', 'OM', 'CEC', 'Ca', 'Mg', 'Na', 'S',
+            'Zn', 'Cu', 'Mn', 'Fe', 'Boron',
+            'Ca_sat', 'Mg_sat', 'K_Sat', 'H_Sat', 'Na_Sat',
+            'NO3', 'NH4', 'Soluble_Salts',
+            'EC', 'EC_shallow', 'EC_deep',
+            'P_Zn_Ratio', 'yieldCorrelations'
+          ];
+
+          // Start with canonical headers, then add any extra properties from samples
+          const headers = [...canonicalHeaders];
+          const headerSet = new Set(headers);
+          sampleData.forEach(s => {
+            Object.keys(s).forEach(k => {
+              if (!headerSet.has(k)) {
+                headers.push(k);
+                headerSet.add(k);
+              }
+            });
+          });
+
+          // Write the header row
+          const lastColHeader = colToLetter(headers.length - 1);
+          await gapi.client.sheets.spreadsheets.values.update({
+            spreadsheetId: CONFIG.SHEET_ID,
+            range: `Samples!A1:${lastColHeader}1`,
+            valueInputOption: 'RAW',
+            resource: { values: [headers] }
+          });
+          console.log(`Syncing ${sampleData.length} samples with ${headers.length} columns`);
 
           const rows = sampleData.map(s => headers.map(h => {
             const v = s[h];
